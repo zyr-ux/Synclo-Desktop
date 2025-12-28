@@ -1,0 +1,65 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <StackPanel Orientation="Vertical" Spacing="20">
+                <RadioButton Content="Home"
+                             Classes="sidebar"
+                             GroupName="Sidebar"
+                             IsChecked="True" />
+
+                <RadioButton Content="Account"
+                             Classes="sidebar"
+                             GroupName="Sidebar" />
+
+                <RadioButton Content="Settings"
+                             Classes="sidebar"
+                             GroupName="Sidebar" />
+            </StackPanel>
+        </Border>
+    </Design.PreviewWith>
+
+
+    <!-- Base Sidebar RadioButton -->
+    <Style Selector="RadioButton.sidebar">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter
+                        Content="{TemplateBinding Content}"
+                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Foreground="{TemplateBinding Foreground}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+
+        <Setter Property="FontFamily" Value="{DynamicResource Inconsolata-Bold}" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="Height" Value="45" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Margin" Value="20 0 20 0" />
+
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+
+        <Setter Property="Background" Value="{DynamicResource SidebarButtonBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundL}" />
+    </Style>
+
+    <!-- Selected -->
+    <Style Selector="RadioButton.sidebar:checked">
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundD}" />
+    </Style>
+
+    <!-- Hover -->
+    <Style Selector="RadioButton.sidebar:pointerover">
+        <Setter Property="Opacity" Value="0.8" />
+    </Style>
+
+</Styles>

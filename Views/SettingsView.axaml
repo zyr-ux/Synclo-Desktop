@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Synclo.Views.SettingsView"
+             xmlns:vm="using:Synclo.ViewModels"
+             x:DataType="vm:SettingsViewModel"
+             Background="{DynamicResource PrimaryBackground}">
+
+    <StackPanel Orientation="Vertical"
+                Margin="20 20 20 20"
+                Spacing="20">
+
+        <!--Theme Switcher-->
+        <Border Background="{DynamicResource Accent}"
+                CornerRadius="8"
+                Padding="16"
+                Margin="0 12 0 0">
+            <Grid
+                ColumnDefinitions="Auto, * , Auto">
+                <!-- <Svg Path="/Assets/Icons/palette.svg" -->
+                <!--      Grid.RowSpan="2" -->
+                <!--      Width="28" -->
+                <!--      Height="28" -->
+                <!--      VerticalAlignment="Center" -->
+                <!--      Margin="0 0 16 0" /> -->
+                <materialIcons:MaterialIcon
+                    Grid.RowSpan="2"
+                    Kind="PaletteOutline"
+                    Width="36"
+                    Height="36"
+                    VerticalAlignment="Center"
+                    Margin="0 0 16 0"
+                    Foreground="{DynamicResource ForegroundD}" />
+
+
+                <!-- ComboBox -->
+                <ComboBox Grid.Column="2"
+                          Width="160"
+                          VerticalAlignment="Center"
+                          HorizontalContentAlignment="Center"
+                          FontFamily="{DynamicResource Inconsolata-Medium}"
+                          SelectedItem="{Binding SelectedTheme}"
+                          ItemsSource="{Binding AvailableThemes}" />
+
+                <StackPanel
+                    Grid.Column="1">
+                    <TextBlock Text="Theme"
+                               FontFamily="{StaticResource Inconsolata-Bold}"
+                               FontSize="24"
+                               Foreground="{DynamicResource ForegroundD}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="Select theme to apply"
+                               FontSize="16"
+                               FontFamily="{StaticResource Inconsolata-Medium}"
+                               Foreground="{DynamicResource ForegroundD}"
+                               Margin="0 4 0 0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--Test Connection Button-->
+        <Button
+            Width="200"
+            Height="50"
+            Content="Test Connection"
+            FontFamily="{DynamicResource Inconsolata-Bold}"
+            FontSize="18"
+            HorizontalContentAlignment="Center"
+            VerticalContentAlignment="Center"
+            CornerRadius="10"
+            Background="{DynamicResource Accent}"
+            Foreground="{DynamicResource ForegroundD}" />
+
+        <!--Stop Syncing Button-->
+        <Button
+            Width="200"
+            Height="50"
+            Content="Stop Syncing"
+            FontFamily="{DynamicResource Inconsolata-Bold}"
+            FontSize="18"
+            HorizontalContentAlignment="Center"
+            VerticalContentAlignment="Center"
+            CornerRadius="10"
+            Background="{DynamicResource Accent}"
+            Foreground="{DynamicResource ForegroundD}" />
+
+    </StackPanel>
+</UserControl>

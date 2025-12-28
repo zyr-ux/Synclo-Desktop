@@ -1,0 +1,12 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Color x:Key="Accent">#c9c4c1</Color>
+    <Color x:Key="PrimaryBackground">#212121</Color>
+    <Color x:Key="SidebarBackground">#4a4747</Color>
+    <Color x:Key="SidebarButtonBackground">#757575</Color>
+    <Color x:Key="ForegroundD">#212121</Color>
+    <Color x:Key="ForegroundL">#c9c3bf</Color>
+    <Color x:Key="Yellow">#ebc16e</Color>
+
+</ResourceDictionary>

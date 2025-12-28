@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Synclo.Views.HomeView"
+             Background="{DynamicResource PrimaryBackground}">
+
+    <Grid RowDefinitions="Auto, *, Auto" Margin="30">
+
+        <!-- title -->
+        <TextBlock Grid.Row="0"
+                   Text="History"
+                   FontSize="36"
+                   FontFamily="{DynamicResource Inconsolata-Bold}"
+                   Foreground="#FFCC66" />
+
+        <!-- HISTORY LIST -->
+         <!-- <ItemsControl ItemsSource="{Binding HistoryEntries}"> -->
+         <!--     <ItemsControl.ItemsPanel> -->
+         <!--         <ItemsPanelTemplate> -->
+         <!--             <StackPanel Spacing="20" /> -->
+         <!--         </ItemsPanelTemplate> -->
+         <!--     </ItemsControl.ItemsPanel> -->
+         <!-- -->
+         <!--     <ItemsControl.ItemTemplate> -->
+         <!--         <DataTemplate> -->
+         <!--             <Button Background="Transparent" -->
+         <!--                     BorderBrush="Transparent" -->
+         <!--                     Padding="0" -->
+         <!--                     HorizontalAlignment="Stretch" -->
+         <!--                     VerticalAlignment="Stretch" -->
+         <!--                     Command="{Binding DataContext.YourClickCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" -->
+         <!--                     CommandParameter="{Binding}"> -->
+         <!-- -->
+         <!--                 <StackPanel> -->
+         <!--                     <Grid ColumnDefinitions="*, Auto"> -->
+         <!--                         <TextBlock Text="{Binding Message}" -->
+         <!--                                    VerticalAlignment="Center" -->
+         <!--                                    Foreground="#e0e0e0" -->
+         <!--                                    FontFamily="{DynamicResource Inconsolata-Bold}" -->
+         <!--                                    FontSize="20" /> -->
+         <!-- -->
+         <!--                         <TextBlock Grid.Column="1" -->
+         <!--                                    Text="{Binding Time}" -->
+         <!--                                    VerticalAlignment="Center" -->
+         <!--                                    Foreground="#bbbbbb" -->
+         <!--                                    FontSize="18" /> -->
+         <!--                     </Grid> -->
+         <!-- -->
+         <!--                     <Border Height="1" -->
+         <!--                             Background="#444" -->
+         <!--                             Margin="0,10,0,0" /> -->
+         <!--                 </StackPanel> -->
+         <!--             </Button> -->
+         <!--         </DataTemplate> -->
+         <!--     </ItemsControl.ItemTemplate> -->
+         <!-- </ItemsControl> -->
+
+    </Grid>
+</UserControl>
