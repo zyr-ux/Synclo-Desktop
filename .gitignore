@@ -37,3 +37,10 @@ secrets.json
 ## OS
 .DS_Store
 Thumbs.db
+
+## Testing artifacts
+TestResults/
+
+## Crash dumps (Useful for debugging crashes on local)
+*.dmp
+*.dump
