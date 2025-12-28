@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.SecretsManager;
@@ -19,30 +20,49 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
 
     public async Task LoginAsync(string email, string password)
     {
+        // TODO: Phase 2 - Implement E2EE login flow
+        // 1. Fetch salt from /auth/salt
+        // 2. Derive auth_key from password + salt
+        // 3. Call AuthService with auth_key
+        // 4. Decrypt and store MK
+        
+        throw new NotImplementedException("E2EE login flow not yet implemented. See Phase 2 migration.");
+        
+        /*
         var req = new LoginRequest
         {
             email = email,
-            password = password,
+            auth_key = "derived_from_password", // TODO: Implement KDF
             device_id = Utils.GetOrCreateDeviceId(),
             device_name = Utils.GetDeviceName()
         };
 
-        // API Service now saves tokens & email to Secrets Manager internally 
-        // as per our previous refactor
         await api.AuthService.LoginAsyncInt(req);
 
-        // Store non-sensitive metadata in standard settings
         settings.Settings.device_id = req.device_id;
         settings.Settings.device_name = req.device_name;
         settings.Save();
+        */
     }
 
     public async Task RegisterAsync(string email, string password)
     {
+        // TODO: Phase 2 - Implement E2EE registration flow
+        // 1. Generate salt and MK
+        // 2. Derive auth_key from password + salt
+        // 3. Wrap MK with auth_key
+        // 4. Call AuthService with E2EE credentials
+        
+        throw new NotImplementedException("E2EE registration flow not yet implemented. See Phase 2 migration.");
+        
+        /*
         var req = new RegisterRequest
         {
             email = email,
-            password = password,
+            auth_key = "derived_from_password", // TODO: Implement KDF
+            encrypted_master_key = "wrapped_mk", // TODO: Implement wrapping
+            salt = "generated_salt", // TODO: Generate
+            kdf_version = 1,
             device_id = Utils.GetOrCreateDeviceId(),
             device_name = Utils.GetDeviceName()
         };
@@ -52,6 +72,7 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
         settings.Settings.device_id = req.device_id;
         settings.Settings.device_name = req.device_name;
         settings.Save();
+        */
     }
 
     public async Task LogoutAsync()

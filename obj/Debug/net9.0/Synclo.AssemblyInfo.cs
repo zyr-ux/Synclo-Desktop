@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Synclo")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ad3df1743fe35e7dbba68d61e32e7e82df83bbaf")]
 [assembly: System.Reflection.AssemblyProductAttribute("Synclo")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Synclo")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

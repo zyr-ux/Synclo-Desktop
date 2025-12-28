@@ -82,3 +82,5 @@ E:\Files\Code Projects\Projects\Avalonia\Synclo\obj\Debug\net9.0\refint\Synclo.d
 E:\Files\Code Projects\Projects\Avalonia\Synclo\obj\Debug\net9.0\Synclo.pdb
 E:\Files\Code Projects\Projects\Avalonia\Synclo\obj\Debug\net9.0\Synclo.genruntimeconfig.cache
 E:\Files\Code Projects\Projects\Avalonia\Synclo\obj\Debug\net9.0\ref\Synclo.dll
+E:\Files\Code Projects\Projects\Avalonia\Synclo\bin\Debug\net9.0\Konscious.Security.Cryptography.Argon2.dll
+E:\Files\Code Projects\Projects\Avalonia\Synclo\bin\Debug\net9.0\Konscious.Security.Cryptography.Blake2.dll
