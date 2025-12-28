@@ -1,6 +1,6 @@
 ## Build
-bin/
-obj/
+[Bb]in/
+[Oo]bj/
 artifacts/
 [Bb]uild[Ll]og.*
 *.log
