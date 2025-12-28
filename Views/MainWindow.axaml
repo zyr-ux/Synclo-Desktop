@@ -38,7 +38,7 @@
 
                     <TextBlock Text="Status:"
                                FontSize="18"
-                               Foreground="#CCCCCC"
+                               Foreground="{DynamicResource ForegroundL}"
                                FontFamily="{DynamicResource Inconsolata-Bold}" />
 
                     <TextBlock Text="{Binding StatusText}"
