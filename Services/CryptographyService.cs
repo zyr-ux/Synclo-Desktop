@@ -5,9 +5,9 @@ using Konscious.Security.Cryptography;
 
 namespace Synclo.Services;
 
-/// <summary>
-/// Provides cryptographic operations for E2EE including KDF, encryption, and decryption.
-/// </summary>
+
+// Provides cryptographic operations for E2EE including KDF, encryption, and decryption.
+
 public sealed class CryptographyService
 {
     // Argon2 parameters - MUST match server exactly
@@ -21,14 +21,7 @@ public sealed class CryptographyService
     public const string MasterKey = "com.synclo.app.crypto.master_key";
     public const string Salt = "com.synclo.app.crypto.salt";
     public const string KdfVersion = "com.synclo.app.crypto.kdf_version";
-
-    /// <summary>
-    /// Derives authentication key from password using Argon2id KDF.
-    /// CRITICAL: Must use exact parameters matching server.
-    /// </summary>
-    /// <param name="password">User password</param>
-    /// <param name="salt">Salt bytes (from server or generated during registration)</param>
-    /// <returns>32-byte auth key</returns>
+    
     public byte[] DeriveAuthKey(string password, byte[] salt)
     {
         if (string.IsNullOrEmpty(password))
@@ -47,22 +40,12 @@ public sealed class CryptographyService
 
         return argon2.GetBytes(HashLength);
     }
-
-    /// <summary>
-    /// Generates a new random master key for encrypting clipboard data.
-    /// </summary>
-    /// <returns>32-byte master key</returns>
+    
     public byte[] GenerateMasterKey()
     {
         return RandomNumberGenerator.GetBytes(32);
     }
-
-    /// <summary>
-    /// Wraps (encrypts) the master key with the authentication key using AES-256-GCM.
-    /// </summary>
-    /// <param name="masterKey">The master key to encrypt</param>
-    /// <param name="authKey">The authentication key used for encryption</param>
-    /// <returns>Nonce (12 bytes) + Ciphertext + Tag</returns>
+    
     public byte[] WrapMasterKey(byte[] masterKey, byte[] authKey)
     {
         if (masterKey == null || masterKey.Length != 32)
@@ -87,13 +70,7 @@ public sealed class CryptographyService
 
         return result;
     }
-
-    /// <summary>
-    /// Unwraps (decrypts) the master key using the authentication key.
-    /// </summary>
-    /// <param name="wrappedMK">Wrapped master key (nonce + ciphertext + tag)</param>
-    /// <param name="authKey">The authentication key used for decryption</param>
-    /// <returns>Decrypted 32-byte master key</returns>
+    
     public byte[] UnwrapMasterKey(byte[] wrappedMK, byte[] authKey)
     {
         if (wrappedMK == null || wrappedMK.Length < NonceLength + 32 + AesGcm.TagByteSizes.MaxSize)
@@ -126,13 +103,7 @@ public sealed class CryptographyService
             throw new InvalidOperationException("Failed to unwrap master key. Invalid auth key or corrupted data.", ex);
         }
     }
-
-    /// <summary>
-    /// Encrypts clipboard content with the master key using AES-256-GCM.
-    /// </summary>
-    /// <param name="plaintext">Plaintext clipboard content</param>
-    /// <param name="masterKey">32-byte master key</param>
-    /// <returns>Tuple of (ciphertext, nonce)</returns>
+    
     public (byte[] ciphertext, byte[] nonce) EncryptClipboard(string plaintext, byte[] masterKey)
     {
         if (string.IsNullOrEmpty(plaintext))
@@ -157,14 +128,7 @@ public sealed class CryptographyService
 
         return (result, nonce);
     }
-
-    /// <summary>
-    /// Decrypts clipboard content with the master key.
-    /// </summary>
-    /// <param name="ciphertext">Ciphertext + tag</param>
-    /// <param name="nonce">12-byte nonce</param>
-    /// <param name="masterKey">32-byte master key</param>
-    /// <returns>Decrypted plaintext string</returns>
+    
     public string DecryptClipboard(byte[] ciphertext, byte[] nonce, byte[] masterKey)
     {
         if (ciphertext == null || ciphertext.Length < AesGcm.TagByteSizes.MaxSize)
@@ -198,12 +162,7 @@ public sealed class CryptographyService
             throw new InvalidOperationException("Failed to decrypt clipboard. Invalid master key or corrupted data.", ex);
         }
     }
-
-    /// <summary>
-    /// Generates a cryptographically secure random nonce.
-    /// </summary>
-    /// <param name="length">Nonce length in bytes (default 12 for AES-GCM)</param>
-    /// <returns>Random bytes</returns>
+    
     public byte[] GenerateNonce(int length = NonceLength)
     {
         if (length < 8 || length > 64)
@@ -211,26 +170,17 @@ public sealed class CryptographyService
 
         return RandomNumberGenerator.GetBytes(length);
     }
-
-    /// <summary>
-    /// Converts bytes to base64 string for JSON transmission.
-    /// </summary>
+    
     public string ToBase64(byte[] data)
     {
         return ToBase64Static(data);
     }
-
-    /// <summary>
-    /// Converts base64 string to bytes.
-    /// </summary>
+    
     public byte[] FromBase64(string base64)
     {
         return FromBase64Static(base64);
     }
-
-    /// <summary>
-    /// Static helper to convert bytes to base64 string for JSON transmission.
-    /// </summary>
+    
     public static string ToBase64Static(byte[] data)
     {
         if (data == null)
@@ -238,10 +188,7 @@ public sealed class CryptographyService
 
         return Convert.ToBase64String(data);
     }
-
-    /// <summary>
-    /// Static helper to convert base64 string to bytes.
-    /// </summary>
+    
     public static byte[] FromBase64Static(string base64)
     {
         if (string.IsNullOrWhiteSpace(base64))
