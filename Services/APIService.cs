@@ -25,6 +25,7 @@ public sealed class APIService : IDisposable
     public DeviceService DeviceService { get; }
     public DeviceCacheService DeviceCacheService { get; }
     public WebSocketService WebSocketService { get; }
+    public NotificationService NotificationService { get; }
 
     public event Action<string>? TokenRefreshed;
 
@@ -48,6 +49,7 @@ public sealed class APIService : IDisposable
         DeviceCacheService = new DeviceCacheService();
         WebSocketService = new WebSocketService(this);
         AccountService = new AccountService(this, settings, DeviceCacheService);
+        NotificationService = new NotificationService();
     }
     
     public Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default)

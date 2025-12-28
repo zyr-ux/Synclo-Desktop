@@ -142,7 +142,7 @@ public sealed class AuthService(APIService api, HttpClient http)
         await SecureStorage.DeleteAsync(SecureStorage.KdfVersion);
     }
 
-    public async Task<string> RefreshTokenAsyncInt(CancellationToken ct) 
+    public async Task<string> RefreshTokenAsyncInt(CancellationToken ct)
     {
         var refreshToken = await SecureStorage.LoadAsync(RefreshToken);
         if (string.IsNullOrWhiteSpace(refreshToken))

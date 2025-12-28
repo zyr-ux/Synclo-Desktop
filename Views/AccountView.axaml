@@ -64,11 +64,23 @@
                              Text="{Binding Password}" />
                 </StackPanel>
 
+                <!-- Inline Status Message -->
+                <TextBlock Text="{Binding StatusMessage}"
+                           IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Foreground="{DynamicResource Accent}"
+                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                           FontSize="16"
+                           TextWrapping="Wrap"
+                           MaxWidth="300"
+                           Margin="0 -40 0 0"
+                           HorizontalAlignment="Center" />
+
                 <Button
                     Width="200"
                     Height="50"
                     Margin="0 -20 0 0"
                     Content="Login"
+                    IsEnabled="{Binding !IsBusy}"
                     FontFamily="{DynamicResource Inconsolata-Bold}"
                     FontSize="18"
                     HorizontalAlignment="Center"
