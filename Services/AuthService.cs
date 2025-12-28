@@ -8,12 +8,55 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
+/// <summary>
+/// Handles authentication operations including login, registration, and token management.
+/// Implements E2EE authentication flow with password derivation via KDF.
+/// </summary>
 public sealed class AuthService(APIService api, HttpClient http)
 {
     private const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
     public const string RefreshToken = $"{Prefix}.auth.refresh_token";
     public const string UserEmail = $"{Prefix}.user.email";
+
+    /// <summary>
+    /// Retrieves KDF salt and version from server for a given email.
+    /// Must be called before login/registration to obtain salt for password derivation.
+    /// </summary>
+    /// <param name="email">User email address</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>SaltResponse with salt and KDF version</returns>
+    /// <exception cref="InvalidRequestException">Email not found or invalid format</exception>
+    public async Task<SaltResponse> GetSaltAsyncInt(string email, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException("Email cannot be empty", nameof(email));
+
+        try
+        {
+            using var res = await http.GetAsync($"/api/auth/salt?email={Uri.EscapeDataString(email)}", ct);
+            var content = await res.Content.ReadAsStringAsync(ct);
+
+            if (res.StatusCode == HttpStatusCode.NotFound)
+                throw new InvalidRequestException("User not found");
+
+            if (res.StatusCode == HttpStatusCode.TooManyRequests)
+                throw new InvalidRequestException("Too many requests. Please wait before trying again.");
+
+            if (!res.IsSuccessStatusCode)
+                throw new ServerFailureException(content);
+
+            var data = api.Deserialize<SaltResponse>(content);
+            if (data == null)
+                throw new ServerFailureException("Server returned success but salt was missing");
+
+            return data;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new NetworkFailureException();
+        }
+    }
 
     public async Task<AuthResponse> LoginAsyncInt(LoginRequest request, CancellationToken ct = default)
     {
@@ -35,6 +78,17 @@ public sealed class AuthService(APIService api, HttpClient http)
         await SecureStorage.SaveAsync(AccessToken, data.access_token);
         await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
         await SecureStorage.SaveAsync(UserEmail, request.email);
+
+        // Store E2EE credentials if present
+        if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
+            await SecureStorage.SaveAsync(SecureStorage.MasterKey, data.encrypted_master_key);
+
+        if (!string.IsNullOrWhiteSpace(data.salt))
+            await SecureStorage.SaveAsync(SecureStorage.Salt, data.salt);
+
+        if (data.kdf_version.HasValue)
+            await SecureStorage.SaveAsync(SecureStorage.KdfVersion, data.kdf_version.Value.ToString());
+
         return data;
     }
 
@@ -61,14 +115,31 @@ public sealed class AuthService(APIService api, HttpClient http)
         await SecureStorage.SaveAsync(AccessToken, data.access_token);
         await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
         await SecureStorage.SaveAsync(UserEmail, request.email);
+
+        // Store E2EE credentials if present
+        if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
+            await SecureStorage.SaveAsync(SecureStorage.MasterKey, data.encrypted_master_key);
+
+        if (!string.IsNullOrWhiteSpace(data.salt))
+            await SecureStorage.SaveAsync(SecureStorage.Salt, data.salt);
+
+        if (data.kdf_version.HasValue)
+            await SecureStorage.SaveAsync(SecureStorage.KdfVersion, data.kdf_version.Value.ToString());
+
         return data;
     }
 
     public async Task LogoutAsyncInt()
     {
+        // Clear auth tokens
         await SecureStorage.DeleteAsync(AccessToken);
         await SecureStorage.DeleteAsync(RefreshToken);
         await SecureStorage.DeleteAsync(UserEmail);
+
+        // Clear E2EE credentials for security
+        await SecureStorage.DeleteAsync(SecureStorage.MasterKey);
+        await SecureStorage.DeleteAsync(SecureStorage.Salt);
+        await SecureStorage.DeleteAsync(SecureStorage.KdfVersion);
     }
 
     public async Task<string> RefreshTokenAsyncInt(CancellationToken ct)
@@ -86,6 +157,18 @@ public sealed class AuthService(APIService api, HttpClient http)
 
             if (!res.IsSuccessStatusCode)
             {
+                // Check for security breach (token reuse)
+                if (res.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    var content = await res.Content.ReadAsStringAsync(ct);
+                    if (content.Contains("reused") || content.Contains("family"))
+                    {
+                        // Token reuse detected - security breach
+                        await LogoutAsyncInt();
+                        throw new SecurityBreachException("Refresh token reused. Session terminated for security.");
+                    }
+                }
+
                 await LogoutAsyncInt();
                 throw new SessionExpiredException();
             }
@@ -100,12 +183,30 @@ public sealed class AuthService(APIService api, HttpClient http)
                 throw new SessionExpiredException();
             }
 
-            // Update storage
+            // Update tokens
             await UpdateTokensAsyncInt(data.access_token, data.refresh_token);
+
+            // Update E2EE credentials if server re-wrapped them
+            if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
+                await SecureStorage.SaveAsync(SecureStorage.MasterKey, data.encrypted_master_key);
+
+            if (!string.IsNullOrWhiteSpace(data.salt))
+                await SecureStorage.SaveAsync(SecureStorage.Salt, data.salt);
+
+            if (data.kdf_version.HasValue)
+                await SecureStorage.SaveAsync(SecureStorage.KdfVersion, data.kdf_version.Value.ToString());
 
             return data.access_token;
         }
-        catch (Exception ex) when (ex is not SessionExpiredException)
+        catch (SessionExpiredException)
+        {
+            throw;
+        }
+        catch (SecurityBreachException)
+        {
+            throw;
+        }
+        catch (Exception)
         {
             throw new NetworkFailureException();
         }

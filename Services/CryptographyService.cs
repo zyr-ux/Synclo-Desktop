@@ -217,6 +217,22 @@ public sealed class CryptographyService
     /// </summary>
     public string ToBase64(byte[] data)
     {
+        return ToBase64Static(data);
+    }
+
+    /// <summary>
+    /// Converts base64 string to bytes.
+    /// </summary>
+    public byte[] FromBase64(string base64)
+    {
+        return FromBase64Static(base64);
+    }
+
+    /// <summary>
+    /// Static helper to convert bytes to base64 string for JSON transmission.
+    /// </summary>
+    public static string ToBase64Static(byte[] data)
+    {
         if (data == null)
             throw new ArgumentNullException(nameof(data));
 
@@ -224,9 +240,9 @@ public sealed class CryptographyService
     }
 
     /// <summary>
-    /// Converts base64 string to bytes.
+    /// Static helper to convert base64 string to bytes.
     /// </summary>
-    public byte[] FromBase64(string base64)
+    public static byte[] FromBase64Static(string base64)
     {
         if (string.IsNullOrWhiteSpace(base64))
             throw new ArgumentException("Base64 string cannot be empty", nameof(base64));

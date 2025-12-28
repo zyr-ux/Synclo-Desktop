@@ -20,59 +20,122 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
 
     public async Task LoginAsync(string email, string password)
     {
-        // TODO: Phase 2 - Implement E2EE login flow
-        // 1. Fetch salt from /auth/salt
-        // 2. Derive auth_key from password + salt
-        // 3. Call AuthService with auth_key
-        // 4. Decrypt and store MK
-        
-        throw new NotImplementedException("E2EE login flow not yet implemented. See Phase 2 migration.");
-        
-        /*
-        var req = new LoginRequest
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            throw new InvalidRequestException("Email and password are required");
+
+        try
         {
-            email = email,
-            auth_key = "derived_from_password", // TODO: Implement KDF
-            device_id = Utils.GetOrCreateDeviceId(),
-            device_name = Utils.GetDeviceName()
-        };
+            // Step 1: Fetch salt from server for password derivation
+            var saltResponse = await api.AuthService.GetSaltAsyncInt(email);
+            var salt = CryptographyService.FromBase64Static(saltResponse.salt);
 
-        await api.AuthService.LoginAsyncInt(req);
+            // Step 2: Derive auth_key from password using KDF
+            var authKey = api.CryptographyService.DeriveAuthKey(password, salt);
 
-        settings.Settings.device_id = req.device_id;
-        settings.Settings.device_name = req.device_name;
-        settings.Save();
-        */
+            // Step 3: Create login request with derived auth_key
+            var req = new LoginRequest
+            {
+                email = email,
+                auth_key = CryptographyService.ToBase64Static(authKey),
+                device_id = Utils.GetOrCreateDeviceId(),
+                device_name = Utils.GetDeviceName()
+            };
+
+            // Step 4: Call AuthService to login and receive encrypted MK
+            var response = await api.AuthService.LoginAsyncInt(req);
+
+            // Step 5: Decrypt master key using derived auth_key
+            if (!string.IsNullOrWhiteSpace(response.encrypted_master_key))
+            {
+                var wrappedMk = CryptographyService.FromBase64Static(response.encrypted_master_key);
+                var masterKey = api.CryptographyService.UnwrapMasterKey(wrappedMk, authKey);
+                
+                // Step 6: Store master key securely
+                await SecureStorage.SaveAsync(SecureStorage.MasterKey, CryptographyService.ToBase64Static(masterKey));
+            }
+
+            // Step 7: Update local settings
+            settings.Settings.device_id = req.device_id;
+            settings.Settings.device_name = req.device_name;
+            settings.Save();
+        }
+        catch (Exception ex) when (ex is NotImplementedException)
+        {
+            throw;
+        }
+        catch (InvalidRequestException)
+        {
+            throw;
+        }
+        catch (InvalidCredentialsException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ServerFailureException($"Login failed: {ex.Message}");
+        }
     }
 
     public async Task RegisterAsync(string email, string password)
     {
-        // TODO: Phase 2 - Implement E2EE registration flow
-        // 1. Generate salt and MK
-        // 2. Derive auth_key from password + salt
-        // 3. Wrap MK with auth_key
-        // 4. Call AuthService with E2EE credentials
-        
-        throw new NotImplementedException("E2EE registration flow not yet implemented. See Phase 2 migration.");
-        
-        /*
-        var req = new RegisterRequest
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            throw new InvalidRequestException("Email and password are required");
+
+        try
         {
-            email = email,
-            auth_key = "derived_from_password", // TODO: Implement KDF
-            encrypted_master_key = "wrapped_mk", // TODO: Implement wrapping
-            salt = "generated_salt", // TODO: Generate
-            kdf_version = 1,
-            device_id = Utils.GetOrCreateDeviceId(),
-            device_name = Utils.GetDeviceName()
-        };
+            // Step 1: Generate salt (32 random bytes) - will be stored on server
+            var salt = api.CryptographyService.GenerateNonce(32);
 
-        await api.AuthService.RegisterAsyncInt(req);
+            // Step 2: Generate master key for clipboard encryption
+            var masterKey = api.CryptographyService.GenerateMasterKey();
 
-        settings.Settings.device_id = req.device_id;
-        settings.Settings.device_name = req.device_name;
-        settings.Save();
-        */
+            // Step 3: Derive auth_key from password using KDF with generated salt
+            var authKey = api.CryptographyService.DeriveAuthKey(password, salt);
+
+            // Step 4: Encrypt (wrap) master key with auth_key
+            var wrappedMk = api.CryptographyService.WrapMasterKey(masterKey, authKey);
+
+            // Step 5: Create registration request with base64-encoded E2EE credentials
+            var req = new RegisterRequest
+            {
+                email = email,
+                auth_key = CryptographyService.ToBase64Static(authKey),
+                encrypted_master_key = CryptographyService.ToBase64Static(wrappedMk),
+                salt = CryptographyService.ToBase64Static(salt),
+                kdf_version = 1,
+                device_id = Utils.GetOrCreateDeviceId(),
+                device_name = Utils.GetDeviceName()
+            };
+
+            // Step 6: Call AuthService to register
+            await api.AuthService.RegisterAsyncInt(req);
+
+            // Step 7: Store salt and master key securely locally
+            await SecureStorage.SaveAsync(SecureStorage.Salt, CryptographyService.ToBase64Static(salt));
+            await SecureStorage.SaveAsync(SecureStorage.MasterKey, CryptographyService.ToBase64Static(masterKey));
+
+            // Step 8: Update local settings
+            settings.Settings.device_id = req.device_id;
+            settings.Settings.device_name = req.device_name;
+            settings.Save();
+        }
+        catch (Exception ex) when (ex is NotImplementedException)
+        {
+            throw;
+        }
+        catch (InvalidRequestException)
+        {
+            throw;
+        }
+        catch (UserAlreadyExistsException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ServerFailureException($"Registration failed: {ex.Message}");
+        }
     }
 
     public async Task LogoutAsync()
@@ -86,10 +149,10 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
             }
             catch
             {
-                /* Ignore */
+                /* Ignore - device deletion is best-effort */
             }
 
-        // Wipe Secrets (Tokens, Email)
+        // Wipe Secrets (Tokens, Email, and E2EE credentials)
         await api.AuthService.LogoutAsyncInt();
 
         // Clear Cache

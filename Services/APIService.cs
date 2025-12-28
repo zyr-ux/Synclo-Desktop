@@ -21,6 +21,7 @@ public sealed class APIService : IDisposable
     
     public AccountService AccountService { get; }
     public AuthService AuthService { get; }
+    public CryptographyService CryptographyService { get; }
     public DeviceService DeviceService { get; }
     public DeviceCacheService DeviceCacheService { get; }
     public WebSocketService WebSocketService { get; }
@@ -42,6 +43,7 @@ public sealed class APIService : IDisposable
 
         // initialize the various sub-services
         AuthService = new AuthService(this, _http);
+        CryptographyService = new CryptographyService();
         DeviceService = new DeviceService(this);
         DeviceCacheService = new DeviceCacheService();
         WebSocketService = new WebSocketService(this);
