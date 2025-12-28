@@ -6,13 +6,7 @@ namespace Synclo.SecretsManager;
 public static class SecureStorage
 {
     private static readonly ISecureStorage _impl;
-
-    // E2EE Constants
-    private const string Prefix = "com.synclo.app";
-    public const string MasterKey = $"{Prefix}.crypto.master_key";
-    public const string Salt = $"{Prefix}.crypto.salt";
-    public const string KdfVersion = $"{Prefix}.crypto.kdf_version";
-
+    
     static SecureStorage()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))

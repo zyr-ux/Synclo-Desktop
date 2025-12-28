@@ -51,7 +51,7 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
                 var masterKey = api.CryptographyService.UnwrapMasterKey(wrappedMk, authKey);
                 
                 // Step 6: Store master key securely
-                await SecureStorage.SaveAsync(SecureStorage.MasterKey, CryptographyService.ToBase64Static(masterKey));
+                await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
             }
 
             // Step 7: Update local settings
@@ -112,8 +112,8 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
             await api.AuthService.RegisterAsyncInt(req);
 
             // Step 7: Store salt and master key securely locally
-            await SecureStorage.SaveAsync(SecureStorage.Salt, CryptographyService.ToBase64Static(salt));
-            await SecureStorage.SaveAsync(SecureStorage.MasterKey, CryptographyService.ToBase64Static(masterKey));
+            await SecureStorage.SaveAsync(CryptographyService.Salt, CryptographyService.ToBase64Static(salt));
+            await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
 
             // Step 8: Update local settings
             settings.Settings.device_id = req.device_id;

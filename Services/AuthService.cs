@@ -14,7 +14,7 @@ namespace Synclo.Services;
 /// </summary>
 public sealed class AuthService(APIService api, HttpClient http)
 {
-    private const string Prefix = "com.synclo.app";
+    public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
     public const string RefreshToken = $"{Prefix}.auth.refresh_token";
     public const string UserEmail = $"{Prefix}.user.email";
@@ -81,13 +81,13 @@ public sealed class AuthService(APIService api, HttpClient http)
 
         // Store E2EE credentials if present
         if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-            await SecureStorage.SaveAsync(SecureStorage.MasterKey, data.encrypted_master_key);
+            await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
 
         if (!string.IsNullOrWhiteSpace(data.salt))
-            await SecureStorage.SaveAsync(SecureStorage.Salt, data.salt);
+            await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
 
         if (data.kdf_version.HasValue)
-            await SecureStorage.SaveAsync(SecureStorage.KdfVersion, data.kdf_version.Value.ToString());
+            await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
 
         return data;
     }
@@ -118,13 +118,13 @@ public sealed class AuthService(APIService api, HttpClient http)
 
         // Store E2EE credentials if present
         if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-            await SecureStorage.SaveAsync(SecureStorage.MasterKey, data.encrypted_master_key);
+            await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
 
         if (!string.IsNullOrWhiteSpace(data.salt))
-            await SecureStorage.SaveAsync(SecureStorage.Salt, data.salt);
+            await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
 
         if (data.kdf_version.HasValue)
-            await SecureStorage.SaveAsync(SecureStorage.KdfVersion, data.kdf_version.Value.ToString());
+            await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
 
         return data;
     }
@@ -137,9 +137,9 @@ public sealed class AuthService(APIService api, HttpClient http)
         await SecureStorage.DeleteAsync(UserEmail);
 
         // Clear E2EE credentials for security
-        await SecureStorage.DeleteAsync(SecureStorage.MasterKey);
-        await SecureStorage.DeleteAsync(SecureStorage.Salt);
-        await SecureStorage.DeleteAsync(SecureStorage.KdfVersion);
+        await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
+        await SecureStorage.DeleteAsync(CryptographyService.Salt);
+        await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
     }
 
     public async Task<string> RefreshTokenAsyncInt(CancellationToken ct)
@@ -188,13 +188,13 @@ public sealed class AuthService(APIService api, HttpClient http)
 
             // Update E2EE credentials if server re-wrapped them
             if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-                await SecureStorage.SaveAsync(SecureStorage.MasterKey, data.encrypted_master_key);
+                await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
 
             if (!string.IsNullOrWhiteSpace(data.salt))
-                await SecureStorage.SaveAsync(SecureStorage.Salt, data.salt);
+                await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
 
             if (data.kdf_version.HasValue)
-                await SecureStorage.SaveAsync(SecureStorage.KdfVersion, data.kdf_version.Value.ToString());
+                await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
 
             return data.access_token;
         }
