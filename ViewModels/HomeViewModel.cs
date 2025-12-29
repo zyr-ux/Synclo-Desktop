@@ -15,14 +15,13 @@ public partial class HomeViewModel : ViewModelBase
     private readonly ClipboardService _clipboardService;
 
     [ObservableProperty] private string? _errorMessage;
-
     [ObservableProperty] private ObservableCollection<ClipboardEntry> _historyEntries = new();
-
     [ObservableProperty] private bool _isLoading;
 
     public HomeViewModel()
     {
         _clipboardService = new ClipboardService(App.APIService);
+        _ = RefreshClipboardHistory();
     }
 
     [RelayCommand]
@@ -40,6 +39,7 @@ public partial class HomeViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            ErrorMessage = ex.Message;
             App.APIService.NotificationService.ShowError(ex.Message);
         }
         finally
