@@ -29,7 +29,7 @@ public class ClipboardService(APIService api)
             blob_version = 1
         };
 
-        var response = await _api.PostAsync("/clipboard/sync", request);
+        var response = await _api.PostAsync("api/clipboard", request);
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();
@@ -46,7 +46,7 @@ public class ClipboardService(APIService api)
 
         var masterKey = _api.CryptographyService.FromBase64(masterKeyBase64);
 
-        var response = await _api.GetAsync("/clipboard/latest");
+        var response = await _api.GetAsync("/api/clipboard");
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();
@@ -63,7 +63,7 @@ public class ClipboardService(APIService api)
 
         var masterKey = _api.CryptographyService.FromBase64(masterKeyBase64);
 
-        var response = await _api.GetAsync($"/clipboard/all?page={page}&page_size={pageSize}");
+        var response = await _api.GetAsync($"/api/clipboard/all?page={page}&page_size={pageSize}");
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();
