@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media;
@@ -60,21 +61,37 @@ public partial class MainWindowViewModel : ViewModelBase
     
     private async Task CheckStatus()
     {
+        if (!await CheckInternet())
+        {
+            StatusText = "No Internet";
+            StatusColor = Brushes.Orange;
+            return;
+        }
+
         try
         {
             await App.APIService.Health();
             StatusText = "Online";
             StatusColor = Brushes.Lime;
         }
-        catch (HttpRequestException)
+        catch
         {
-            StatusText = "Unreachable";
-            StatusColor = Brushes.LightGray;
+            StatusText = "Offline";
+            StatusColor = Brushes.Red;
+        }
+    }
+    
+    private static async Task<bool> CheckInternet()
+    {
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync("1.1.1.1", 1000);
+            return reply.Status == IPStatus.Success;
         }
         catch
         {
-            StatusText  = "Offline";
-            StatusColor = Brushes.Red;
+            return false;
         }
     }
     
