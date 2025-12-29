@@ -16,14 +16,15 @@
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="RenderTransformOrigin" Value="50%,50%" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Background" Value="#CC333333" />
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
+        <Setter Property="FontFamily" Value="{DynamicResource Inconsolata-Medium}"/>
         <Setter Property="CornerRadius" Value="5" />
         <Setter Property="Template">
             <ControlTemplate>
                 <LayoutTransformControl Name="PART_LayoutTransformControl" UseRenderTransform="True">
                     <Border CornerRadius="{TemplateBinding CornerRadius}"
                             BoxShadow="0 2 8 0 #20000000"
-                            Margin="5 5 5 10">
+                            Margin="5 10 8 10">
                         <Border Background="{TemplateBinding Background}"
                                 BorderThickness="0"
                                 CornerRadius="{TemplateBinding CornerRadius}"
@@ -37,7 +38,7 @@
                                 <ContentPresenter.ContentTemplate>
                                     <DataTemplate DataType="notifications:Notification">
                                         <TextBlock Text="{Binding Message}"
-                                                   Foreground="White"
+                                                   Foreground="{DynamicResource ForegroundD}"
                                                    FontSize="14"
                                                    TextWrapping="Wrap"
                                                    TextAlignment="Center" />
