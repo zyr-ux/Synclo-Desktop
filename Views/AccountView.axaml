@@ -62,23 +62,17 @@
                            TextAlignment="Center" />
 
                 <Button Grid.Row="3"
+                        Classes="custom-button"
                         Width="200"
                         Height="50"
                         Content="Login"
-                        IsEnabled="{Binding !IsBusy}"
-                        FontFamily="{DynamicResource Inconsolata-Bold}"
-                        FontSize="18"
                         HorizontalAlignment="Center"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        CornerRadius="10"
-                        Background="{DynamicResource Accent}"
-                        Foreground="{DynamicResource ForegroundD}"
+                        IsEnabled="{Binding !IsBusy}"
                         Command="{Binding LoginCommand}" />
 
                 <Button Grid.Row="4"
                         Content="No account? Register instead"
-                        Classes="listAction"
+                        Classes="textButton"
                         Margin="0 35 0 0"
                         HorizontalAlignment="Center"
                         Command="{Binding RegisterCommand}" />
@@ -138,7 +132,7 @@
                                     </StackPanel>
                                     <Button Grid.Column="1"
                                             Content="Logout"
-                                            Classes="listAction"
+                                            Classes="textButton"
                                             IsVisible="{Binding IsThisDevice, Converter={StaticResource InverseBooleanConverter}}"
                                             Command="{Binding $parent[UserControl].((vm:AccountViewModel)DataContext).LogoutDeviceCommand}"
                                             CommandParameter="{Binding device_id}" />
@@ -150,16 +144,10 @@
             </Border>
 
             <Button Grid.Row="3"
+                    Classes="custom-button"
                     Content="Logout"
                     Height="50"
-                    FontFamily="{DynamicResource Inconsolata-Bold}"
                     Width="100"
-                    FontSize="18"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    CornerRadius="10"
-                    Background="{DynamicResource Accent}"
-                    Foreground="{DynamicResource ForegroundD}"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Bottom"
                     Command="{Binding LogoutCommand}" />

@@ -63,29 +63,17 @@
 
         <!--Test Connection Button-->
         <Button
+            Classes="custom-button"
             Width="200"
             Height="50"
-            Content="Test Connection"
-            FontFamily="{DynamicResource Inconsolata-Bold}"
-            FontSize="18"
-            HorizontalContentAlignment="Center"
-            VerticalContentAlignment="Center"
-            CornerRadius="10"
-            Background="{DynamicResource Accent}"
-            Foreground="{DynamicResource ForegroundD}" />
+            Content="Test Connection"/>
 
         <!--Stop Syncing Button-->
         <Button
+            Classes="custom-button"
             Width="200"
             Height="50"
-            Content="Stop Syncing"
-            FontFamily="{DynamicResource Inconsolata-Bold}"
-            FontSize="18"
-            HorizontalContentAlignment="Center"
-            VerticalContentAlignment="Center"
-            CornerRadius="10"
-            Background="{DynamicResource Accent}"
-            Foreground="{DynamicResource ForegroundD}" />
+            Content="Stop Syncing"/>
 
     </StackPanel>
 </UserControl>
