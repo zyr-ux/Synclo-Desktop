@@ -2,11 +2,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:vm="using:Synclo.ViewModels"
-             xmlns:models="using:Synclo.Models"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Synclo.Views.HomeView"
-             x:DataType="vm:HomeViewModel"
              Background="{DynamicResource PrimaryBackground}">
 
     <Grid RowDefinitions="Auto, *, Auto" Margin="30">
@@ -17,30 +15,57 @@
                    FontSize="36"
                    FontFamily="{DynamicResource Inconsolata-Bold}"
                    Foreground="#FFCC66" />
-
-        <!-- HISTORY LIST -->
-        <ItemsControl Grid.Row="1" ItemsSource="{Binding HistoryEntries}">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Spacing="12" />
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:ClipboardEntry">
-                    <StackPanel>
-                        <TextBlock Text="{Binding plaintext}" FontSize="18" Foreground="{DynamicResource ForegroundL}"/>
-                        <Border Height="1" Background="#444" Margin="0,10,0,0" />
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- REFRESH BUTTON -->
-        <Button Grid.Row="2"
-                Content="Refresh"
-                Command="{Binding RefreshCommand}"
-                HorizontalAlignment="Right"/>
+        
+        <!-- refresh button -->
+        <Button Classes="icon-button"
+                HorizontalAlignment="Right"
+                IsEnabled="True">
+            <materialIcons:MaterialIcon
+                Kind="Refresh"
+                Width="30"
+                Height="30"/>
+        </Button>
+        
+         <!-- <ItemsControl ItemsSource="{Binding HistoryEntries}"> -->
+         <!--     <ItemsControl.ItemsPanel> -->
+         <!--         <ItemsPanelTemplate> -->
+         <!--             <StackPanel Spacing="20" /> -->
+         <!--         </ItemsPanelTemplate> -->
+         <!--     </ItemsControl.ItemsPanel> -->
+         <!-- -->
+         <!--     <ItemsControl.ItemTemplate> -->
+         <!--         <DataTemplate> -->
+         <!--             <Button Background="Transparent" -->
+         <!--                     BorderBrush="Transparent" -->
+         <!--                     Padding="0" -->
+         <!--                     HorizontalAlignment="Stretch" -->
+         <!--                     VerticalAlignment="Stretch" -->
+         <!--                     Command="{Binding DataContext.YourClickCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" -->
+         <!--                     CommandParameter="{Binding}"> -->
+         <!-- -->
+         <!--                 <StackPanel> -->
+         <!--                     <Grid ColumnDefinitions="*, Auto"> -->
+         <!--                         <TextBlock Text="{Binding Message}" -->
+         <!--                                    VerticalAlignment="Center" -->
+         <!--                                    Foreground="#e0e0e0" -->
+         <!--                                    FontFamily="{DynamicResource Inconsolata-Bold}" -->
+         <!--                                    FontSize="20" /> -->
+         <!-- -->
+         <!--                         <TextBlock Grid.Column="1" -->
+         <!--                                    Text="{Binding Time}" -->
+         <!--                                    VerticalAlignment="Center" -->
+         <!--                                    Foreground="#bbbbbb" -->
+         <!--                                    FontSize="18" /> -->
+         <!--                     </Grid> -->
+         <!-- -->
+         <!--                     <Border Height="1" -->
+         <!--                             Background="#444" -->
+         <!--                             Margin="0,10,0,0" /> -->
+         <!--                 </StackPanel> -->
+         <!--             </Button> -->
+         <!--         </DataTemplate> -->
+         <!--     </ItemsControl.ItemTemplate> -->
+         <!-- </ItemsControl> -->
 
     </Grid>
 </UserControl>
