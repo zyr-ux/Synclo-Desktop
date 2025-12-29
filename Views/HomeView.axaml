@@ -10,9 +10,6 @@
              x:DataType="vm:HomeViewModel"
              Background="{DynamicResource PrimaryBackground}">
 
-    <UserControl.DataContext>
-        <vm:HomeViewModel />
-    </UserControl.DataContext>
 
     <Grid RowDefinitions="Auto, *, Auto" Margin="30">
         
