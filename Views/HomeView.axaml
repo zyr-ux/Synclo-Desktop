@@ -15,63 +15,70 @@
     </UserControl.DataContext>
 
     <Grid RowDefinitions="Auto, *, Auto" Margin="30">
-
-        <!-- title -->
-        <TextBlock Grid.Row="0"
-                   Text="History"
-                   FontSize="36"
-                   FontFamily="{DynamicResource Inconsolata-Bold}"
-                   Foreground="#FFCC66" />
-
-        <!-- refresh button -->
-        <Button Classes="icon-button"
-                HorizontalAlignment="Right"
-                IsEnabled="{Binding !IsLoading}"
-                Command="{Binding RefreshClipboardHistoryCommand}">
-            <materialIcons:MaterialIcon
-                Kind="Refresh"
-                Width="30"
-                Height="30" />
-        </Button>
-
+        
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <!-- title -->
+            <TextBlock Text="History"
+                       FontSize="36"
+                       FontFamily="{DynamicResource Inconsolata-Bold}"
+                       Foreground="#FFCC66" />
+            
+            <!-- refresh button -->
+            <Button Classes="icon-button"
+                    HorizontalAlignment="Right"
+                    Margin="20 0 0 0"
+                    VerticalAlignment="Center"
+                    IsEnabled="{Binding !IsLoading}"
+                    Command="{Binding RefreshClipboardHistoryCommand}">
+                <materialIcons:MaterialIcon
+                    Kind="Refresh"
+                    VerticalAlignment="Center"
+                    Width="26"
+                    Height="26" />
+            </Button>
+        </StackPanel>
+        
         <!--history list-->
-        <ItemsControl Grid.Row="1" ItemsSource="{Binding HistoryEntries}">
+        <ItemsControl Grid.Row="1" 
+                      ItemsSource="{Binding HistoryEntries}"
+                      Margin="0,30,0,0">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <StackPanel Spacing="20" />
+                    <StackPanel Spacing="25" />
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
 
             <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="models:ClipboardEntry">
-                    <Button Background="Transparent"
-                            BorderBrush="Transparent"
-                            Padding="0"
-                            HorizontalAlignment="Stretch"
-                            VerticalAlignment="Stretch"
-                            Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                            CommandParameter="{Binding}">
-
-                        <StackPanel>
-                            <Grid ColumnDefinitions="*, Auto">
+                    <StackPanel>
+                        <Grid ColumnDefinitions="*, Auto">
+                            <Button Grid.Column="0"
+                                    Classes="textButton"
+                                    Padding="0"
+                                    Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                    CommandParameter="{Binding}">
                                 <TextBlock Text="{Binding plaintext}"
                                            VerticalAlignment="Center"
-                                           Foreground="#e0e0e0"
-                                           FontFamily="{DynamicResource Inconsolata-Bold}"
-                                           FontSize="20" />
+                                           Foreground="{DynamicResource Accent}"
+                                           FontSize="18"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,0,20,0"
+                                           FontFamily="{DynamicResource Inconsolata-Medium}"/>
+                            </Button>
 
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding timestamp, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
-                                           VerticalAlignment="Center"
-                                           Foreground="#bbbbbb"
-                                           FontSize="18" />
-                            </Grid>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding timestamp, StringFormat={}{0:h:mm tt}}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Accent}"
+                                       FontSize="16"
+                                       FontFamily="{DynamicResource Inconsolata-Medium}"/>
+                        </Grid>
 
-                            <Border Height="1"
-                                    Background="#444"
-                                    Margin="0,10,0,0" />
-                        </StackPanel>
-                    </Button>
+                        <Border Height="1"
+                                Background="{DynamicResource Accent}"
+                                Margin="0,8,0,0" 
+                                Opacity="0.5"/>
+                    </StackPanel>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
