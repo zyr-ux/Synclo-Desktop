@@ -10,32 +10,26 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class DeviceService
+public sealed class DeviceService(APIService api)
 {
-    private readonly APIService _api;
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private string? _cachedPath;
 
-    public DeviceService(APIService api)
-    {
-        _api = api;
-    }
-
     public async Task<List<DeviceModel>> GetDevicesAsync(CancellationToken ct = default)
     {
-        using var res = await _api.GetAsync("/api/devices", ct);
+        using var res = await api.GetAsync("/api/devices", ct);
         var content = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
             throw new ServerFailureException(content);
 
-        var list = _api.Deserialize<List<DeviceModel>>(content);
+        var list = api.Deserialize<List<DeviceModel>>(content);
         return list ?? [];
     }
 
     public async Task DeleteDeviceAsync(string deviceId, CancellationToken ct = default)
     {
-        using var res = await _api.DeleteAsync($"/api/devices/{deviceId}", ct);
+        using var res = await api.DeleteAsync($"/api/devices/{deviceId}", ct);
         if (!res.IsSuccessStatusCode)
         {
             var error = await res.Content.ReadAsStringAsync(ct);
