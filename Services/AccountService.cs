@@ -188,7 +188,7 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
             }
             catch
             {
-                App.APIService.NotificationService.ShowError("Logout failed.");
+                App.NotificationService.ShowError("Logout failed.");
             }
 
         await SecureStorage.DeleteAsync(AccessToken);

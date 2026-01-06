@@ -23,7 +23,6 @@ public sealed class APIService : IDisposable
     public CryptographyService CryptographyService { get; }
     public DeviceService DeviceService { get; }
     public WebSocketService WebSocketService { get; }
-    public NotificationService NotificationService { get; }
     public ClipboardService ClipboardService { get; }
 
     public event Action<string>? TokenRefreshed;
@@ -45,7 +44,6 @@ public sealed class APIService : IDisposable
         DeviceService = new DeviceService(this);
         AccountService = new AccountService(this, _http, settings, DeviceService);
         WebSocketService = new WebSocketService(this);
-        NotificationService = new NotificationService();
         ClipboardService = new ClipboardService(this);
     }
     

@@ -94,13 +94,13 @@ public partial class AccountViewModel : ViewModelBase
         
         if (string.IsNullOrWhiteSpace(Email))
         {
-            App.APIService.NotificationService.ShowWarning("Email is required", "Login");
+            App.NotificationService.ShowWarning("Email is required", "Login");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(Password))
         {
-            App.APIService.NotificationService.ShowWarning("Password is required", "Login");
+            App.NotificationService.ShowWarning("Password is required", "Login");
             return;
         }
 
@@ -112,32 +112,32 @@ public partial class AccountViewModel : ViewModelBase
             await _accountService.LoginAsync(Email, Password);
             Password = string.Empty;
             StatusMessage = string.Empty;
-            App.APIService.NotificationService.ShowSuccess("Logged in successfully.", "Login");
+            App.NotificationService.ShowSuccess("Logged in successfully.", "Login");
             await OnAuthSuccess();
         }
         catch (InvalidRequestException ex)
         {
-            App.APIService.NotificationService.ShowWarning(ex.Message, "Login");
+            App.NotificationService.ShowWarning(ex.Message, "Login");
         }
         catch (InvalidCredentialsException)
         {
-            App.APIService.NotificationService.ShowError("Incorrect email or password.", "Login");
+            App.NotificationService.ShowError("Incorrect email or password.", "Login");
         }
         catch (SecurityBreachException)
         {
-            App.APIService.NotificationService.ShowError("Your session was terminated for security. Please log in again.", "Login");
+            App.NotificationService.ShowError("Your session was terminated for security. Please log in again.", "Login");
         }
         catch (NetworkFailureException)
         {
-            App.APIService.NotificationService.ShowError("Network issue detected. Please check your connection.", "Login");
+            App.NotificationService.ShowError("Network issue detected. Please check your connection.", "Login");
         }
         catch (ServerFailureException)
         {
-            App.APIService.NotificationService.ShowError("Something went wrong on our side. Please try again.", "Login");
+            App.NotificationService.ShowError("Something went wrong on our side. Please try again.", "Login");
         }
         catch (Exception)
         {
-            App.APIService.NotificationService.ShowError("Login failed. Please try again.", "Login");
+            App.NotificationService.ShowError("Login failed. Please try again.", "Login");
         }
         finally
         {
@@ -157,19 +157,19 @@ public partial class AccountViewModel : ViewModelBase
         
         if (string.IsNullOrWhiteSpace(Email))
         {
-            App.APIService.NotificationService.ShowWarning("Email is required", "Register");
+            App.NotificationService.ShowWarning("Email is required", "Register");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(Password))
         {
-            App.APIService.NotificationService.ShowWarning("Password is required", "Register");
+            App.NotificationService.ShowWarning("Password is required", "Register");
             return;
         }
 
         if (Password.Length < 8)
         {
-            App.APIService.NotificationService.ShowWarning("Password must be at least 8 characters", "Register");
+            App.NotificationService.ShowWarning("Password must be at least 8 characters", "Register");
             return;
         }
 
@@ -180,28 +180,28 @@ public partial class AccountViewModel : ViewModelBase
         {
             await _accountService.RegisterAsync(Email, Password);
             Password = string.Empty;
-            App.APIService.NotificationService.ShowSuccess("Account created successfully.", "Register");
+            App.NotificationService.ShowSuccess("Account created successfully.", "Register");
             await OnAuthSuccess();
         }
         catch (InvalidRequestException ex)
         {
-            App.APIService.NotificationService.ShowWarning(ex.Message, "Register");
+            App.NotificationService.ShowWarning(ex.Message, "Register");
         }
         catch (UserAlreadyExistsException)
         {
-            App.APIService.NotificationService.ShowError("This email is already registered.", "Register");
+            App.NotificationService.ShowError("This email is already registered.", "Register");
         }
         catch (NetworkFailureException)
         {
-            App.APIService.NotificationService.ShowError("Network issue detected. Please check your connection.", "Register");
+            App.NotificationService.ShowError("Network issue detected. Please check your connection.", "Register");
         }
         catch (ServerFailureException)
         {
-            App.APIService.NotificationService.ShowError("Something went wrong on our side. Please try again.", "Register");
+            App.NotificationService.ShowError("Something went wrong on our side. Please try again.", "Register");
         }
         catch (Exception)
         {
-            App.APIService.NotificationService.ShowError("Registration failed. Please try again.", "Register");
+            App.NotificationService.ShowError("Registration failed. Please try again.", "Register");
         }
         finally
         {

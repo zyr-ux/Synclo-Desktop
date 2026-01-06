@@ -14,6 +14,6 @@ public partial class MainWindow : Window
             Position = NotificationPosition.TopRight,
             MaxItems = 3
         };
-        App.APIService.NotificationService.SetManager(manager);
+        App.NotificationService.SetManager(manager);
     }
 }

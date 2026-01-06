@@ -14,6 +14,7 @@ public class App : Application
 {
     public static ISettingsService Settings { get; private set; }
     public static APIService APIService { get; private set; }
+    public static NotificationService NotificationService { get; private set; }
     
     public override void Initialize()
     {
@@ -23,6 +24,7 @@ public class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         Settings = new SettingsService();
+        NotificationService = new NotificationService();
         APIService = new APIService(Settings);
         
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -34,20 +36,21 @@ public class App : Application
                 DataContext = mainVM
             };
             
-            // Secure check to test if the user is authenticated
+            desktop.Exit += (s, e) =>
+            {
+                APIService?.Dispose();
+                NotificationService = null;
+                mainVM.Dispose();
+            };
+            
             _ = Task.Run(async () => 
             {
+                await Task.Delay(100);
                 if (await APIService.AccountService.IsAuthenticatedAsync())
                 {
                     await APIService.WebSocketService.ConnectAsync();
                 }
             });
-
-            desktop.Exit += (s, e) =>
-            {
-                APIService?.Dispose();
-                mainVM.Dispose();
-            };
         }
 
         base.OnFrameworkInitializationCompleted();

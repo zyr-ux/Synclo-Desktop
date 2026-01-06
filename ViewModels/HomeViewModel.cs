@@ -35,12 +35,12 @@ public partial class HomeViewModel : ViewModelBase
             var history = await _clipboardService.GetClipboardHistoryAsync();
             HistoryEntries.Clear();
             foreach (var entry in history.history) HistoryEntries.Add(entry);
-            App.APIService.NotificationService.ShowSuccess("Clipboard history refreshed.");
+            App.NotificationService.ShowSuccess("Clipboard history refreshed.");
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-            App.APIService.NotificationService.ShowError(ex.Message);
+            App.NotificationService.ShowError(ex.Message);
         }
         finally
         {
@@ -61,12 +61,12 @@ public partial class HomeViewModel : ViewModelBase
                 var clipboard = desktop.MainWindow?.Clipboard;
                 if (clipboard != null)
                     await clipboard.SetTextAsync(entry.plaintext);
-                App.APIService.NotificationService.ShowSuccess("Copied to clipboard.");
+                App.NotificationService.ShowSuccess("Copied to clipboard.");
             }
         }
         catch (Exception ex)
         {
-            App.APIService.NotificationService.ShowError(ex.Message);
+            App.NotificationService.ShowError(ex.Message);
         }
     }
 }
