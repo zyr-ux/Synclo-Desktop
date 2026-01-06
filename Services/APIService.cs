@@ -87,7 +87,7 @@ public sealed class APIService : IDisposable
         await _refreshLock.WaitAsync(ct);
         try
         {
-            var newToken = await AccountService.RefreshTokenAsyncInt(ct);
+            var newToken = await AccountService.RefreshTokenAsync(ct);
             TokenRefreshed?.Invoke(newToken);
             return await SendReqHelper(method, url, body, ct);
         }
