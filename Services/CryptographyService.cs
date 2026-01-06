@@ -18,9 +18,9 @@ public sealed class CryptographyService
     private const int NonceLength = 12; // Recommended for AES-GCM
     
     // Secure storage keys
-    public static string MasterKey => $"{AuthService.Prefix}.crypto.master_key";
-    public static string Salt => $"{AuthService.Prefix}.crypto.salt";
-    public static string KdfVersion => $"{AuthService.Prefix}.crypto.kdf_version";
+    public static string MasterKey => $"{AccountService.Prefix}.crypto.master_key";
+    public static string Salt => $"{AccountService.Prefix}.crypto.salt";
+    public static string KdfVersion => $"{AccountService.Prefix}.crypto.kdf_version";
     
     public byte[] DeriveAuthKey(string password, byte[] salt)
     {

@@ -1,21 +1,29 @@
 using System;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class AccountService(APIService api, ISettingsService settings, DeviceCacheService deviceCacheService)
+public sealed class AccountService(APIService api, HttpClient http, ISettingsService settings, DeviceCacheService deviceCacheService)
 {
+    public const string Prefix = "com.synclo.app";
+    public const string AccessToken = $"{Prefix}.auth.access_token";
+    public const string RefreshToken = $"{Prefix}.auth.refresh_token";
+    public const string UserEmail = $"{Prefix}.user.email";
+
     public async Task<bool> IsAuthenticatedAsync()
     {
-        var token = await SecureStorage.LoadAsync(AuthService.AccessToken);
+        var token = await SecureStorage.LoadAsync(AccessToken);
         return !string.IsNullOrWhiteSpace(token);
     }
 
     public async Task<string?> GetStoredEmailAsync()
     {
-        return await SecureStorage.LoadAsync(AuthService.UserEmail);
+        return await SecureStorage.LoadAsync(UserEmail);
     }
 
     public async Task LoginAsync(string email, string password)
@@ -25,14 +33,10 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
 
         try
         {
-            // Step 1: Fetch salt from server for password derivation
-            var saltResponse = await api.AuthService.GetSaltAsyncInt(email);
+            var saltResponse = await GetSaltAsyncInt(email);
             var salt = CryptographyService.FromBase64Static(saltResponse.salt);
-
-            // Step 2: Derive auth_key from password using KDF
             var authKey = api.CryptographyService.DeriveAuthKey(password, salt);
 
-            // Step 3: Create login request with derived auth_key
             var req = new LoginRequest
             {
                 email = email,
@@ -41,20 +45,15 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
                 device_name = Utils.GetDeviceName()
             };
 
-            // Step 4: Call AuthService to login and receive encrypted MK
-            var response = await api.AuthService.LoginAsyncInt(req);
+            var response = await LoginAsyncInt(req);
 
-            // Step 5: Decrypt master key using derived auth_key
             if (!string.IsNullOrWhiteSpace(response.encrypted_master_key))
             {
                 var wrappedMk = CryptographyService.FromBase64Static(response.encrypted_master_key);
                 var masterKey = api.CryptographyService.UnwrapMasterKey(wrappedMk, authKey);
-                
-                // Step 6: Store master key securely
                 await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
             }
 
-            // Step 7: Update local settings
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
             settings.Save();
@@ -84,19 +83,11 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
 
         try
         {
-            // Step 1: Generate salt (32 random bytes) - will be stored on server
             var salt = api.CryptographyService.GenerateNonce(32);
-
-            // Step 2: Generate master key for clipboard encryption
             var masterKey = api.CryptographyService.GenerateMasterKey();
-
-            // Step 3: Derive auth_key from password using KDF with generated salt
             var authKey = api.CryptographyService.DeriveAuthKey(password, salt);
-
-            // Step 4: Encrypt (wrap) master key with auth_key
             var wrappedMk = api.CryptographyService.WrapMasterKey(masterKey, authKey);
 
-            // Step 5: Create registration request with base64-encoded E2EE credentials
             var req = new RegisterRequest
             {
                 email = email,
@@ -108,14 +99,11 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
                 device_name = Utils.GetDeviceName()
             };
 
-            // Step 6: Call AuthService to register
-            await api.AuthService.RegisterAsyncInt(req);
+            await RegisterAsyncInt(req);
 
-            // Step 7: Store salt and master key securely locally
             await SecureStorage.SaveAsync(CryptographyService.Salt, CryptographyService.ToBase64Static(salt));
             await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
 
-            // Step 8: Update local settings
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
             settings.Save();
@@ -140,7 +128,6 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
 
     public async Task LogoutAsync()
     {
-        // Delete this device from the server
         var deviceId = settings.Settings.device_id;
         if (!string.IsNullOrWhiteSpace(deviceId))
             try
@@ -149,13 +136,187 @@ public sealed class AccountService(APIService api, ISettingsService settings, De
             }
             catch
             {
-                /* Ignore - device deletion is best-effort */
             }
 
-        // Wipe Secrets (Tokens, Email, and E2EE credentials)
-        await api.AuthService.LogoutAsyncInt();
-
-        // Clear Cache
+        await LogoutAsyncInt();
         await deviceCacheService.ClearAsync();
+    }
+
+    public async Task<SaltResponse> GetSaltAsyncInt(string email, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException("Email cannot be empty", nameof(email));
+
+        try
+        {
+            using var res = await http.GetAsync($"/api/auth/salt?email={Uri.EscapeDataString(email)}", ct);
+            var content = await res.Content.ReadAsStringAsync(ct);
+
+            if (res.StatusCode == HttpStatusCode.NotFound)
+                throw new InvalidRequestException("User not found");
+
+            if (res.StatusCode == HttpStatusCode.TooManyRequests)
+                throw new InvalidRequestException("Too many requests. Please wait before trying again.");
+
+            if (!res.IsSuccessStatusCode)
+                throw new ServerFailureException(content);
+
+            var data = api.Deserialize<SaltResponse>(content);
+            if (data == null)
+                throw new ServerFailureException("Server returned success but salt was missing");
+
+            return data;
+        }
+        catch (HttpRequestException)
+        {
+            throw new NetworkFailureException();
+        }
+    }
+
+    public async Task<AuthResponse> LoginAsyncInt(LoginRequest request, CancellationToken ct = default)
+    {
+        using var res = await api.PostAsync("/api/login", request, ct);
+        var content = await res.Content.ReadAsStringAsync(ct);
+
+        if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest)
+            throw new InvalidCredentialsException(content);
+
+        if (!res.IsSuccessStatusCode)
+            throw new ServerFailureException(content);
+
+        var data = api.Deserialize<AuthResponse>(content);
+
+        if (string.IsNullOrWhiteSpace(data?.access_token) || string.IsNullOrWhiteSpace(data?.refresh_token))
+            throw new ServerFailureException("Server returned success but tokens were empty.");
+
+        await SecureStorage.SaveAsync(AccessToken, data.access_token);
+        await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
+        await SecureStorage.SaveAsync(UserEmail, request.email);
+
+        if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
+            await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
+
+        if (!string.IsNullOrWhiteSpace(data.salt))
+            await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
+
+        if (data.kdf_version.HasValue)
+            await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
+
+        return data;
+    }
+
+    public async Task<AuthResponse> RegisterAsyncInt(RegisterRequest request, CancellationToken ct = default)
+    {
+        using var res = await api.PostAsync("/api/register", request, ct);
+        var content = await res.Content.ReadAsStringAsync(ct);
+
+        if (!res.IsSuccessStatusCode)
+            throw res.StatusCode switch
+            {
+                HttpStatusCode.Conflict => new UserAlreadyExistsException(content),
+                HttpStatusCode.BadRequest => new InvalidRequestException(content),
+                _ => new ServerFailureException(content)
+            };
+
+        var data = api.Deserialize<AuthResponse>(content);
+
+        if (string.IsNullOrWhiteSpace(data?.access_token) || string.IsNullOrWhiteSpace(data?.refresh_token))
+            throw new ServerFailureException("Missing tokens in response.");
+
+        await SecureStorage.SaveAsync(AccessToken, data.access_token);
+        await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
+        await SecureStorage.SaveAsync(UserEmail, request.email);
+
+        if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
+            await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
+
+        if (!string.IsNullOrWhiteSpace(data.salt))
+            await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
+
+        if (data.kdf_version.HasValue)
+            await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
+
+        return data;
+    }
+
+    public async Task LogoutAsyncInt()
+    {
+        await SecureStorage.DeleteAsync(AccessToken);
+        await SecureStorage.DeleteAsync(RefreshToken);
+        await SecureStorage.DeleteAsync(UserEmail);
+        await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
+        await SecureStorage.DeleteAsync(CryptographyService.Salt);
+        await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
+    }
+
+    public async Task<string> RefreshTokenAsyncInt(CancellationToken ct)
+    {
+        var refreshToken = await SecureStorage.LoadAsync(RefreshToken);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            throw new SessionExpiredException();
+
+        var body = new { refresh_token = refreshToken };
+
+        try
+        {
+            using var res = await http.PostAsync("/api/refresh", api.Serialize(body), ct);
+
+            if (!res.IsSuccessStatusCode)
+            {
+                if (res.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    var content = await res.Content.ReadAsStringAsync(ct);
+                    if (content.Contains("reused") || content.Contains("family"))
+                    {
+                        await LogoutAsyncInt();
+                        throw new SecurityBreachException("Refresh token reused. Session terminated for security.");
+                    }
+                }
+
+                await LogoutAsyncInt();
+                throw new SessionExpiredException();
+            }
+
+            var json = await res.Content.ReadAsStringAsync(ct);
+            var data = api.Deserialize<AuthResponse>(json);
+
+            if (data == null || string.IsNullOrWhiteSpace(data.access_token) ||
+                string.IsNullOrWhiteSpace(data.refresh_token))
+            {
+                await LogoutAsyncInt();
+                throw new SessionExpiredException();
+            }
+
+            await UpdateTokensAsyncInt(data.access_token, data.refresh_token);
+
+            if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
+                await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
+
+            if (!string.IsNullOrWhiteSpace(data.salt))
+                await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
+
+            if (data.kdf_version.HasValue)
+                await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
+
+            return data.access_token;
+        }
+        catch (SessionExpiredException)
+        {
+            throw;
+        }
+        catch (SecurityBreachException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            throw new NetworkFailureException();
+        }
+    }
+
+    public async Task UpdateTokensAsyncInt(string accessToken, string refreshToken)
+    {
+        await SecureStorage.SaveAsync(AccessToken, accessToken);
+        await SecureStorage.SaveAsync(RefreshToken, refreshToken);
     }
 }

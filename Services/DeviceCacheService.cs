@@ -29,8 +29,7 @@ public sealed class DeviceCacheService
     {
         if (_cachedPath != null) return _cachedPath;
 
-        // 1. Load email from Secure Storage
-        var email = await SecureStorage.LoadAsync(AuthService.UserEmail);
+        var email = await SecureStorage.LoadAsync(AccountService.UserEmail);
 
         // 2. Extract the part before the '@'
         var identifier = "anonymous";

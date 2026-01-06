@@ -20,7 +20,6 @@ public sealed class APIService : IDisposable
     private bool _disposed;
     
     public AccountService AccountService { get; }
-    public AuthService AuthService { get; }
     public CryptographyService CryptographyService { get; }
     public DeviceService DeviceService { get; }
     public DeviceCacheService DeviceCacheService { get; }
@@ -43,13 +42,11 @@ public sealed class APIService : IDisposable
             PropertyNameCaseInsensitive = true
         };
 
-        // initialize the various sub-services
-        AuthService = new AuthService(this, _http);
         CryptographyService = new CryptographyService();
         DeviceService = new DeviceService(this);
         DeviceCacheService = new DeviceCacheService();
+        AccountService = new AccountService(this, _http, settings, DeviceCacheService);
         WebSocketService = new WebSocketService(this);
-        AccountService = new AccountService(this, settings, DeviceCacheService);
         NotificationService = new NotificationService();
         ClipboardService = new ClipboardService(this);
     }
@@ -90,10 +87,8 @@ public sealed class APIService : IDisposable
         await _refreshLock.WaitAsync(ct);
         try
         {
-            var newToken = await AuthService.RefreshTokenAsyncInt(ct);
-            // Notify the rest of the app (e.g., WebSockets) that the token changed
+            var newToken = await AccountService.RefreshTokenAsyncInt(ct);
             TokenRefreshed?.Invoke(newToken);
-            // Retry the original request with the new token
             return await SendReqHelper(method, url, body, ct);
         }
         finally
@@ -107,7 +102,7 @@ public sealed class APIService : IDisposable
     {
         using var req = new HttpRequestMessage(method, url);
 
-        var token = await SecureStorage.LoadAsync(AuthService.AccessToken);
+        var token = await SecureStorage.LoadAsync(AccountService.AccessToken);
         if (!string.IsNullOrWhiteSpace(token))
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

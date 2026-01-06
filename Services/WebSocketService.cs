@@ -69,7 +69,7 @@ public sealed class WebSocketService : IDisposable
     {
         if (_disposed || _manualDisconnect || IsConnected) return;
 
-        var token = await SecureStorage.LoadAsync(AuthService.AccessToken);
+        var token = await SecureStorage.LoadAsync(AccountService.AccessToken);
         if (string.IsNullOrWhiteSpace(token)) return;
 
         await DisconnectInternal();
