@@ -19,6 +19,14 @@ public partial class AccountDetailsViewModel : ViewModelBase
 
     [ObservableProperty] private string _username = string.Empty;
     [ObservableProperty] private bool _isBusy;
+    
+    // --- New Properties for Password Reset ---
+    [ObservableProperty] private bool _isResetPasswordVisible;
+    [ObservableProperty] private string _currentPassword = string.Empty;
+    [ObservableProperty] private string _newPassword = string.Empty;
+    [ObservableProperty] private string _confirmPassword = string.Empty;
+    [ObservableProperty] private string _resetPasswordError = string.Empty;
+
     public ObservableCollection<DeviceModel> Devices { get; } = new();
 
     public AccountDetailsViewModel(AccountService accountService, DeviceService deviceService, string email, Action onLogout)
@@ -59,6 +67,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
         catch
         {
+            // Handle offline/error state if needed
         }
     }
 
@@ -100,7 +109,69 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
         catch
         {
+            // Handle error
         }
     }
-}
 
+    // --- New Commands for Password Reset ---
+
+    [RelayCommand]
+    private void OpenResetPassword()
+    {
+        ResetInputs();
+        IsResetPasswordVisible = true;
+    }
+
+    [RelayCommand]
+    private void CancelResetPassword()
+    {
+        IsResetPasswordVisible = false;
+        ResetInputs();
+    }
+
+    [RelayCommand]
+    private async Task SubmitResetPasswordAsync()
+    {
+        ResetPasswordError = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(CurrentPassword) || 
+            string.IsNullOrWhiteSpace(NewPassword) || 
+            string.IsNullOrWhiteSpace(ConfirmPassword))
+        {
+            ResetPasswordError = "All fields are required.";
+            return;
+        }
+
+        if (NewPassword != ConfirmPassword)
+        {
+            ResetPasswordError = "New passwords do not match.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            // Trigger the API endpoint here
+            // Example: await App.APIService.AuthService.ChangePasswordAsync(CurrentPassword, NewPassword);
+            
+            IsResetPasswordVisible = false;
+            ResetInputs();
+        }
+        catch (Exception ex)
+        {
+            ResetPasswordError = "Failed to update password. Please check your current password.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ResetInputs()
+    {
+        CurrentPassword = string.Empty;
+        NewPassword = string.Empty;
+        ConfirmPassword = string.Empty;
+        ResetPasswordError = string.Empty;
+    }
+}
