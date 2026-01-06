@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Synclo.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+             x:Class="Synclo.Views.AccountDetailsView"
+             x:DataType="vm:AccountDetailsViewModel"
+             Background="{DynamicResource PrimaryBackground}">
+
+    <Grid Margin="40"
+          RowDefinitions="Auto, Auto, Auto, *">
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    Margin="0,0,0,20">
+            <TextBlock Text="Logged in as :"
+                       FontSize="28"
+                       Foreground="{DynamicResource Yellow}"
+                       FontFamily="{DynamicResource Inconsolata-Bold}" />
+            <TextBlock Text="{Binding Username}"
+                       FontFamily="{DynamicResource Inconsolata-Medium}"
+                       FontSize="28"
+                       Foreground="{DynamicResource Accent}" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1"
+                   Text="Manage Devices"
+                   FontSize="36"
+                   Foreground="{DynamicResource Accent}"
+                   FontFamily="{DynamicResource Inconsolata-Bold}"
+                   Margin="0,0,0,15" />
+
+        <Border Grid.Row="2"
+                Background="#303030"
+                CornerRadius="12"
+                Padding="20"
+                VerticalAlignment="Top">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="250">
+                <ItemsControl ItemsSource="{Binding Devices}" HorizontalAlignment="Stretch">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="15" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*, Auto">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding device_name}"
+                                               FontFamily="{DynamicResource Inconsolata-Bold}"
+                                               Foreground="#e0e0e0"
+                                               FontSize="18" />
+                                    <TextBlock Text=" - this device"
+                                               FontFamily="{DynamicResource Inconsolata-Bold}"
+                                               Foreground="#666666"
+                                               FontSize="18"
+                                               IsVisible="{Binding IsThisDevice}" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="Logout"
+                                        Classes="textButton"
+                                        IsVisible="{Binding IsThisDevice, Converter={StaticResource InverseBooleanConverter}}"
+                                        Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
+                                        CommandParameter="{Binding device_id}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <Button Grid.Row="3"
+                Classes="custom-button"
+                Content="Logout"
+                Height="50"
+                Width="100"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Command="{Binding LogoutCommand}" />
+    </Grid>
+</UserControl>
