@@ -14,7 +14,7 @@ namespace Synclo.ViewModels;
 public partial class AccountViewModel : ViewModelBase
 {
     private readonly AccountService _accountService;
-    private readonly DeviceCacheService _deviceCacheService;
+    private readonly DeviceService _deviceService;
 
     [ObservableProperty] private string _email = string.Empty;
     [ObservableProperty] private bool _isBusy;
@@ -28,7 +28,7 @@ public partial class AccountViewModel : ViewModelBase
     public AccountViewModel()
     {
         _accountService = App.APIService.AccountService;
-        _deviceCacheService = App.APIService.DeviceCacheService;
+        _deviceService = App.APIService.DeviceService;
         _ = InitializeAsync();
     }
     
@@ -66,16 +66,14 @@ public partial class AccountViewModel : ViewModelBase
 
     private async Task LoadDevicesAsync()
     {
-        // 1. Show cached data immediately
-        var cached = await _deviceCacheService.LoadAsync();
+        var cached = await _deviceService.LoadAsync();
         UpdateDeviceList(cached);
 
-        // 2. Fetch fresh data from API
         try
         {
             var fresh = await App.APIService.DeviceService.GetDevicesAsync();
             UpdateDeviceList(fresh);
-            await _deviceCacheService.SaveAsync(fresh);
+            await _deviceService.SaveAsync(fresh);
         }
         catch (SessionExpiredException)
         {
@@ -83,7 +81,6 @@ public partial class AccountViewModel : ViewModelBase
         }
         catch
         {
-            /* Fallback to cached list is already shown */
         }
     }
 
@@ -249,12 +246,11 @@ public partial class AccountViewModel : ViewModelBase
             if (target != null)
             {
                 Devices.Remove(target);
-                await _deviceCacheService.SaveAsync(Devices.ToList());
+                await _deviceService.SaveAsync(Devices.ToList());
             }
         }
         catch
         {
-            /* Handle error */
         }
     }
 }

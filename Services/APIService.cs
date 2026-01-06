@@ -22,7 +22,6 @@ public sealed class APIService : IDisposable
     public AccountService AccountService { get; }
     public CryptographyService CryptographyService { get; }
     public DeviceService DeviceService { get; }
-    public DeviceCacheService DeviceCacheService { get; }
     public WebSocketService WebSocketService { get; }
     public NotificationService NotificationService { get; }
     public ClipboardService ClipboardService { get; }
@@ -44,8 +43,7 @@ public sealed class APIService : IDisposable
 
         CryptographyService = new CryptographyService();
         DeviceService = new DeviceService(this);
-        DeviceCacheService = new DeviceCacheService();
-        AccountService = new AccountService(this, _http, settings, DeviceCacheService);
+        AccountService = new AccountService(this, _http, settings, DeviceService);
         WebSocketService = new WebSocketService(this);
         NotificationService = new NotificationService();
         ClipboardService = new ClipboardService(this);

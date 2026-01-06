@@ -8,7 +8,7 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class AccountService(APIService api, HttpClient http, ISettingsService settings, DeviceCacheService deviceCacheService)
+public sealed class AccountService(APIService api, HttpClient http, ISettingsService settings, DeviceService deviceService)
 {
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
@@ -197,7 +197,7 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
         await SecureStorage.DeleteAsync(CryptographyService.Salt);
         await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
-        await deviceCacheService.ClearAsync();
+        await deviceService.ClearAsync();
     }
 
     private async Task<SaltResponse> GetSaltAsync(string email, CancellationToken ct = default)
