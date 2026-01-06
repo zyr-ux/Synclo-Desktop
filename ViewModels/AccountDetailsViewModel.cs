@@ -68,6 +68,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         catch
         {
             // Handle offline/error state if needed
+            App.NotificationService.ShowError("Device Offline");
         }
     }
 
