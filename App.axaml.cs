@@ -1,9 +1,9 @@
 using System.Linq;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Synclo.Services;
 using Synclo.ViewModels;
 using Synclo.Views;
@@ -15,7 +15,7 @@ public class App : Application
     public static ISettingsService Settings { get; private set; }
     public static APIService APIService { get; private set; }
     public static NotificationService NotificationService { get; private set; }
-    
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -23,34 +23,35 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // 1. Initialize Services
         Settings = new SettingsService();
         NotificationService = new NotificationService();
         APIService = new APIService(Settings);
-        
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             DisableAvaloniaDataAnnotationValidation();
+
+            // 2. Create the Main ViewModel
             var mainVM = new MainWindowViewModel();
+
+            // 3. Create the Main Window
             desktop.MainWindow = new MainWindow
             {
                 DataContext = mainVM
             };
-            
+
+            // 4. Trigger Secure Startup Sequence (Safe on UI Thread)
+            // We use Dispatcher to ensure the Window is fully constructed first.
+            Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
+
+            // 5. Cleanup on Exit
             desktop.Exit += (s, e) =>
             {
                 APIService?.Dispose();
                 NotificationService = null;
                 mainVM.Dispose();
             };
-            
-            _ = Task.Run(async () => 
-            {
-                await Task.Delay(100);
-                if (await APIService.AccountService.IsAuthenticatedAsync())
-                {
-                    await APIService.WebSocketService.ConnectAsync();
-                }
-            });
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -58,11 +59,12 @@ public class App : Application
 
     private void DisableAvaloniaDataAnnotationValidation()
     {
-        // Get an array of plugins to remove
         var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
+            BindingPlugins.DataValidators
+                .OfType<DataAnnotationsValidationPlugin>()
+                .ToArray();
 
-        // remove each entry found
-        foreach (var plugin in dataValidationPluginsToRemove) BindingPlugins.DataValidators.Remove(plugin);
+        foreach (var plugin in dataValidationPluginsToRemove)
+            BindingPlugins.DataValidators.Remove(plugin);
     }
 }

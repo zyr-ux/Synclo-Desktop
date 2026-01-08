@@ -18,14 +18,14 @@ public class ClipboardService(APIService api)
         if (string.IsNullOrEmpty(masterKeyBase64))
             throw new InvalidOperationException("Master key not found. User must be logged in.");
 
-        var masterKey = _api.CryptographyService.FromBase64(masterKeyBase64);
+        var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
 
         var (ciphertext, nonce) = _api.CryptographyService.EncryptClipboard(content, masterKey);
 
         var request = new ClipboardSyncRequest
         {
-            ciphertext = _api.CryptographyService.ToBase64(ciphertext),
-            nonce = _api.CryptographyService.ToBase64(nonce),
+            ciphertext = CryptographyService.ToBase64Static(ciphertext),
+            nonce = CryptographyService.ToBase64Static(nonce),
             blob_version = 1
         };
 
@@ -44,7 +44,7 @@ public class ClipboardService(APIService api)
         if (string.IsNullOrEmpty(masterKeyBase64))
             throw new InvalidOperationException("Master key not found. User must be logged in.");
 
-        var masterKey = _api.CryptographyService.FromBase64(masterKeyBase64);
+        var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
 
         var response = await _api.GetAsync("/api/clipboard");
         response.EnsureSuccessStatusCode();
@@ -61,7 +61,7 @@ public class ClipboardService(APIService api)
         if (string.IsNullOrEmpty(masterKeyBase64))
             throw new InvalidOperationException("Master key not found. User must be logged in.");
 
-        var masterKey = _api.CryptographyService.FromBase64(masterKeyBase64);
+        var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
 
         var response = await _api.GetAsync($"/api/clipboard/all?page={page}&page_size={pageSize}");
         response.EnsureSuccessStatusCode();
@@ -84,10 +84,9 @@ public class ClipboardService(APIService api)
         if (masterKey == null)
             throw new ArgumentNullException(nameof(masterKey));
 
-        var ciphertext = _api.CryptographyService.FromBase64(entry.ciphertext);
-        var nonce = _api.CryptographyService.FromBase64(entry.nonce);
+        var ciphertext = CryptographyService.FromBase64Static(entry.ciphertext);
+        var nonce = CryptographyService.FromBase64Static(entry.nonce);
 
         return _api.CryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
     }
 }
-

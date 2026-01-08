@@ -1,255 +1,309 @@
 using System;
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text;
 using Konscious.Security.Cryptography;
 
 namespace Synclo.Services;
 
-
-// Provides cryptographic operations for E2EE including KDF, encryption, and decryption.
-
 public sealed class CryptographyService
 {
-    // Argon2 parameters - MUST match server exactly
+    // -------------------- CONSTANTS --------------------
+
+    // Argon2 parameters — DO NOT CHANGE
     private const int TimeCost = 2;
-    private const int MemoryCost = 65536; // 64 MB
+    private const int MemoryCost = 65536;
     private const int Parallelism = 1;
-    private const int HashLength = 32; // 256 bits
-    private const int NonceLength = 12; // Recommended for AES-GCM
-    
+
+    private const int HashLength = 32;
+    private const int NonceLength = 12;
+
+    private const byte WrapFormatVersion = 1;
+    private const byte KdfVersionValue = 1;
+
+    private static readonly byte[] ClipboardAad = "clipboard_v1"u8.ToArray();
+    private static readonly byte[] WrapAad = "wrap_mk_v1"u8.ToArray();
+    private static readonly byte[] HkdfSaltLabel = "hkdf_salt_v1"u8.ToArray();
+
     // Secure storage keys
     public static string MasterKey => $"{AccountService.Prefix}.crypto.master_key";
     public static string Salt => $"{AccountService.Prefix}.crypto.salt";
     public static string KdfVersion => $"{AccountService.Prefix}.crypto.kdf_version";
-    
-    public byte[] DeriveAuthKey(string password, byte[] salt)
-    {
-        var keys = DerivePasswordKeys(password, salt);
-        return keys.authKey;
-    }
 
-    public (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(string password, byte[] salt)
+    // -------------------- PASSWORD DERIVATION --------------------
+
+    public byte[] DeriveAuthKey(string password, byte[] salt)
+        => DerivePasswordKeys(password.AsSpan(), salt).authKey;
+
+    public byte[] DeriveAuthKey(ReadOnlySpan<char> password, byte[] salt)
+        => DerivePasswordKeys(password, salt).authKey;
+
+    public (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(
+        string password,
+        byte[] salt
+    ) => DerivePasswordKeys(password.AsSpan(), salt);
+
+    public (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(
+        ReadOnlySpan<char> password,
+        byte[] salt
+    )
     {
-        if (string.IsNullOrEmpty(password))
+        if (password.IsEmpty)
             throw new ArgumentException("Password cannot be empty", nameof(password));
-        
-        if (salt == null || salt.Length < 16 || salt.Length > 256)
-            throw new ArgumentException("Salt must be between 16 and 256 bytes", nameof(salt));
+
+        if (salt is null || salt.Length < 16 || salt.Length > 256)
+            throw new ArgumentException("Salt must be 16–256 bytes", nameof(salt));
 
         var baseKey = DeriveBaseKey(password, salt);
+        var hkdfSalt = DeriveHkdfSalt(salt);
+
         try
         {
-            var authKey = Hkdf(baseKey, "auth_key", HashLength);
-            var wrappingKey = Hkdf(baseKey, "wrapping_key", HashLength);
+            var authKey = new byte[HashLength];
+            var wrappingKey = new byte[HashLength];
+
+            HKDF.DeriveKey(
+                HashAlgorithmName.SHA256,
+                baseKey,
+                authKey,
+                hkdfSalt,
+                BuildInfo("auth_key")
+            );
+
+            HKDF.DeriveKey(
+                HashAlgorithmName.SHA256,
+                baseKey,
+                wrappingKey,
+                hkdfSalt,
+                BuildInfo("wrapping_key")
+            );
+
             return (authKey, wrappingKey);
         }
         finally
         {
             CryptographicOperations.ZeroMemory(baseKey);
+            CryptographicOperations.ZeroMemory(hkdfSalt);
         }
     }
-    
-    private byte[] DeriveBaseKey(string password, byte[] salt)
-    {
-        using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
-        {
-            Salt = salt,
-            DegreeOfParallelism = Parallelism,
-            MemorySize = MemoryCost,
-            Iterations = TimeCost
-        };
 
-        return argon2.GetBytes(HashLength);
-    }
-    
-    public byte[] GenerateMasterKey()
+    private static byte[] BuildInfo(string purpose)
+        => Encoding.UTF8.GetBytes($"{purpose}|kdf_v{KdfVersionValue}");
+
+    private static byte[] DeriveHkdfSalt(byte[] argonSalt)
     {
-        return RandomNumberGenerator.GetBytes(32);
+        using var sha = SHA256.Create();
+        sha.TransformBlock(HkdfSaltLabel, 0, HkdfSaltLabel.Length, null, 0);
+        sha.TransformFinalBlock(argonSalt, 0, argonSalt.Length);
+        return sha.Hash!;
     }
-    
+
+    private static byte[] DeriveBaseKey(ReadOnlySpan<char> password, byte[] salt)
+    {
+        var maxBytes = Encoding.UTF8.GetMaxByteCount(password.Length);
+        var rented = ArrayPool<byte>.Shared.Rent(maxBytes);
+
+        try
+        {
+            var byteCount = Encoding.UTF8.GetBytes(password, rented);
+            var pwdBytes = new byte[byteCount];
+            Buffer.BlockCopy(rented, 0, pwdBytes, 0, byteCount);
+
+            try
+            {
+                using var argon2 = new Argon2id(pwdBytes)
+                {
+                    Salt = salt,
+                    DegreeOfParallelism = Parallelism,
+                    MemorySize = MemoryCost,
+                    Iterations = TimeCost
+                };
+
+                return argon2.GetBytes(HashLength);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(pwdBytes);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(rented.AsSpan(0, maxBytes));
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    // -------------------- MASTER KEY --------------------
+
+    public byte[] GenerateMasterKey()
+        => RandomNumberGenerator.GetBytes(32);
+
     public byte[] WrapMasterKey(byte[] masterKey, byte[] wrappingKey)
     {
-        if (masterKey == null || masterKey.Length != 32)
-            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
-        
-        if (wrappingKey == null || wrappingKey.Length != 32)
-            throw new ArgumentException("Wrapping key must be 32 bytes", nameof(wrappingKey));
+        if (masterKey is null || masterKey.Length != 32)
+            throw new ArgumentException("Invalid master key", nameof(masterKey));
 
-        var nonce = GenerateNonce(NonceLength);
-        
-        using var aesGcm = new AesGcm(wrappingKey, AesGcm.TagByteSizes.MaxSize);
-        var ciphertext = new byte[masterKey.Length];
+        if (wrappingKey is null || wrappingKey.Length != 32)
+            throw new ArgumentException("Invalid wrapping key", nameof(wrappingKey));
+
+        var nonce = GenerateNonce();
+
+        using var aes = new AesGcm(wrappingKey, AesGcm.TagByteSizes.MaxSize);
+        var ciphertext = new byte[32];
         var tag = new byte[AesGcm.TagByteSizes.MaxSize];
-        
-        aesGcm.Encrypt(nonce, masterKey, ciphertext, tag);
 
-        // Combine: nonce + ciphertext + tag
-        var result = new byte[nonce.Length + ciphertext.Length + tag.Length];
-        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
-        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length, ciphertext.Length);
-        Buffer.BlockCopy(tag, 0, result, nonce.Length + ciphertext.Length, tag.Length);
+        aes.Encrypt(nonce, masterKey, ciphertext, tag, WrapAad);
+
+        var result = new byte[1 + nonce.Length + ciphertext.Length + tag.Length];
+        result[0] = WrapFormatVersion;
+
+        Buffer.BlockCopy(nonce, 0, result, 1, nonce.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, 1 + nonce.Length, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, result, 1 + nonce.Length + ciphertext.Length, tag.Length);
+
+        CryptographicOperations.ZeroMemory(ciphertext);
+        CryptographicOperations.ZeroMemory(tag);
 
         return result;
     }
-    
+
     public byte[] UnwrapMasterKey(byte[] wrappedMK, byte[] wrappingKey)
     {
-        if (wrappedMK == null || wrappedMK.Length < NonceLength + 32 + AesGcm.TagByteSizes.MaxSize)
-            throw new ArgumentException("Invalid wrapped master key length", nameof(wrappedMK));
-        
-        if (wrappingKey == null || wrappingKey.Length != 32)
-            throw new ArgumentException("Wrapping key must be 32 bytes", nameof(wrappingKey));
+        if (wrappedMK is null || wrappedMK.Length != 1 + NonceLength + 32 + AesGcm.TagByteSizes.MaxSize)
+            throw new ArgumentException("Invalid wrapped master key", nameof(wrappedMK));
 
-        // Extract components
+        if (wrappedMK[0] != WrapFormatVersion)
+            throw new ArgumentException("Unsupported wrap format", nameof(wrappedMK));
+
+        if (wrappingKey is null || wrappingKey.Length != 32)
+            throw new ArgumentException("Invalid wrapping key", nameof(wrappingKey));
+
         var nonce = new byte[NonceLength];
-        var ciphertextLength = wrappedMK.Length - NonceLength - AesGcm.TagByteSizes.MaxSize;
-        var ciphertext = new byte[ciphertextLength];
+        var ciphertext = new byte[32];
         var tag = new byte[AesGcm.TagByteSizes.MaxSize];
 
-        Buffer.BlockCopy(wrappedMK, 0, nonce, 0, NonceLength);
-        Buffer.BlockCopy(wrappedMK, NonceLength, ciphertext, 0, ciphertextLength);
-        Buffer.BlockCopy(wrappedMK, NonceLength + ciphertextLength, tag, 0, tag.Length);
+        Buffer.BlockCopy(wrappedMK, 1, nonce, 0, nonce.Length);
+        Buffer.BlockCopy(wrappedMK, 1 + nonce.Length, ciphertext, 0, ciphertext.Length);
+        Buffer.BlockCopy(wrappedMK, 1 + nonce.Length + ciphertext.Length, tag, 0, tag.Length);
 
-        // Decrypt
-        using var aesGcm = new AesGcm(wrappingKey, AesGcm.TagByteSizes.MaxSize);
-        var plaintext = new byte[ciphertextLength];
-        
+        using var aes = new AesGcm(wrappingKey, AesGcm.TagByteSizes.MaxSize);
+        var plaintext = new byte[32];
+
         try
         {
-            aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext, WrapAad);
             return plaintext;
         }
         catch (CryptographicException ex)
         {
-            throw new InvalidOperationException("Failed to unwrap master key. Invalid auth key or corrupted data.", ex);
+            throw new InvalidOperationException("Cryptographic operation failed", ex);
         }
-    }
-    
-    public byte[] GenerateNonce(int length = NonceLength)
-    {
-        if (length < 8 || length > 64)
-            throw new ArgumentException("Nonce length must be between 8 and 64 bytes", nameof(length));
-
-        return RandomNumberGenerator.GetBytes(length);
-    }
-    
-    private byte[] Hkdf(byte[] ikm, string info, int length)
-    {
-        var salt = new byte[HashLength];
-        using var hmacExtract = new HMACSHA256(salt);
-        var prk = hmacExtract.ComputeHash(ikm);
-
-        var infoBytes = Encoding.UTF8.GetBytes(info);
-        var okm = new byte[length];
-        var previous = Array.Empty<byte>();
-        var bytesGenerated = 0;
-
-        using var hmacExpand = new HMACSHA256(prk);
-        byte counter = 1;
-        while (bytesGenerated < length)
+        finally
         {
-            var input = new byte[previous.Length + infoBytes.Length + 1];
-            Buffer.BlockCopy(previous, 0, input, 0, previous.Length);
-            Buffer.BlockCopy(infoBytes, 0, input, previous.Length, infoBytes.Length);
-            input[^1] = counter;
-
-            previous = hmacExpand.ComputeHash(input);
-            var bytesToCopy = Math.Min(previous.Length, length - bytesGenerated);
-            Buffer.BlockCopy(previous, 0, okm, bytesGenerated, bytesToCopy);
-            bytesGenerated += bytesToCopy;
-            counter++;
-        }
-
-        CryptographicOperations.ZeroMemory(prk);
-        return okm;
-    }
-    
-    public string ToBase64(byte[] data)
-    {
-        return ToBase64Static(data);
-    }
-    
-    public byte[] FromBase64(string base64)
-    {
-        return FromBase64Static(base64);
-    }
-    
-    public static string ToBase64Static(byte[] data)
-    {
-        if (data == null)
-            throw new ArgumentNullException(nameof(data));
-
-        return Convert.ToBase64String(data);
-    }
-    
-    public static byte[] FromBase64Static(string base64)
-    {
-        if (string.IsNullOrWhiteSpace(base64))
-            throw new ArgumentException("Base64 string cannot be empty", nameof(base64));
-
-        try
-        {
-            return Convert.FromBase64String(base64);
-        }
-        catch (FormatException ex)
-        {
-            throw new ArgumentException("Invalid base64 string", nameof(base64), ex);
+            CryptographicOperations.ZeroMemory(ciphertext);
+            CryptographicOperations.ZeroMemory(tag);
         }
     }
 
-    public string DecryptClipboard(byte[] ciphertext, byte[] nonce, byte[] masterKey)
-    {
-        if (ciphertext == null || ciphertext.Length < AesGcm.TagByteSizes.MaxSize)
-            throw new ArgumentException("Invalid ciphertext length", nameof(ciphertext));
-        
-        if (nonce == null || nonce.Length != NonceLength)
-            throw new ArgumentException($"Nonce must be {NonceLength} bytes", nameof(nonce));
-        
-        if (masterKey == null || masterKey.Length != 32)
-            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
+    // -------------------- CLIPBOARD --------------------
 
-        var tagLength = AesGcm.TagByteSizes.MaxSize;
-        var actualCiphertext = new byte[ciphertext.Length - tagLength];
-        var tag = new byte[tagLength];
-
-        Buffer.BlockCopy(ciphertext, 0, actualCiphertext, 0, actualCiphertext.Length);
-        Buffer.BlockCopy(ciphertext, actualCiphertext.Length, tag, 0, tagLength);
-
-        using var aesGcm = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
-        var plaintext = new byte[actualCiphertext.Length];
-        
-        try
-        {
-            aesGcm.Decrypt(nonce, actualCiphertext, tag, plaintext);
-            return Encoding.UTF8.GetString(plaintext);
-        }
-        catch (CryptographicException ex)
-        {
-            throw new InvalidOperationException("Failed to decrypt clipboard. Invalid master key or corrupted data.", ex);
-        }
-    }
-    
-    public (byte[] ciphertext, byte[] nonce) EncryptClipboard(string plaintext, byte[] masterKey)
+    public (byte[] ciphertext, byte[] nonce) EncryptClipboard(
+        string plaintext,
+        byte[] masterKey
+    )
     {
         if (string.IsNullOrEmpty(plaintext))
             throw new ArgumentException("Plaintext cannot be empty", nameof(plaintext));
-        
-        if (masterKey == null || masterKey.Length != 32)
-            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
 
-        var nonce = GenerateNonce(NonceLength);
-        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        
-        using var aesGcm = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
-        var ciphertext = new byte[plaintextBytes.Length];
+        if (masterKey is null || masterKey.Length != 32)
+            throw new ArgumentException("Invalid master key", nameof(masterKey));
+
+        var nonce = GenerateNonce();
+        var data = Encoding.UTF8.GetBytes(plaintext);
+
+        using var aes = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
+        var ciphertext = new byte[data.Length];
         var tag = new byte[AesGcm.TagByteSizes.MaxSize];
-        
-        aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag);
+
+        try
+        {
+            aes.Encrypt(nonce, data, ciphertext, tag, ClipboardAad);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(data);
+        }
 
         var result = new byte[ciphertext.Length + tag.Length];
         Buffer.BlockCopy(ciphertext, 0, result, 0, ciphertext.Length);
         Buffer.BlockCopy(tag, 0, result, ciphertext.Length, tag.Length);
 
+        CryptographicOperations.ZeroMemory(tag);
+
         return (result, nonce);
     }
+
+    public string DecryptClipboard(
+        byte[] ciphertext,
+        byte[] nonce,
+        byte[] masterKey
+    )
+    {
+        if (ciphertext is null || ciphertext.Length < AesGcm.TagByteSizes.MaxSize)
+            throw new ArgumentException("Invalid ciphertext", nameof(ciphertext));
+
+        if (nonce is null || nonce.Length != NonceLength)
+            throw new ArgumentException("Invalid nonce", nameof(nonce));
+
+        if (masterKey is null || masterKey.Length != 32)
+            throw new ArgumentException("Invalid master key", nameof(masterKey));
+
+        var tagLen = AesGcm.TagByteSizes.MaxSize;
+        var dataLen = ciphertext.Length - tagLen;
+
+        var data = new byte[dataLen];
+        var tag = new byte[tagLen];
+
+        Buffer.BlockCopy(ciphertext, 0, data, 0, dataLen);
+        Buffer.BlockCopy(ciphertext, dataLen, tag, 0, tagLen);
+
+        using var aes = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
+        var plaintext = new byte[dataLen];
+
+        try
+        {
+            aes.Decrypt(nonce, data, tag, plaintext, ClipboardAad);
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new InvalidOperationException("Cryptographic operation failed", ex);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+            CryptographicOperations.ZeroMemory(data);
+            CryptographicOperations.ZeroMemory(tag);
+        }
+    }
+
+    // -------------------- UTIL --------------------
+
+    public byte[] GenerateNonce(int length = NonceLength)
+    {
+        if (length < 8 || length > 64)
+            throw new ArgumentException("Nonce length must be 8–64 bytes", nameof(length));
+
+        return RandomNumberGenerator.GetBytes(length);
+    }
+
+    public static string ToBase64Static(byte[] data)
+        => Convert.ToBase64String(data ?? throw new ArgumentNullException(nameof(data)));
+
+    public static byte[] FromBase64Static(string base64)
+        => Convert.FromBase64String(
+            string.IsNullOrWhiteSpace(base64)
+                ? throw new ArgumentException("Base64 cannot be empty", nameof(base64))
+                : base64
+        );
 }

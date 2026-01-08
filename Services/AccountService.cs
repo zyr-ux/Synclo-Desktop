@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
@@ -8,12 +9,21 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class AccountService(APIService api, HttpClient http, ISettingsService settings, DeviceService deviceService)
+public sealed class AccountService(
+    APIService api,
+    HttpClient http,
+    ISettingsService settings,
+    DeviceService deviceService)
 {
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
     public const string RefreshToken = $"{Prefix}.auth.refresh_token";
     public const string UserEmail = $"{Prefix}.user.email";
+
+    // -------------------- KDF --------------------
+    private const int SupportedKdfVersion = 1;
+
+    // -------------------- AUTH STATE --------------------
 
     public async Task<bool> IsAuthenticatedAsync()
     {
@@ -22,9 +32,25 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
     }
 
     public async Task<string?> GetStoredEmailAsync()
+        => await SecureStorage.LoadAsync(UserEmail);
+
+    // -------------------- KDF ENFORCEMENT --------------------
+    public async Task EnforceLocalKdfVersionAsync()
     {
-        return await SecureStorage.LoadAsync(UserEmail);
+        var stored = await SecureStorage.LoadAsync(CryptographyService.KdfVersion);
+
+        if (string.IsNullOrWhiteSpace(stored))
+            return;
+
+        if (!int.TryParse(stored, out var version) || version != SupportedKdfVersion)
+        {
+            await LogoutAsync();
+            throw new SecurityException(
+                $"Local session uses unsupported security version {stored}. Please log in again.");
+        }
     }
+
+    // -------------------- LOGIN --------------------
 
     public async Task LoginAsync(string email, string password, CancellationToken ct = default)
     {
@@ -34,8 +60,18 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         try
         {
             var saltResponse = await GetSaltAsync(email, ct);
+
+            if (saltResponse.kdf_version != SupportedKdfVersion)
+            {
+                throw new InvalidRequestException(
+                    $"Account requires security version {saltResponse.kdf_version}, " +
+                    $"but this app only supports version {SupportedKdfVersion}. Please update.");
+            }
+
             var salt = CryptographyService.FromBase64Static(saltResponse.salt);
-            var (authKey, wrappingKey) = api.CryptographyService.DerivePasswordKeys(password, salt);
+
+            var (authKey, wrappingKey) =
+                api.CryptographyService.DerivePasswordKeys(password, salt);
 
             var req = new LoginRequest
             {
@@ -54,52 +90,46 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
             if (!res.IsSuccessStatusCode)
                 throw new ServerFailureException(content);
 
-            var data = api.Deserialize<AuthResponse>(content);
+            var data = api.Deserialize<AuthResponse>(content)
+                       ?? throw new ServerFailureException("Invalid response");
 
-            if (string.IsNullOrWhiteSpace(data?.access_token) || string.IsNullOrWhiteSpace(data?.refresh_token))
-                throw new ServerFailureException("Server returned success but tokens were empty.");
+            if (string.IsNullOrWhiteSpace(data.access_token) ||
+                string.IsNullOrWhiteSpace(data.refresh_token) ||
+                string.IsNullOrWhiteSpace(data.encrypted_master_key))
+                throw new ServerFailureException("Missing auth data");
+
+            var wrappedMk =
+                CryptographyService.FromBase64Static(data.encrypted_master_key);
+
+            var masterKey =
+                api.CryptographyService.UnwrapMasterKey(wrappedMk, wrappingKey);
 
             await SecureStorage.SaveAsync(AccessToken, data.access_token);
             await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
             await SecureStorage.SaveAsync(UserEmail, email);
-
-            if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-                await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
+            await SecureStorage.SaveAsync(
+                CryptographyService.MasterKey,
+                CryptographyService.ToBase64Static(masterKey));
+            await SecureStorage.SaveAsync(
+                CryptographyService.KdfVersion,
+                SupportedKdfVersion.ToString());
 
             if (!string.IsNullOrWhiteSpace(data.salt))
                 await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
-
-            if (data.kdf_version.HasValue)
-                await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
-
-            if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-            {
-                var wrappedMk = CryptographyService.FromBase64Static(data.encrypted_master_key);
-                var masterKey = api.CryptographyService.UnwrapMasterKey(wrappedMk, wrappingKey);
-                await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
-            }
 
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
             settings.Save();
         }
-        catch (Exception ex) when (ex is NotImplementedException)
-        {
-            throw;
-        }
-        catch (InvalidRequestException)
-        {
-            throw;
-        }
-        catch (InvalidCredentialsException)
-        {
-            throw;
-        }
+        catch (InvalidRequestException) { throw; }
+        catch (InvalidCredentialsException) { throw; }
         catch (Exception ex)
         {
             throw new ServerFailureException($"Login failed: {ex.Message}");
         }
     }
+
+    // -------------------- REGISTER --------------------
 
     public async Task RegisterAsync(string email, string password, CancellationToken ct = default)
     {
@@ -110,8 +140,12 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         {
             var salt = api.CryptographyService.GenerateNonce(32);
             var masterKey = api.CryptographyService.GenerateMasterKey();
-            var (authKey, wrappingKey) = api.CryptographyService.DerivePasswordKeys(password, salt);
-            var wrappedMk = api.CryptographyService.WrapMasterKey(masterKey, wrappingKey);
+
+            var (authKey, wrappingKey) =
+                api.CryptographyService.DerivePasswordKeys(password, salt);
+
+            var wrappedMk =
+                api.CryptographyService.WrapMasterKey(masterKey, wrappingKey);
 
             var req = new RegisterRequest
             {
@@ -119,7 +153,7 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
                 auth_key = CryptographyService.ToBase64Static(authKey),
                 encrypted_master_key = CryptographyService.ToBase64Static(wrappedMk),
                 salt = CryptographyService.ToBase64Static(salt),
-                kdf_version = 1,
+                kdf_version = SupportedKdfVersion,
                 device_id = Utils.GetOrCreateDeviceId(),
                 device_name = Utils.GetDeviceName()
             };
@@ -135,69 +169,68 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
                     _ => new ServerFailureException(content)
                 };
 
-            var data = api.Deserialize<AuthResponse>(content);
+            var data = api.Deserialize<AuthResponse>(content)
+                       ?? throw new ServerFailureException("Invalid response");
 
-            if (string.IsNullOrWhiteSpace(data?.access_token) || string.IsNullOrWhiteSpace(data?.refresh_token))
-                throw new ServerFailureException("Missing tokens in response.");
+            if (string.IsNullOrWhiteSpace(data.access_token) ||
+                string.IsNullOrWhiteSpace(data.refresh_token))
+                throw new ServerFailureException("Missing tokens");
 
             await SecureStorage.SaveAsync(AccessToken, data.access_token);
             await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
             await SecureStorage.SaveAsync(UserEmail, email);
-
-            if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-                await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
-
-            if (!string.IsNullOrWhiteSpace(data.salt))
-                await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
-
-            if (data.kdf_version.HasValue)
-                await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
-
-            await SecureStorage.SaveAsync(CryptographyService.Salt, CryptographyService.ToBase64Static(salt));
-            await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
+            await SecureStorage.SaveAsync(
+                CryptographyService.MasterKey,
+                CryptographyService.ToBase64Static(masterKey));
+            await SecureStorage.SaveAsync(
+                CryptographyService.Salt,
+                CryptographyService.ToBase64Static(salt));
+            await SecureStorage.SaveAsync(
+                CryptographyService.KdfVersion,
+                SupportedKdfVersion.ToString());
 
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
             settings.Save();
         }
-        catch (Exception ex) when (ex is NotImplementedException)
-        {
-            throw;
-        }
-        catch (InvalidRequestException)
-        {
-            throw;
-        }
-        catch (UserAlreadyExistsException)
-        {
-            throw;
-        }
+        catch (InvalidRequestException) { throw; }
+        catch (UserAlreadyExistsException) { throw; }
         catch (Exception ex)
         {
             throw new ServerFailureException($"Registration failed: {ex.Message}");
         }
     }
 
-    public async Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
+    // -------------------- CHANGE PASSWORD --------------------
+
+    public async Task ChangePasswordAsync(
+        string currentPassword,
+        string newPassword,
+        CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        if (string.IsNullOrWhiteSpace(currentPassword) ||
+            string.IsNullOrWhiteSpace(newPassword))
             throw new InvalidRequestException("Passwords are required");
 
-        var email = await SecureStorage.LoadAsync(UserEmail);
         var storedSalt = await SecureStorage.LoadAsync(CryptographyService.Salt);
-        var storedMasterKey = await SecureStorage.LoadAsync(CryptographyService.MasterKey);
+        var storedMk = await SecureStorage.LoadAsync(CryptographyService.MasterKey);
 
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(storedSalt) || string.IsNullOrWhiteSpace(storedMasterKey))
+        if (string.IsNullOrWhiteSpace(storedSalt) ||
+            string.IsNullOrWhiteSpace(storedMk))
             throw new SessionExpiredException();
 
-        var currentSalt = CryptographyService.FromBase64Static(storedSalt);
-        var masterKey = CryptographyService.FromBase64Static(storedMasterKey);
+        var salt = CryptographyService.FromBase64Static(storedSalt);
+        var masterKey = CryptographyService.FromBase64Static(storedMk);
 
-        var (oldAuthKey, _) = api.CryptographyService.DerivePasswordKeys(currentPassword, currentSalt);
+        var (oldAuthKey, _) =
+            api.CryptographyService.DerivePasswordKeys(currentPassword, salt);
 
         var newSalt = api.CryptographyService.GenerateNonce(32);
-        var (newAuthKey, newWrappingKey) = api.CryptographyService.DerivePasswordKeys(newPassword, newSalt);
-        var newWrappedMk = api.CryptographyService.WrapMasterKey(masterKey, newWrappingKey);
+        var (newAuthKey, newWrappingKey) =
+            api.CryptographyService.DerivePasswordKeys(newPassword, newSalt);
+
+        var newWrappedMk =
+            api.CryptographyService.WrapMasterKey(masterKey, newWrappingKey);
 
         var req = new
         {
@@ -205,93 +238,29 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
             new_auth_key = CryptographyService.ToBase64Static(newAuthKey),
             new_encrypted_master_key = CryptographyService.ToBase64Static(newWrappedMk),
             new_salt = CryptographyService.ToBase64Static(newSalt),
-            new_kdf_version = 1
+            new_kdf_version = SupportedKdfVersion
         };
 
         using var res = await api.PostAsync("/api/password/change", req, ct);
         var content = await res.Content.ReadAsStringAsync(ct);
 
         if (res.StatusCode == HttpStatusCode.Unauthorized)
-            throw new InvalidCredentialsException("Invalid current password.");
-
-        if (res.StatusCode == HttpStatusCode.BadRequest)
-            throw new InvalidRequestException(content);
-
-        if (res.StatusCode == HttpStatusCode.TooManyRequests)
-            throw new InvalidRequestException("Too many attempts. Try again later.");
+            throw new InvalidCredentialsException(content);
 
         if (!res.IsSuccessStatusCode)
             throw new ServerFailureException(content);
 
-        await SecureStorage.SaveAsync(CryptographyService.Salt, CryptographyService.ToBase64Static(newSalt));
-        await SecureStorage.SaveAsync(CryptographyService.KdfVersion, "1");
+        await SecureStorage.SaveAsync(
+            CryptographyService.Salt,
+            CryptographyService.ToBase64Static(newSalt));
+        await SecureStorage.SaveAsync(
+            CryptographyService.KdfVersion,
+            SupportedKdfVersion.ToString());
     }
 
-    public async Task LogoutAsync()
-    {
-        var deviceId = settings.Settings.device_id;
-        if (!string.IsNullOrWhiteSpace(deviceId))
-            try
-            {
-                await api.DeviceService.DeleteDeviceAsync(deviceId);
-            }
-            catch
-            {
-                App.NotificationService.ShowError("Logout failed.");
-            }
+    // -------------------- TOKEN REFRESH --------------------
 
-        await SecureStorage.DeleteAsync(AccessToken);
-        await SecureStorage.DeleteAsync(RefreshToken);
-        await SecureStorage.DeleteAsync(UserEmail);
-        await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
-        await SecureStorage.DeleteAsync(CryptographyService.Salt);
-        await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
-        await deviceService.ClearAsync();
-    }
-
-    public async Task ForceClearLocalSessionAsync()
-    {
-        await SecureStorage.DeleteAsync(AccessToken);
-        await SecureStorage.DeleteAsync(RefreshToken);
-        await SecureStorage.DeleteAsync(UserEmail);
-        await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
-        await SecureStorage.DeleteAsync(CryptographyService.Salt);
-        await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
-        await deviceService.ClearAsync();
-    }
-
-    private async Task<SaltResponse> GetSaltAsync(string email, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-            throw new ArgumentException("Email cannot be empty", nameof(email));
-
-        try
-        {
-            using var res = await http.GetAsync($"/api/auth/salt?email={Uri.EscapeDataString(email)}", ct);
-            var content = await res.Content.ReadAsStringAsync(ct);
-
-            if (res.StatusCode == HttpStatusCode.NotFound)
-                throw new InvalidRequestException("User not found");
-
-            if (res.StatusCode == HttpStatusCode.TooManyRequests)
-                throw new InvalidRequestException("Too many requests. Please wait before trying again.");
-
-            if (!res.IsSuccessStatusCode)
-                throw new ServerFailureException(content);
-
-            var data = api.Deserialize<SaltResponse>(content);
-            if (data == null)
-                throw new ServerFailureException("Server returned success but salt was missing");
-
-            return data;
-        }
-        catch (HttpRequestException)
-        {
-            throw new NetworkFailureException();
-        }
-    }
-    
-    public async Task<string> RefreshTokenAsync(CancellationToken ct)
+    public async Task<string> RefreshTokenAsync(CancellationToken ct = default)
     {
         var refreshToken = await SecureStorage.LoadAsync(RefreshToken);
         if (string.IsNullOrWhiteSpace(refreshToken))
@@ -301,17 +270,17 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
 
         try
         {
-            using var res = await http.PostAsync("/api/refresh", api.Serialize(body), ct);
+            using var res = await api.PostAsync("/api/refresh", body, ct);
 
             if (!res.IsSuccessStatusCode)
             {
                 if (res.StatusCode == HttpStatusCode.Unauthorized)
                 {
-                    var content = await res.Content.ReadAsStringAsync(ct);
-                    if (content.Contains("reused") || content.Contains("family"))
+                    var errorContent = await res.Content.ReadAsStringAsync(ct);
+                    if (errorContent.Contains("reused") || errorContent.Contains("family"))
                     {
                         await LogoutAsync();
-                        throw new SecurityBreachException("Refresh token reused. Session terminated for security.");
+                        throw new SecurityBreachException("Refresh token reuse detected.");
                     }
                 }
 
@@ -319,46 +288,81 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
                 throw new SessionExpiredException();
             }
 
-            var json = await res.Content.ReadAsStringAsync(ct);
-            var data = api.Deserialize<AuthResponse>(json);
+            var content = await res.Content.ReadAsStringAsync(ct);
+            var data = api.Deserialize<AuthResponse>(content);
 
-            if (data == null || string.IsNullOrWhiteSpace(data.access_token) ||
+            if (data == null ||
+                string.IsNullOrWhiteSpace(data.access_token) ||
                 string.IsNullOrWhiteSpace(data.refresh_token))
             {
                 await LogoutAsync();
                 throw new SessionExpiredException();
             }
 
-            await UpdateTokensAsyncInt(data.access_token, data.refresh_token);
+            if (data.kdf_version.HasValue &&
+                data.kdf_version.Value != SupportedKdfVersion)
+            {
+                await LogoutAsync();
+                throw new SecurityException(
+                    $"Account upgraded to security version {data.kdf_version}. Please update the app.");
+            }
 
-            if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
-                await SecureStorage.SaveAsync(CryptographyService.MasterKey, data.encrypted_master_key);
+            await SecureStorage.SaveAsync(AccessToken, data.access_token);
+            await SecureStorage.SaveAsync(RefreshToken, data.refresh_token);
 
             if (!string.IsNullOrWhiteSpace(data.salt))
                 await SecureStorage.SaveAsync(CryptographyService.Salt, data.salt);
 
             if (data.kdf_version.HasValue)
-                await SecureStorage.SaveAsync(CryptographyService.KdfVersion, data.kdf_version.Value.ToString());
+                await SecureStorage.SaveAsync(
+                    CryptographyService.KdfVersion,
+                    data.kdf_version.Value.ToString());
 
             return data.access_token;
         }
-        catch (SessionExpiredException)
-        {
-            throw;
-        }
-        catch (SecurityBreachException)
-        {
-            throw;
-        }
-        catch (Exception)
+        catch (HttpRequestException)
         {
             throw new NetworkFailureException();
         }
     }
 
-    private static async Task UpdateTokensAsyncInt(string accessToken, string refreshToken)
+    // -------------------- LOGOUT --------------------
+
+    public async Task LogoutAsync()
     {
-        await SecureStorage.SaveAsync(AccessToken, accessToken);
-        await SecureStorage.SaveAsync(RefreshToken, refreshToken);
+        var deviceId = settings.Settings.device_id;
+        if (!string.IsNullOrWhiteSpace(deviceId))
+        {
+            try { await deviceService.DeleteDeviceAsync(deviceId); }
+            catch { }
+        }
+
+        await SecureStorage.DeleteAsync(AccessToken);
+        await SecureStorage.DeleteAsync(RefreshToken);
+        await SecureStorage.DeleteAsync(UserEmail);
+        await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
+        await SecureStorage.DeleteAsync(CryptographyService.Salt);
+        await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
+
+        await deviceService.ClearAsync();
+    }
+
+    // -------------------- SALT --------------------
+
+    private async Task<SaltResponse> GetSaltAsync(string email, CancellationToken ct)
+    {
+        using var res =
+            await http.GetAsync($"/api/auth/salt?email={Uri.EscapeDataString(email)}", ct);
+
+        var content = await res.Content.ReadAsStringAsync(ct);
+
+        if (res.StatusCode == HttpStatusCode.NotFound)
+            throw new InvalidRequestException("User not found");
+
+        if (!res.IsSuccessStatusCode)
+            throw new ServerFailureException(content);
+
+        return api.Deserialize<SaltResponse>(content)
+               ?? throw new ServerFailureException("Missing salt");
     }
 }
