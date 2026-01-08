@@ -26,6 +26,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
     [ObservableProperty] private string _newPassword = string.Empty;
     [ObservableProperty] private string _confirmPassword = string.Empty;
     [ObservableProperty] private string _resetPasswordError = string.Empty;
+    [ObservableProperty] private string _resetPasswordStatusMessage = string.Empty;
 
     public ObservableCollection<DeviceModel> Devices { get; } = new();
 
@@ -137,6 +138,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
             return;
 
         ResetPasswordError = string.Empty;
+        ResetPasswordStatusMessage = string.Empty;
 
         if (string.IsNullOrWhiteSpace(CurrentPassword) || 
             string.IsNullOrWhiteSpace(NewPassword) || 
@@ -159,6 +161,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
 
         IsBusy = true;
+        ResetPasswordStatusMessage = "Updating password...";
         try
         {
             await _accountService.ChangePasswordAsync(CurrentPassword, NewPassword);
@@ -189,6 +192,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+            ResetPasswordStatusMessage = string.Empty;
         }
     }
 
@@ -198,5 +202,6 @@ public partial class AccountDetailsViewModel : ViewModelBase
         NewPassword = string.Empty;
         ConfirmPassword = string.Empty;
         ResetPasswordError = string.Empty;
+        ResetPasswordStatusMessage = string.Empty;
     }
 }

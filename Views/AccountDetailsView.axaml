@@ -180,13 +180,32 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2" Spacing="15">
-                        <TextBlock Text="{Binding ResetPasswordError}"
-                                   Foreground="#FF5555"
-                                   FontSize="14"
-                                   IsVisible="{Binding !!ResetPasswordError}"
-                                   TextWrapping="Wrap" />
+                    <StackPanel Grid.Row="2" 
+                                Spacing="15" 
+                                Margin="0 10 0 0">
 
+                        <!-- SAME MESSAGE SLOT -->
+                        <Grid>
+                            <!-- Status -->
+                            <TextBlock Text="{Binding ResetPasswordStatusMessage}"
+                                       Foreground="{DynamicResource Accent}"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       IsVisible="{Binding !!ResetPasswordStatusMessage}" />
+
+                            <!-- Error (overlays status) -->
+                            <TextBlock Text="{Binding ResetPasswordError}"
+                                       Foreground="#FF5555"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       IsVisible="{Binding !!ResetPasswordError}" />
+                        </Grid>
+
+                        <!-- Buttons stay unchanged -->
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Right"
                                     Spacing="10">
@@ -207,11 +226,12 @@
                                                             Height="24" />
                             </Button>
                         </StackPanel>
+
                     </StackPanel>
+
                 </Grid>
             </Border>
         </Grid>
 
     </Grid>
 </UserControl>
-
