@@ -249,6 +249,17 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         await deviceService.ClearAsync();
     }
 
+    public async Task ForceClearLocalSessionAsync()
+    {
+        await SecureStorage.DeleteAsync(AccessToken);
+        await SecureStorage.DeleteAsync(RefreshToken);
+        await SecureStorage.DeleteAsync(UserEmail);
+        await SecureStorage.DeleteAsync(CryptographyService.MasterKey);
+        await SecureStorage.DeleteAsync(CryptographyService.Salt);
+        await SecureStorage.DeleteAsync(CryptographyService.KdfVersion);
+        await deviceService.ClearAsync();
+    }
+
     private async Task<SaltResponse> GetSaltAsync(string email, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(email))
