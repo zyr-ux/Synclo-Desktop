@@ -35,7 +35,7 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         {
             var saltResponse = await GetSaltAsync(email, ct);
             var salt = CryptographyService.FromBase64Static(saltResponse.salt);
-            var authKey = api.CryptographyService.DeriveAuthKey(password, salt);
+            var (authKey, wrappingKey) = api.CryptographyService.DerivePasswordKeys(password, salt);
 
             var req = new LoginRequest
             {
@@ -75,7 +75,7 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
             if (!string.IsNullOrWhiteSpace(data.encrypted_master_key))
             {
                 var wrappedMk = CryptographyService.FromBase64Static(data.encrypted_master_key);
-                var masterKey = api.CryptographyService.UnwrapMasterKey(wrappedMk, authKey);
+                var masterKey = api.CryptographyService.UnwrapMasterKey(wrappedMk, wrappingKey);
                 await SecureStorage.SaveAsync(CryptographyService.MasterKey, CryptographyService.ToBase64Static(masterKey));
             }
 
@@ -110,8 +110,8 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         {
             var salt = api.CryptographyService.GenerateNonce(32);
             var masterKey = api.CryptographyService.GenerateMasterKey();
-            var authKey = api.CryptographyService.DeriveAuthKey(password, salt);
-            var wrappedMk = api.CryptographyService.WrapMasterKey(masterKey, authKey);
+            var (authKey, wrappingKey) = api.CryptographyService.DerivePasswordKeys(password, salt);
+            var wrappedMk = api.CryptographyService.WrapMasterKey(masterKey, wrappingKey);
 
             var req = new RegisterRequest
             {
@@ -176,6 +176,55 @@ public sealed class AccountService(APIService api, HttpClient http, ISettingsSer
         {
             throw new ServerFailureException($"Registration failed: {ex.Message}");
         }
+    }
+
+    public async Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+            throw new InvalidRequestException("Passwords are required");
+
+        var email = await SecureStorage.LoadAsync(UserEmail);
+        var storedSalt = await SecureStorage.LoadAsync(CryptographyService.Salt);
+        var storedMasterKey = await SecureStorage.LoadAsync(CryptographyService.MasterKey);
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(storedSalt) || string.IsNullOrWhiteSpace(storedMasterKey))
+            throw new SessionExpiredException();
+
+        var currentSalt = CryptographyService.FromBase64Static(storedSalt);
+        var masterKey = CryptographyService.FromBase64Static(storedMasterKey);
+
+        var (oldAuthKey, _) = api.CryptographyService.DerivePasswordKeys(currentPassword, currentSalt);
+
+        var newSalt = api.CryptographyService.GenerateNonce(32);
+        var (newAuthKey, newWrappingKey) = api.CryptographyService.DerivePasswordKeys(newPassword, newSalt);
+        var newWrappedMk = api.CryptographyService.WrapMasterKey(masterKey, newWrappingKey);
+
+        var req = new
+        {
+            old_auth_key = CryptographyService.ToBase64Static(oldAuthKey),
+            new_auth_key = CryptographyService.ToBase64Static(newAuthKey),
+            new_encrypted_master_key = CryptographyService.ToBase64Static(newWrappedMk),
+            new_salt = CryptographyService.ToBase64Static(newSalt),
+            new_kdf_version = 1
+        };
+
+        using var res = await api.PostAsync("/api/password/change", req, ct);
+        var content = await res.Content.ReadAsStringAsync(ct);
+
+        if (res.StatusCode == HttpStatusCode.Unauthorized)
+            throw new InvalidCredentialsException("Invalid current password.");
+
+        if (res.StatusCode == HttpStatusCode.BadRequest)
+            throw new InvalidRequestException(content);
+
+        if (res.StatusCode == HttpStatusCode.TooManyRequests)
+            throw new InvalidRequestException("Too many attempts. Try again later.");
+
+        if (!res.IsSuccessStatusCode)
+            throw new ServerFailureException(content);
+
+        await SecureStorage.SaveAsync(CryptographyService.Salt, CryptographyService.ToBase64Static(newSalt));
+        await SecureStorage.SaveAsync(CryptographyService.KdfVersion, "1");
     }
 
     public async Task LogoutAsync()

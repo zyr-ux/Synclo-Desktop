@@ -24,12 +24,33 @@ public sealed class CryptographyService
     
     public byte[] DeriveAuthKey(string password, byte[] salt)
     {
+        var keys = DerivePasswordKeys(password, salt);
+        return keys.authKey;
+    }
+
+    public (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(string password, byte[] salt)
+    {
         if (string.IsNullOrEmpty(password))
             throw new ArgumentException("Password cannot be empty", nameof(password));
         
         if (salt == null || salt.Length < 16 || salt.Length > 256)
             throw new ArgumentException("Salt must be between 16 and 256 bytes", nameof(salt));
 
+        var baseKey = DeriveBaseKey(password, salt);
+        try
+        {
+            var authKey = Hkdf(baseKey, "auth_key", HashLength);
+            var wrappingKey = Hkdf(baseKey, "wrapping_key", HashLength);
+            return (authKey, wrappingKey);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(baseKey);
+        }
+    }
+    
+    private byte[] DeriveBaseKey(string password, byte[] salt)
+    {
         using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
         {
             Salt = salt,
@@ -46,17 +67,17 @@ public sealed class CryptographyService
         return RandomNumberGenerator.GetBytes(32);
     }
     
-    public byte[] WrapMasterKey(byte[] masterKey, byte[] authKey)
+    public byte[] WrapMasterKey(byte[] masterKey, byte[] wrappingKey)
     {
         if (masterKey == null || masterKey.Length != 32)
             throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
         
-        if (authKey == null || authKey.Length != 32)
-            throw new ArgumentException("Auth key must be 32 bytes", nameof(authKey));
+        if (wrappingKey == null || wrappingKey.Length != 32)
+            throw new ArgumentException("Wrapping key must be 32 bytes", nameof(wrappingKey));
 
         var nonce = GenerateNonce(NonceLength);
         
-        using var aesGcm = new AesGcm(authKey, AesGcm.TagByteSizes.MaxSize);
+        using var aesGcm = new AesGcm(wrappingKey, AesGcm.TagByteSizes.MaxSize);
         var ciphertext = new byte[masterKey.Length];
         var tag = new byte[AesGcm.TagByteSizes.MaxSize];
         
@@ -71,13 +92,13 @@ public sealed class CryptographyService
         return result;
     }
     
-    public byte[] UnwrapMasterKey(byte[] wrappedMK, byte[] authKey)
+    public byte[] UnwrapMasterKey(byte[] wrappedMK, byte[] wrappingKey)
     {
         if (wrappedMK == null || wrappedMK.Length < NonceLength + 32 + AesGcm.TagByteSizes.MaxSize)
             throw new ArgumentException("Invalid wrapped master key length", nameof(wrappedMK));
         
-        if (authKey == null || authKey.Length != 32)
-            throw new ArgumentException("Auth key must be 32 bytes", nameof(authKey));
+        if (wrappingKey == null || wrappingKey.Length != 32)
+            throw new ArgumentException("Wrapping key must be 32 bytes", nameof(wrappingKey));
 
         // Extract components
         var nonce = new byte[NonceLength];
@@ -90,7 +111,7 @@ public sealed class CryptographyService
         Buffer.BlockCopy(wrappedMK, NonceLength + ciphertextLength, tag, 0, tag.Length);
 
         // Decrypt
-        using var aesGcm = new AesGcm(authKey, AesGcm.TagByteSizes.MaxSize);
+        using var aesGcm = new AesGcm(wrappingKey, AesGcm.TagByteSizes.MaxSize);
         var plaintext = new byte[ciphertextLength];
         
         try
@@ -104,71 +125,43 @@ public sealed class CryptographyService
         }
     }
     
-    public (byte[] ciphertext, byte[] nonce) EncryptClipboard(string plaintext, byte[] masterKey)
-    {
-        if (string.IsNullOrEmpty(plaintext))
-            throw new ArgumentException("Plaintext cannot be empty", nameof(plaintext));
-        
-        if (masterKey == null || masterKey.Length != 32)
-            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
-
-        var nonce = GenerateNonce(NonceLength);
-        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        
-        using var aesGcm = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
-        var ciphertext = new byte[plaintextBytes.Length];
-        var tag = new byte[AesGcm.TagByteSizes.MaxSize];
-        
-        aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag);
-
-        // Combine ciphertext + tag (nonce is returned separately as per server spec)
-        var result = new byte[ciphertext.Length + tag.Length];
-        Buffer.BlockCopy(ciphertext, 0, result, 0, ciphertext.Length);
-        Buffer.BlockCopy(tag, 0, result, ciphertext.Length, tag.Length);
-
-        return (result, nonce);
-    }
-    
-    public string DecryptClipboard(byte[] ciphertext, byte[] nonce, byte[] masterKey)
-    {
-        if (ciphertext == null || ciphertext.Length < AesGcm.TagByteSizes.MaxSize)
-            throw new ArgumentException("Invalid ciphertext length", nameof(ciphertext));
-        
-        if (nonce == null || nonce.Length != NonceLength)
-            throw new ArgumentException($"Nonce must be {NonceLength} bytes", nameof(nonce));
-        
-        if (masterKey == null || masterKey.Length != 32)
-            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
-
-        // Extract tag from end
-        var tagLength = AesGcm.TagByteSizes.MaxSize;
-        var actualCiphertext = new byte[ciphertext.Length - tagLength];
-        var tag = new byte[tagLength];
-
-        Buffer.BlockCopy(ciphertext, 0, actualCiphertext, 0, actualCiphertext.Length);
-        Buffer.BlockCopy(ciphertext, actualCiphertext.Length, tag, 0, tagLength);
-
-        // Decrypt
-        using var aesGcm = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
-        var plaintext = new byte[actualCiphertext.Length];
-        
-        try
-        {
-            aesGcm.Decrypt(nonce, actualCiphertext, tag, plaintext);
-            return Encoding.UTF8.GetString(plaintext);
-        }
-        catch (CryptographicException ex)
-        {
-            throw new InvalidOperationException("Failed to decrypt clipboard. Invalid master key or corrupted data.", ex);
-        }
-    }
-    
     public byte[] GenerateNonce(int length = NonceLength)
     {
         if (length < 8 || length > 64)
             throw new ArgumentException("Nonce length must be between 8 and 64 bytes", nameof(length));
 
         return RandomNumberGenerator.GetBytes(length);
+    }
+    
+    private byte[] Hkdf(byte[] ikm, string info, int length)
+    {
+        var salt = new byte[HashLength];
+        using var hmacExtract = new HMACSHA256(salt);
+        var prk = hmacExtract.ComputeHash(ikm);
+
+        var infoBytes = Encoding.UTF8.GetBytes(info);
+        var okm = new byte[length];
+        var previous = Array.Empty<byte>();
+        var bytesGenerated = 0;
+
+        using var hmacExpand = new HMACSHA256(prk);
+        byte counter = 1;
+        while (bytesGenerated < length)
+        {
+            var input = new byte[previous.Length + infoBytes.Length + 1];
+            Buffer.BlockCopy(previous, 0, input, 0, previous.Length);
+            Buffer.BlockCopy(infoBytes, 0, input, previous.Length, infoBytes.Length);
+            input[^1] = counter;
+
+            previous = hmacExpand.ComputeHash(input);
+            var bytesToCopy = Math.Min(previous.Length, length - bytesGenerated);
+            Buffer.BlockCopy(previous, 0, okm, bytesGenerated, bytesToCopy);
+            bytesGenerated += bytesToCopy;
+            counter++;
+        }
+
+        CryptographicOperations.ZeroMemory(prk);
+        return okm;
     }
     
     public string ToBase64(byte[] data)
@@ -203,5 +196,60 @@ public sealed class CryptographyService
             throw new ArgumentException("Invalid base64 string", nameof(base64), ex);
         }
     }
-}
 
+    public string DecryptClipboard(byte[] ciphertext, byte[] nonce, byte[] masterKey)
+    {
+        if (ciphertext == null || ciphertext.Length < AesGcm.TagByteSizes.MaxSize)
+            throw new ArgumentException("Invalid ciphertext length", nameof(ciphertext));
+        
+        if (nonce == null || nonce.Length != NonceLength)
+            throw new ArgumentException($"Nonce must be {NonceLength} bytes", nameof(nonce));
+        
+        if (masterKey == null || masterKey.Length != 32)
+            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
+
+        var tagLength = AesGcm.TagByteSizes.MaxSize;
+        var actualCiphertext = new byte[ciphertext.Length - tagLength];
+        var tag = new byte[tagLength];
+
+        Buffer.BlockCopy(ciphertext, 0, actualCiphertext, 0, actualCiphertext.Length);
+        Buffer.BlockCopy(ciphertext, actualCiphertext.Length, tag, 0, tagLength);
+
+        using var aesGcm = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
+        var plaintext = new byte[actualCiphertext.Length];
+        
+        try
+        {
+            aesGcm.Decrypt(nonce, actualCiphertext, tag, plaintext);
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new InvalidOperationException("Failed to decrypt clipboard. Invalid master key or corrupted data.", ex);
+        }
+    }
+    
+    public (byte[] ciphertext, byte[] nonce) EncryptClipboard(string plaintext, byte[] masterKey)
+    {
+        if (string.IsNullOrEmpty(plaintext))
+            throw new ArgumentException("Plaintext cannot be empty", nameof(plaintext));
+        
+        if (masterKey == null || masterKey.Length != 32)
+            throw new ArgumentException("Master key must be 32 bytes", nameof(masterKey));
+
+        var nonce = GenerateNonce(NonceLength);
+        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+        
+        using var aesGcm = new AesGcm(masterKey, AesGcm.TagByteSizes.MaxSize);
+        var ciphertext = new byte[plaintextBytes.Length];
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize];
+        
+        aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag);
+
+        var result = new byte[ciphertext.Length + tag.Length];
+        Buffer.BlockCopy(ciphertext, 0, result, 0, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, result, ciphertext.Length, tag.Length);
+
+        return (result, nonce);
+    }
+}

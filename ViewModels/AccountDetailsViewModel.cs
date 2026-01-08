@@ -133,6 +133,9 @@ public partial class AccountDetailsViewModel : ViewModelBase
     [RelayCommand]
     private async Task SubmitResetPasswordAsync()
     {
+        if (IsBusy)
+            return;
+
         ResetPasswordError = string.Empty;
 
         if (string.IsNullOrWhiteSpace(CurrentPassword) || 
@@ -140,6 +143,12 @@ public partial class AccountDetailsViewModel : ViewModelBase
             string.IsNullOrWhiteSpace(ConfirmPassword))
         {
             ResetPasswordError = "All fields are required.";
+            return;
+        }
+
+        if (NewPassword.Length < 8)
+        {
+            ResetPasswordError = "Password must be at least 8 characters.";
             return;
         }
 
@@ -152,15 +161,30 @@ public partial class AccountDetailsViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            // Trigger the API endpoint here
-            // Example: await App.APIService.AuthService.ChangePasswordAsync(CurrentPassword, NewPassword);
-            
+            await _accountService.ChangePasswordAsync(CurrentPassword, NewPassword);
+            App.NotificationService.ShowSuccess("Password updated.");
             IsResetPasswordVisible = false;
             ResetInputs();
         }
-        catch (Exception ex)
+        catch (InvalidCredentialsException)
         {
-            ResetPasswordError = "Failed to update password. Please check your current password.";
+            ResetPasswordError = "Current password is incorrect.";
+        }
+        catch (InvalidRequestException ex)
+        {
+            ResetPasswordError = ex.Message;
+        }
+        catch (NetworkFailureException)
+        {
+            ResetPasswordError = "Network error. Try again.";
+        }
+        catch (ServerFailureException ex)
+        {
+            ResetPasswordError = ex.Message;
+        }
+        catch (Exception)
+        {
+            ResetPasswordError = "Failed to update password. Please try again.";
         }
         finally
         {
