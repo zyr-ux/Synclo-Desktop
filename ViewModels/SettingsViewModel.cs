@@ -1,8 +1,12 @@
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Material.Icons;
 using Synclo.Services;
 
 namespace Synclo.ViewModels;
@@ -11,6 +15,9 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settings;
     [ObservableProperty] private string _selectedTheme = "System";
+    [ObservableProperty] private bool _showResult;
+    [ObservableProperty] private MaterialIconKind _healthCheckIcon = MaterialIconKind.QuestionMark;
+    [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
 
     public SettingsViewModel()
     {
@@ -44,7 +51,24 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void HealthCheck()
+    private async Task HealthCheck()
     {
+        ShowResult = true;
+        try
+        {
+            await App.APIService.Health().WaitAsync(TimeSpan.FromSeconds(1));
+            HealthCheckIcon = MaterialIconKind.Check;
+            HealthCheckColor = Brushes.LimeGreen;
+        }
+        catch
+        {
+            HealthCheckIcon = MaterialIconKind.Close;
+            HealthCheckColor = Brushes.Red;
+        }
+        finally
+        {
+            await Task.Delay(400);
+            ShowResult = false;
+        }
     }
 }

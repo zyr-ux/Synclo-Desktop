@@ -20,12 +20,6 @@
                 Margin="0 12 0 0">
             <Grid
                 ColumnDefinitions="Auto, * , Auto">
-                <!-- <Svg Path="/Assets/Icons/palette.svg" -->
-                <!--      Grid.RowSpan="2" -->
-                <!--      Width="28" -->
-                <!--      Height="28" -->
-                <!--      VerticalAlignment="Center" -->
-                <!--      Margin="0 0 16 0" /> -->
                 <materialIcons:MaterialIcon
                     Grid.RowSpan="2"
                     Kind="PaletteOutline"
@@ -62,11 +56,28 @@
         </Border>
 
         <!--Test Connection Button-->
-        <Button
-            Classes="custom-button"
-            Width="200"
-            Height="50"
-            Content="Test Connection"/>
+        
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button
+                Classes="custom-button"
+                Width="200"
+                Height="50"
+                Content="Test Connection"
+                Command="{Binding HealthCheckCommand}"/>
+            
+            <Grid Width="50" 
+                  Height="50" 
+                  IsVisible="{Binding ShowResult}"
+                  VerticalAlignment="Center">
+                
+                <materialIcons:MaterialIcon
+                    Kind="{Binding HealthCheckIcon}"
+                    Height="25"
+                    Width="25"
+                    Foreground="{Binding HealthCheckColor}"/>
+            </Grid>
+        </StackPanel>
+        
 
         <!--Stop Syncing Button-->
         <Button
