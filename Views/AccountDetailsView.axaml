@@ -95,7 +95,7 @@
                         Height="50"
                         Width="150"
                         Command="{Binding DeleteAccountCommand}"
-                        IsEnabled="{Binding IsBusy}"/>
+                        IsEnabled="{Binding !IsBusy}"/>
 
                     <Button Classes="custom-button"
                             Content="Reset Password"
@@ -109,7 +109,7 @@
                             Height="50"
                             Width="100"
                             Command="{Binding LogoutCommand}"
-                            IsEnabled="{Binding IsBusy}"/>
+                            IsEnabled="{Binding !IsBusy}"/>
                 </StackPanel>
 
             </Grid>
