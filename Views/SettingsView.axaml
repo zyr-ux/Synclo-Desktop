@@ -67,9 +67,15 @@
             
             <Grid Width="50" 
                   Height="50" 
-                  IsVisible="{Binding ShowResult}"
+                  Opacity="{Binding GridOpacity}"
                   VerticalAlignment="Center">
-                
+    
+                <Grid.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.3"/>
+                    </Transitions>
+                </Grid.Transitions>
+    
                 <materialIcons:MaterialIcon
                     Kind="{Binding HealthCheckIcon}"
                     Height="25"

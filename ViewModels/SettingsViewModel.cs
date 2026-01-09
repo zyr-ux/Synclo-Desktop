@@ -16,8 +16,10 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ISettingsService _settings;
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
+    
     [ObservableProperty] private MaterialIconKind _healthCheckIcon = MaterialIconKind.QuestionMark;
     [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
+    [ObservableProperty] private double _gridOpacity;
 
     public SettingsViewModel()
     {
@@ -53,7 +55,8 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task HealthCheck()
     {
-        ShowResult = true;
+        GridOpacity = 1.0; 
+    
         try
         {
             await App.APIService.Health().WaitAsync(TimeSpan.FromSeconds(1));
@@ -67,8 +70,8 @@ public partial class SettingsViewModel : ViewModelBase
         }
         finally
         {
-            await Task.Delay(400);
-            ShowResult = false;
+            await Task.Delay(1000); 
+            GridOpacity = 0.0; 
         }
     }
 }
