@@ -59,7 +59,7 @@ public partial class SettingsViewModel : ViewModelBase
     
         try
         {
-            await App.APIService.Health().WaitAsync(TimeSpan.FromSeconds(1));
+            await App.APIService.Health().WaitAsync(TimeSpan.FromSeconds(0.5));
             HealthCheckIcon = MaterialIconKind.Check;
             HealthCheckColor = Brushes.LimeGreen;
         }
