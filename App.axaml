@@ -3,7 +3,6 @@
              xmlns:local="using:Synclo"
              xmlns:converters="clr-namespace:Synclo.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-             xmlns:labs="using:Avalonia.Labs.Controls"
              x:Class="Synclo.App"
              RequestedThemeVariant="Dark">
 
@@ -15,7 +14,6 @@
     <Application.Styles>
         <FluentTheme />
         <materialIcons:MaterialIconStyles />
-        <labs:ControlThemes/>
         <StyleInclude Source="avares://Synclo/Styles/RadioButtonSidebar.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/TextButton.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/HistoryItem.axaml" />
