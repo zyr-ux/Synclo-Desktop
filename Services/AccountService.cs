@@ -203,10 +203,7 @@ public sealed class AccountService(
 
     // -------------------- CHANGE PASSWORD --------------------
 
-    public async Task ChangePasswordAsync(
-        string currentPassword,
-        string newPassword,
-        CancellationToken ct = default)
+    public async Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(currentPassword) ||
             string.IsNullOrWhiteSpace(newPassword))
@@ -330,6 +327,7 @@ public sealed class AccountService(
 
     public async Task LogoutAsync()
     {
+        await App.APIService.WebSocketService.DisconnectAsync();
         var deviceId = settings.Settings.device_id;
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
@@ -364,5 +362,19 @@ public sealed class AccountService(
 
         return api.Deserialize<SaltResponse>(content)
                ?? throw new ServerFailureException("Missing salt");
+    }
+    
+    // Delete Account
+    public async Task DeleteAccountAsync(CancellationToken ct = default)
+    {
+        using var res = await api.DeleteAsync("/api/account/delete", ct);
+
+        if (!res.IsSuccessStatusCode)
+        {
+            var content = await res.Content.ReadAsStringAsync(ct);
+            throw new ServerFailureException(content); 
+        }
+
+        await LogoutAsync();
     }
 }

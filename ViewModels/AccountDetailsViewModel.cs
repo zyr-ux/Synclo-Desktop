@@ -19,8 +19,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
 
     [ObservableProperty] private string _username = string.Empty;
     [ObservableProperty] private bool _isBusy;
-    
-    // --- New Properties for Password Reset ---
+
     [ObservableProperty] private bool _isResetPasswordVisible;
     [ObservableProperty] private string _currentPassword = string.Empty;
     [ObservableProperty] private string _newPassword = string.Empty;
@@ -30,15 +29,19 @@ public partial class AccountDetailsViewModel : ViewModelBase
 
     public ObservableCollection<DeviceModel> Devices { get; } = new();
 
-    public AccountDetailsViewModel(AccountService accountService, DeviceService deviceService, string email, Action onLogout)
+    public AccountDetailsViewModel(
+        AccountService accountService,
+        DeviceService deviceService,
+        string email,
+        Action onLogout)
     {
         _accountService = accountService;
         _deviceService = deviceService;
         _onLogout = onLogout;
-        
+
         var atIndex = email.IndexOf('@');
-        Username = atIndex > 0 ? email.Substring(0, atIndex) : email;
-        
+        Username = atIndex > 0 ? email[..atIndex] : email;
+
         _ = LoadDevicesAsync();
     }
 
@@ -47,7 +50,8 @@ public partial class AccountDetailsViewModel : ViewModelBase
         Dispatcher.UIThread.Post(() =>
         {
             Devices.Clear();
-            foreach (var d in list) Devices.Add(d);
+            foreach (var d in list)
+                Devices.Add(d);
         });
     }
 
@@ -58,7 +62,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
 
         try
         {
-            var fresh = await App.APIService.DeviceService.GetDevicesAsync();
+            var fresh = await _deviceService.GetDevicesAsync();
             UpdateDeviceList(fresh);
             await _deviceService.SaveAsync(fresh);
         }
@@ -68,7 +72,6 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
         catch
         {
-            // Handle offline/error state if needed
             App.NotificationService.ShowError("Device Offline");
         }
     }
@@ -86,7 +89,6 @@ public partial class AccountDetailsViewModel : ViewModelBase
         try
         {
             await _accountService.LogoutAsync();
-            await App.APIService.WebSocketService.DisconnectAsync();
             Devices.Clear();
             _onLogout();
         }
@@ -101,7 +103,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
     {
         try
         {
-            await App.APIService.DeviceService.DeleteDeviceAsync(deviceId);
+            await _deviceService.DeleteDeviceAsync(deviceId);
             var target = Devices.FirstOrDefault(x => x.device_id == deviceId);
             if (target != null)
             {
@@ -111,14 +113,11 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
         catch
         {
-            // Handle error
         }
     }
 
-    // --- New Commands for Password Reset ---
-
     [RelayCommand]
-    private void OpenResetPassword()
+    private void ShowResetPassword()
     {
         ResetInputs();
         IsResetPasswordVisible = true;
@@ -140,8 +139,8 @@ public partial class AccountDetailsViewModel : ViewModelBase
         ResetPasswordError = string.Empty;
         ResetPasswordStatusMessage = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(CurrentPassword) || 
-            string.IsNullOrWhiteSpace(NewPassword) || 
+        if (string.IsNullOrWhiteSpace(CurrentPassword) ||
+            string.IsNullOrWhiteSpace(NewPassword) ||
             string.IsNullOrWhiteSpace(ConfirmPassword))
         {
             ResetPasswordError = "All fields are required.";
@@ -185,14 +184,38 @@ public partial class AccountDetailsViewModel : ViewModelBase
         {
             ResetPasswordError = ex.Message;
         }
-        catch (Exception)
+        catch
         {
-            ResetPasswordError = "Failed to update password. Please try again.";
+            ResetPasswordError = "Failed to update password.";
         }
         finally
         {
             IsBusy = false;
             ResetPasswordStatusMessage = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteAccount()
+    {
+        IsBusy = true;
+        try
+        {
+            await _accountService.DeleteAccountAsync();
+            Devices.Clear();
+            _onLogout();
+        }
+        catch (NetworkFailureException)
+        {
+            App.NotificationService.ShowError("Network error. Try again.");
+        }
+        catch
+        {
+            App.NotificationService.ShowError("Failed to delete account!.");
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
