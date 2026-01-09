@@ -71,8 +71,7 @@
                                         <Button Grid.Column="1"
                                                 Content="Logout"
                                                 Classes="textButton"
-                                                IsVisible="{Binding IsThisDevice,
-                                                    Converter={StaticResource InverseBooleanConverter}}"
+                                                IsVisible="{Binding !IsThisDevice}"
                                                 Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
                                                 CommandParameter="{Binding device_id}" />
                                     </Grid>
@@ -95,7 +94,7 @@
                             Height="50"
                             Width="160"
                             Command="{Binding OpenResetPasswordCommand}"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" />
+                            IsEnabled="{Binding !IsBusy}" />
 
                     <Button Classes="custom-button"
                             Content="Logout"
@@ -146,7 +145,7 @@
                                      Padding="3"
                                      CornerRadius="0"
                                      Classes="revealPasswordButton"
-                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" />
+                                     IsEnabled="{Binding !IsBusy}" />
                         </StackPanel>
 
                         <StackPanel Spacing="3">
@@ -161,7 +160,7 @@
                                      Padding="3"
                                      CornerRadius="0"
                                      Classes="revealPasswordButton"
-                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" />
+                                     IsEnabled="{Binding !IsBusy}" />
                         </StackPanel>
 
                         <StackPanel Spacing="3">
@@ -176,7 +175,7 @@
                                      Padding="3"
                                      CornerRadius="0"
                                      Classes="revealPasswordButton"
-                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" />
+                                     IsEnabled="{Binding !IsBusy}" />
                         </StackPanel>
                     </StackPanel>
 
@@ -212,7 +211,7 @@
 
                             <Button Classes="icon-button"
                                     Command="{Binding CancelResetPasswordCommand}"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
+                                    IsEnabled="{Binding !IsBusy}">
                                 <materialIcons:MaterialIcon Kind="Close"
                                                             Width="24"
                                                             Height="24" />
@@ -220,7 +219,7 @@
 
                             <Button Classes="icon-button"
                                     Command="{Binding SubmitResetPasswordCommand}"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
+                                    IsEnabled="{Binding !IsBusy}">
                                 <materialIcons:MaterialIcon Kind="ArrowRight"
                                                             Width="24"
                                                             Height="24" />
