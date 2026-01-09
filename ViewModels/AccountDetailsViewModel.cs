@@ -198,6 +198,9 @@ public partial class AccountDetailsViewModel : ViewModelBase
     [RelayCommand]
     private async Task DeleteAccount()
     {
+        bool confirmed = await App.DialogService.ShowConfirmationAsync("Delete Account");
+
+        if (!confirmed) return;
         IsBusy = true;
         try
         {

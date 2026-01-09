@@ -15,6 +15,7 @@ public class App : Application
     public static ISettingsService Settings { get; private set; }
     public static APIService APIService { get; private set; }
     public static NotificationService NotificationService { get; private set; }
+    public static DialogService.IDialogService DialogService { get; private set; }
 
     public override void Initialize()
     {
@@ -23,29 +24,21 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        // 1. Initialize Services
+        // Initialize Services
         Settings = new SettingsService();
         NotificationService = new NotificationService();
+        DialogService = new DialogService();
         APIService = new APIService(Settings);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             DisableAvaloniaDataAnnotationValidation();
-
-            // 2. Create the Main ViewModel
             var mainVM = new MainWindowViewModel();
-
-            // 3. Create the Main Window
             desktop.MainWindow = new MainWindow
             {
                 DataContext = mainVM
             };
-
-            // 4. Trigger Secure Startup Sequence (Safe on UI Thread)
-            // We use Dispatcher to ensure the Window is fully constructed first.
             Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
-
-            // 5. Cleanup on Exit
             desktop.Exit += (s, e) =>
             {
                 APIService?.Dispose();
