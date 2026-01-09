@@ -32,7 +32,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel()
     {
         CurrentViewModel = _homeViewModel;
-        FireStatusCheck();
+        _ = Task.Run(CheckStatus);
     }
 
     public async Task InitializeApplicationAsync()
@@ -68,19 +68,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             while (await _timer.WaitForNextTickAsync(_cts.Token))
             {
-                FireStatusCheck();
+                _ = Task.Run(CheckStatus);
             }
         }
         catch (OperationCanceledException)
         {
         }
     }
-
-    private void FireStatusCheck()
-    {
-        _ = Task.Run(CheckStatus);
-    }
-
+    
     private async Task CheckStatus()
     {
         if (!await CheckInternet())
