@@ -26,7 +26,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://Synclo/Themes/ThemePalettes.axaml" />
                 <ResourceInclude Source="avares://Synclo/Controls/Combobox.axaml" />
-                <ResourceInclude Source="avares://Synclo/Controls/FieldsTextBox.axaml" />
+                <ResourceInclude Source="avares://Synclo/Controls/TextBox.axaml" />
                 <ResourceInclude Source="avares://Synclo/Controls/NotificationCard.axaml" />
             </ResourceDictionary.MergedDictionaries>
 
