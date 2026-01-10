@@ -1,22 +1,15 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              xmlns:vm="using:Synclo.ViewModels"
-             mc:Ignorable="d"
              x:Class="Synclo.Views.AccountDetailsView"
              x:DataType="vm:AccountDetailsViewModel"
              Background="{DynamicResource PrimaryBackground}">
 
-    <!-- Root view -->
     <Grid>
-
-        <!-- Main Content -->
         <Border Padding="40">
             <Grid RowDefinitions="Auto,Auto,Auto,*">
 
-                <!-- Header -->
                 <StackPanel Grid.Row="0"
                             Orientation="Horizontal"
                             Spacing="10"
@@ -26,12 +19,11 @@
                                Foreground="{DynamicResource Yellow}"
                                FontFamily="{DynamicResource Inconsolata-Bold}" />
                     <TextBlock Text="{Binding Username}"
-                               FontFamily="{DynamicResource Inconsolata-Medium}"
                                FontSize="28"
-                               Foreground="{DynamicResource Accent}" />
+                               Foreground="{DynamicResource Accent}"
+                               FontFamily="{DynamicResource Inconsolata-Medium}" />
                 </StackPanel>
 
-                <!-- Section title -->
                 <TextBlock Grid.Row="1"
                            Text="Manage Devices"
                            FontSize="36"
@@ -39,33 +31,32 @@
                            FontFamily="{DynamicResource Inconsolata-Bold}"
                            Margin="0,0,0,15" />
 
-                <!-- Devices list -->
                 <Border Grid.Row="2"
                         Background="#303030"
                         CornerRadius="12"
                         Padding="20">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  MaxHeight="250">
+                    <ScrollViewer MaxHeight="250">
                         <ItemsControl ItemsSource="{Binding Devices}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Spacing="15" />
+                                    <StackPanel Spacing="15"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
+
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="*,Auto">
                                         <StackPanel Orientation="Horizontal"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="{Binding device_name}"
-                                                       FontFamily="{DynamicResource Inconsolata-Bold}"
-                                                       Foreground="#e0e0e0"
-                                                       FontSize="18" />
-                                            <TextBlock Text=" - this device"
-                                                       FontFamily="{DynamicResource Inconsolata-Bold}"
-                                                       Foreground="#666666"
                                                        FontSize="18"
-                                                       IsVisible="{Binding IsThisDevice}" />
+                                                       Foreground="#e0e0e0"
+                                                       FontFamily="{DynamicResource Inconsolata-Bold}" />
+                                            <TextBlock Text=" - this device"
+                                                       FontSize="18"
+                                                       Foreground="#666666"
+                                                       IsVisible="{Binding IsThisDevice}"
+                                                       FontFamily="{DynamicResource Inconsolata-Bold}" />
                                         </StackPanel>
 
                                         <Button Grid.Column="1"
@@ -81,165 +72,36 @@
                     </ScrollViewer>
                 </Border>
 
-                <!-- Bottom actions -->
                 <StackPanel Grid.Row="3"
                             Orientation="Horizontal"
-                            HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
+                            HorizontalAlignment="Right"
                             Spacing="20"
                             Margin="0,20,0,0">
-                    
-                    <Button
-                        Classes="custom-button"
-                        Content="Delete Account"
-                        Height="50"
-                        Width="150"
-                        Command="{Binding DeleteAccountCommand}"
-                        IsEnabled="{Binding !IsBusy}"/>
+
+                    <Button Classes="custom-button"
+                            Content="Delete Account"
+                            Width="150"
+                            Height="50"
+                            Command="{Binding DeleteAccountCommand}"
+                            IsEnabled="{Binding !IsBusy}" />
 
                     <Button Classes="custom-button"
                             Content="Reset Password"
-                            Height="50"
                             Width="150"
-                            Command="{Binding ShowResetPasswordCommand}"
+                            Height="50"
+                            Command="{Binding ResetPasswordCommand}"
                             IsEnabled="{Binding !IsBusy}" />
 
                     <Button Classes="custom-button"
                             Content="Logout"
-                            Height="50"
                             Width="100"
+                            Height="50"
                             Command="{Binding LogoutCommand}"
-                            IsEnabled="{Binding !IsBusy}"/>
+                            IsEnabled="{Binding !IsBusy}" />
                 </StackPanel>
 
             </Grid>
         </Border>
-
-        <!-- Reset Password -->
-        <Grid IsVisible="{Binding IsResetPasswordVisible}"
-              Background="#B21A1A1A"
-              HorizontalAlignment="Stretch"
-              VerticalAlignment="Stretch">
-
-            <Border Background="{DynamicResource PrimaryBackground}"
-                    CornerRadius="12"
-                    Width="400"
-                    Height="400"
-                    Padding="30"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-
-                <Grid RowDefinitions="Auto,*,Auto">
-                    <TextBlock Grid.Row="0"
-                               Text="Reset Password"
-                               FontSize="24"
-                               Foreground="{DynamicResource Yellow}"
-                               FontFamily="{DynamicResource Inconsolata-Bold}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,35" />
-
-                    <StackPanel Grid.Row="1"
-                                Spacing="25"
-                                VerticalAlignment="Center">
-
-                        <StackPanel Spacing="3">
-                            <TextBlock Text="Current Password"
-                                       Foreground="{DynamicResource Accent}"
-                                       FontFamily="{DynamicResource Inconsolata-Medium}" />
-
-                            <TextBox PasswordChar="*"
-                                     Text="{Binding CurrentPassword}"
-                                     Background="Transparent"
-                                     BorderThickness="0 0 0 1"
-                                     Padding="3"
-                                     CornerRadius="0"
-                                     Classes="revealPasswordButton"
-                                     IsEnabled="{Binding !IsBusy}" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="3">
-                            <TextBlock Text="New Password"
-                                       Foreground="{DynamicResource Accent}"
-                                       FontFamily="{DynamicResource Inconsolata-Medium}" />
-
-                            <TextBox PasswordChar="*"
-                                     Text="{Binding NewPassword}"
-                                     Background="Transparent"
-                                     BorderThickness="0 0 0 1"
-                                     Padding="3"
-                                     CornerRadius="0"
-                                     Classes="revealPasswordButton"
-                                     IsEnabled="{Binding !IsBusy}" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="3">
-                            <TextBlock Text="Confirm Password"
-                                       Foreground="{DynamicResource Accent}"
-                                       FontFamily="{DynamicResource Inconsolata-Medium}" />
-
-                            <TextBox PasswordChar="*"
-                                     Text="{Binding ConfirmPassword}"
-                                     Background="Transparent"
-                                     BorderThickness="0 0 0 1"
-                                     Padding="3"
-                                     CornerRadius="0"
-                                     Classes="revealPasswordButton"
-                                     IsEnabled="{Binding !IsBusy}" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="2" 
-                                Spacing="15" 
-                                Margin="0 10 0 0">
-
-                        <!-- SAME MESSAGE SLOT -->
-                        <Grid>
-                            <!-- Status -->
-                            <TextBlock Text="{Binding ResetPasswordStatusMessage}"
-                                       Foreground="{DynamicResource Accent}"
-                                       FontSize="14"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"
-                                       HorizontalAlignment="Center"
-                                       IsVisible="{Binding !!ResetPasswordStatusMessage}" />
-
-                            <!-- Error (overlays status) -->
-                            <TextBlock Text="{Binding ResetPasswordError}"
-                                       Foreground="#FF5555"
-                                       FontSize="14"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"
-                                       HorizontalAlignment="Center"
-                                       IsVisible="{Binding !!ResetPasswordError}" />
-                        </Grid>
-
-                        <!-- Buttons stay unchanged -->
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Right"
-                                    Spacing="10">
-
-                            <Button Classes="icon-button"
-                                    Command="{Binding CancelResetPasswordCommand}"
-                                    IsEnabled="{Binding !IsBusy}">
-                                <materialIcons:MaterialIcon Kind="Close"
-                                                            Width="24"
-                                                            Height="24" />
-                            </Button>
-
-                            <Button Classes="icon-button"
-                                    Command="{Binding SubmitResetPasswordCommand}"
-                                    IsEnabled="{Binding !IsBusy}">
-                                <materialIcons:MaterialIcon Kind="ArrowRight"
-                                                            Width="24"
-                                                            Height="24" />
-                            </Button>
-                        </StackPanel>
-
-                    </StackPanel>
-
-                </Grid>
-            </Border>
-        </Grid>
-
     </Grid>
 </UserControl>

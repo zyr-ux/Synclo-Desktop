@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Synclo.Components;
 using Synclo.Models;
 using Synclo.Services;
 
@@ -20,13 +21,6 @@ public partial class AccountDetailsViewModel : ViewModelBase
     [ObservableProperty] private string _username = string.Empty;
     [ObservableProperty] private bool _isBusy;
 
-    [ObservableProperty] private bool _isResetPasswordVisible;
-    [ObservableProperty] private string _currentPassword = string.Empty;
-    [ObservableProperty] private string _newPassword = string.Empty;
-    [ObservableProperty] private string _confirmPassword = string.Empty;
-    [ObservableProperty] private string _resetPasswordError = string.Empty;
-    [ObservableProperty] private string _resetPasswordStatusMessage = string.Empty;
-
     public ObservableCollection<DeviceModel> Devices { get; } = new();
 
     public AccountDetailsViewModel(
@@ -39,13 +33,13 @@ public partial class AccountDetailsViewModel : ViewModelBase
         _deviceService = deviceService;
         _onLogout = onLogout;
 
-        var atIndex = email.IndexOf('@');
-        Username = atIndex > 0 ? email[..atIndex] : email;
+        var at = email.IndexOf('@');
+        Username = at > 0 ? email[..at] : email;
 
         _ = LoadDevicesAsync();
     }
 
-    private void UpdateDeviceList(IEnumerable<DeviceModel> list)
+    private void UpdateDevices(IEnumerable<DeviceModel> list)
     {
         Dispatcher.UIThread.Post(() =>
         {
@@ -58,12 +52,12 @@ public partial class AccountDetailsViewModel : ViewModelBase
     private async Task LoadDevicesAsync()
     {
         var cached = await _deviceService.LoadAsync();
-        UpdateDeviceList(cached);
+        UpdateDevices(cached);
 
         try
         {
             var fresh = await _deviceService.GetDevicesAsync();
-            UpdateDeviceList(fresh);
+            UpdateDevices(fresh);
             await _deviceService.SaveAsync(fresh);
         }
         catch (SessionExpiredException)
@@ -74,12 +68,6 @@ public partial class AccountDetailsViewModel : ViewModelBase
         {
             App.NotificationService.ShowError("Device Offline");
         }
-    }
-
-    [RelayCommand]
-    private async Task RefreshAsync()
-    {
-        await LoadDevicesAsync();
     }
 
     [RelayCommand]
@@ -117,90 +105,29 @@ public partial class AccountDetailsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ShowResetPassword()
+    private async Task ResetPasswordAsync()
     {
-        ResetInputs();
-        IsResetPasswordVisible = true;
-    }
+        var dialog = new ResetPasswordDialogView();
+        var viewModel = new ResetPasswordDialogViewModel(res => dialog.Close(res));
+        dialog.DataContext = viewModel;
+        
+        var desktop =
+            Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
 
-    [RelayCommand]
-    private void CancelResetPassword()
-    {
-        IsResetPasswordVisible = false;
-        ResetInputs();
-    }
-
-    [RelayCommand]
-    private async Task SubmitResetPasswordAsync()
-    {
-        if (IsBusy)
-            return;
-
-        ResetPasswordError = string.Empty;
-        ResetPasswordStatusMessage = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(CurrentPassword) ||
-            string.IsNullOrWhiteSpace(NewPassword) ||
-            string.IsNullOrWhiteSpace(ConfirmPassword))
-        {
-            ResetPasswordError = "All fields are required.";
-            return;
-        }
-
-        if (NewPassword.Length < 8)
-        {
-            ResetPasswordError = "Password must be at least 8 characters.";
-            return;
-        }
-
-        if (NewPassword != ConfirmPassword)
-        {
-            ResetPasswordError = "New passwords do not match.";
-            return;
-        }
-
-        IsBusy = true;
-        ResetPasswordStatusMessage = "Updating password...";
-        try
-        {
-            await _accountService.ChangePasswordAsync(CurrentPassword, NewPassword);
+        viewModel.SetAccountService(_accountService);
+        var result = await dialog.ShowDialog<bool?>(desktop?.MainWindow!);
+        if (result == true)
             App.NotificationService.ShowSuccess("Password updated.");
-            IsResetPasswordVisible = false;
-            ResetInputs();
-        }
-        catch (InvalidCredentialsException)
-        {
-            ResetPasswordError = "Current password is incorrect.";
-        }
-        catch (InvalidRequestException ex)
-        {
-            ResetPasswordError = ex.Message;
-        }
-        catch (NetworkFailureException)
-        {
-            ResetPasswordError = "Network error. Try again.";
-        }
-        catch (ServerFailureException ex)
-        {
-            ResetPasswordError = ex.Message;
-        }
-        catch
-        {
-            ResetPasswordError = "Failed to update password.";
-        }
-        finally
-        {
-            IsBusy = false;
-            ResetPasswordStatusMessage = string.Empty;
-        }
     }
-
+    
     [RelayCommand]
-    private async Task DeleteAccount()
+    private async Task DeleteAccountAsync()
     {
-        bool confirmed = await App.DialogService.ShowConfirmationAsync("Delete Account");
+        var confirmed = await App.DialogService.ShowConfirmationAsync("Delete Account");
+        if (!confirmed)
+            return;
 
-        if (!confirmed) return;
         IsBusy = true;
         try
         {
@@ -210,24 +137,15 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
         catch (NetworkFailureException)
         {
-            App.NotificationService.ShowError("Network error. Try again.");
+            App.NotificationService.ShowError("Network error.");
         }
         catch
         {
-            App.NotificationService.ShowError("Failed to delete account!.");
+            App.NotificationService.ShowError("Failed to delete account.");
         }
         finally
         {
             IsBusy = false;
         }
-    }
-
-    private void ResetInputs()
-    {
-        CurrentPassword = string.Empty;
-        NewPassword = string.Empty;
-        ConfirmPassword = string.Empty;
-        ResetPasswordError = string.Empty;
-        ResetPasswordStatusMessage = string.Empty;
     }
 }
