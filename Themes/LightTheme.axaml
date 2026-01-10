@@ -3,7 +3,7 @@
 
     <Color x:Key="Accent">#363b3e</Color>
     <Color x:Key="PrimaryBackground">#dedede</Color>
-    <Color x:Key="SidebarBackground">#b5b8b8</Color>
+    <Color x:Key="SecondaryBackground">#b5b8b8</Color>
     <Color x:Key="SidebarButtonBackground">#8a8a8a</Color>
     <Color x:Key="ForegroundD">#dedede</Color>
     <Color x:Key="ForegroundL">#363c40</Color>
