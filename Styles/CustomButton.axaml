@@ -3,6 +3,11 @@
     <Design.PreviewWith>
         <Border Padding="20">
             <!-- Add Controls for Previewer Here -->
+            <Button
+                Classes="custom-button"
+                Width="200"
+                Height="50"
+                Content="Test Connection"/>
         </Border>
     </Design.PreviewWith>
 
