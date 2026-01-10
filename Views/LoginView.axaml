@@ -17,11 +17,7 @@
             <TextBlock Text="E-mail"
                        FontFamily="{DynamicResource Inconsolata-Bold}"
                        FontSize="24" />
-            <TextBox Background="Transparent"
-                     BorderThickness="0 0 0 1"
-                     CornerRadius="0"
-                     Padding="3"
-                     Width="300"
+            <TextBox Width="300"
                      FontSize="18"
                      FontFamily="{DynamicResource Inconsolata-Medium}"
                      Text="{Binding Email}" />
@@ -32,11 +28,7 @@
                        FontFamily="{DynamicResource Inconsolata-Bold}"
                        FontSize="24" />
             <TextBox Classes="revealPasswordButton"
-                     Background="Transparent"
                      PasswordChar="*"
-                     BorderThickness="0 0 0 1"
-                     CornerRadius="0"
-                     Padding="3"
                      Width="300"
                      FontSize="18"
                      FontFamily="{DynamicResource Inconsolata-Medium}"
