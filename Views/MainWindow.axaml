@@ -24,7 +24,7 @@
 
         <!-- Sidebar -->
         <Border Grid.Column="0"
-                Background="{DynamicResource SidebarBackground}"
+                Background="{DynamicResource SecondaryBackground}"
                 Padding="0 20 0 10">
 
             <DockPanel LastChildFill="True">
