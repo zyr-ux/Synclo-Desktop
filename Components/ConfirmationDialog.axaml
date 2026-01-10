@@ -2,7 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Synclo.Components.ConfirmationDialog"
         Title="Confirm Action" 
-        Width="350" Height="220"
+        Width="350"
+        SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="Transparent"
         TransparencyLevelHint="None"
@@ -10,11 +11,13 @@
         CanResize="False"
         ShowInTaskbar="False">
 
-    <Border Background="{DynamicResource SidebarBackground}"
+    <Border Background="{DynamicResource PrimaryBackground}"
             CornerRadius="20" 
             BorderBrush="{DynamicResource Accent}" 
             BorderThickness="0"
-            Padding="25">
+            BoxShadow="0 10 20 0 #40000000, 0 -4 14 0 #22000000, 0 2 10 0 #20000000"
+            Padding="15"
+            Margin="20">
         <Grid RowDefinitions="Auto, *, Auto">
             
             <TextBlock Grid.Row="0" 
@@ -33,7 +36,7 @@
                        FontSize="16"
                        FontFamily="{DynamicResource Inconsolata-Medium}"
                        VerticalAlignment="Center" 
-                       Margin="0,15"/>
+                       Margin="0,35"/>
 
             <StackPanel Grid.Row="2" 
                         Orientation="Horizontal" 
