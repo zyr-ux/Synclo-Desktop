@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="Synclo.Views.ConfirmationDialog"
+        x:Class="Synclo.Components.ConfirmationDialog"
         Title="Confirm Action" 
         Width="350" Height="220"
         WindowStartupLocation="CenterOwner"

@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Synclo.Views;
+using Synclo.Components;
 
 namespace Synclo.Services;
 

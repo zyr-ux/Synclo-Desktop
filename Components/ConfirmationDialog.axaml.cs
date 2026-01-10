@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 
-namespace Synclo.Views;
+namespace Synclo.Components;
 
 public partial class ConfirmationDialog : Window
 {
