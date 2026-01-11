@@ -33,8 +33,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         AccountService accountService,
         DeviceService deviceService,
         NotificationService notificationService,
-        DialogService.IDialogService dialogService,
-        string email)
+        DialogService.IDialogService dialogService)
     {
         _factory = factory;
         _accountService = accountService;
@@ -42,10 +41,16 @@ public partial class AccountDetailsViewModel : ViewModelBase
         _notificationService = notificationService;
         _dialogService = dialogService;
 
+        _ = InitializeAsync();
+    }
+    
+    private async Task InitializeAsync()
+    {
+        var email = await _accountService.GetStoredEmailAsync() ?? "";
         var at = email.IndexOf('@');
         Username = at > 0 ? email[..at] : email;
-
-        _ = LoadDevicesAsync();
+        
+        await LoadDevicesAsync();
     }
 
     private void UpdateDevices(IEnumerable<DeviceModel> list)

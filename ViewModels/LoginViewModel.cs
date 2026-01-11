@@ -17,7 +17,7 @@ public partial class LoginViewModel : ViewModelBase
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
-    public event Action<string>? LoginSucceeded;
+    public event Action? LoginSucceeded;
 
     public LoginViewModel(AccountService accountService, NotificationService notificationService)
     {
@@ -26,7 +26,7 @@ public partial class LoginViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task LoginAsync()
+    private async Task LoginAsync() 
     {
         if (IsBusy) return;
 
@@ -53,7 +53,7 @@ public partial class LoginViewModel : ViewModelBase
             Password = string.Empty;
             StatusMessage = string.Empty;
             _notificationService.ShowSuccess("Logged in successfully.", "Login");
-            LoginSucceeded?.Invoke(Email);
+            LoginSucceeded?.Invoke();
         }
         catch (InvalidRequestException ex)
         {
@@ -119,7 +119,7 @@ public partial class LoginViewModel : ViewModelBase
             await _accountService.RegisterAsync(Email, Password);
             Password = string.Empty;
             _notificationService.ShowSuccess("Account created successfully.", "Register");
-            LoginSucceeded?.Invoke(Email);
+            LoginSucceeded?.Invoke();
         }
         catch (InvalidRequestException ex)
         {

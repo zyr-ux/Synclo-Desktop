@@ -28,8 +28,7 @@ public partial class AccountViewModel : ViewModelBase
     {
         if (await _accountService.IsAuthenticatedAsync())
         {
-            var email = await _accountService.GetStoredEmailAsync() ?? "";
-            ShowAccountDetails(email);
+            ShowAccountDetails();
             _ = _webSocketService.ConnectAsync();
         }
         else
@@ -45,16 +44,15 @@ public partial class AccountViewModel : ViewModelBase
         CurrentViewModel = loginViewModel;
     }
 
-    private void ShowAccountDetails(string email)
-    {
-        var accountDetailsViewModel = _factory.Create<AccountDetailsViewModel, string>(email);
+    private void ShowAccountDetails() {
+        var accountDetailsViewModel = _factory.Create<AccountDetailsViewModel>();
         accountDetailsViewModel.LoggedOut += OnLogout;
         CurrentViewModel = accountDetailsViewModel;
     }
 
-    private void OnLoginSuccess(string email)
+    private void OnLoginSuccess()
     {
-        ShowAccountDetails(email);
+        ShowAccountDetails();
         _ = _webSocketService.ConnectAsync();
     }
 
