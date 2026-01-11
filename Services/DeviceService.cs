@@ -10,7 +10,7 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class DeviceService(APIService api)
+public sealed class DeviceService(APIService api, ISettingsService settings, ISecureStorage secureStorage)
 {
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -24,7 +24,12 @@ public sealed class DeviceService(APIService api)
             throw new ServerFailureException(content);
 
         var list = api.Deserialize<List<DeviceModel>>(content);
-        return list ?? [];
+        var currentDeviceId = settings.Settings.device_id;
+        foreach (var device in list)
+        {
+            device.IsThisDevice = device.device_id == currentDeviceId;
+        }
+        return list;
     }
 
     public async Task DeleteDeviceAsync(string deviceId, CancellationToken ct = default)
@@ -48,7 +53,12 @@ public sealed class DeviceService(APIService api)
         {
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             var data = await JsonSerializer.DeserializeAsync<List<DeviceModel>>(fs, _options);
-            return data ?? [];
+            var currentDeviceId = settings.Settings.device_id;
+            foreach (var device in data)
+            {
+                device.IsThisDevice = device.device_id == currentDeviceId;
+            }
+            return data;
         }
         catch
         {
@@ -108,7 +118,7 @@ public sealed class DeviceService(APIService api)
     {
         if (_cachedPath != null) return _cachedPath;
 
-        var email = await SecureStorage.LoadAsync(AccountService.UserEmail);
+        var email = await secureStorage.LoadAsync(AccountService.UserEmail);
         var identifier = "anonymous";
         if (!string.IsNullOrWhiteSpace(email))
         {

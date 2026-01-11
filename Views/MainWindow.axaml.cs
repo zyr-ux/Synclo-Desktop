@@ -1,11 +1,12 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
+using Synclo.Services;
 
 namespace Synclo.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    public MainWindow(NotificationService notificationService)
     {
         InitializeComponent();
 
@@ -14,6 +15,6 @@ public partial class MainWindow : Window
             Position = NotificationPosition.TopRight,
             MaxItems = 3
         };
-        App.NotificationService.SetManager(manager);
+        notificationService.SetManager(manager);
     }
 }

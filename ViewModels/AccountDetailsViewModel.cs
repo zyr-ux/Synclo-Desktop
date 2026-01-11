@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Synclo.Components;
+using Synclo.Factory;
 using Synclo.Models;
 using Synclo.Services;
 
@@ -16,22 +17,30 @@ public partial class AccountDetailsViewModel : ViewModelBase
 {
     private readonly AccountService _accountService;
     private readonly DeviceService _deviceService;
-    private readonly Action _onLogout;
+    private readonly IViewModelFactory _factory;
+    private readonly NotificationService _notificationService;
+    private readonly DialogService.IDialogService _dialogService;
 
     [ObservableProperty] private string _username = string.Empty;
     [ObservableProperty] private bool _isBusy;
 
     public ObservableCollection<DeviceModel> Devices { get; } = new();
 
+    public event Action? LoggedOut;
+
     public AccountDetailsViewModel(
+        IViewModelFactory factory,
         AccountService accountService,
         DeviceService deviceService,
-        string email,
-        Action onLogout)
+        NotificationService notificationService,
+        DialogService.IDialogService dialogService,
+        string email)
     {
+        _factory = factory;
         _accountService = accountService;
         _deviceService = deviceService;
-        _onLogout = onLogout;
+        _notificationService = notificationService;
+        _dialogService = dialogService;
 
         var at = email.IndexOf('@');
         Username = at > 0 ? email[..at] : email;
@@ -66,7 +75,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         }
         catch
         {
-            App.NotificationService.ShowError("Device Offline");
+            _notificationService.ShowError("Device Offline");
         }
     }
 
@@ -78,7 +87,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         {
             await _accountService.LogoutAsync();
             Devices.Clear();
-            _onLogout();
+            LoggedOut?.Invoke();
         }
         finally
         {
@@ -108,23 +117,23 @@ public partial class AccountDetailsViewModel : ViewModelBase
     private async Task ResetPasswordAsync()
     {
         var dialog = new ResetPasswordDialogView();
-        var viewModel = new ResetPasswordDialogViewModel(res => dialog.Close(res));
-        dialog.DataContext = viewModel;
         
         var desktop =
             Avalonia.Application.Current?.ApplicationLifetime
                 as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
 
-        viewModel.SetAccountService(_accountService);
+        var viewModel = _factory.Create<ResetPasswordDialogViewModel, Action<bool?>>(res => dialog.Close(res));
+        dialog.DataContext = viewModel;
+        
         var result = await dialog.ShowDialog<bool?>(desktop?.MainWindow!);
         if (result == true)
-            App.NotificationService.ShowSuccess("Password updated.");
+            _notificationService.ShowSuccess("Password updated.");
     }
     
     [RelayCommand]
     private async Task DeleteAccountAsync()
     {
-        var confirmed = await App.DialogService.ShowConfirmationAsync("Delete Account");
+        var confirmed = await _dialogService.ShowConfirmationAsync("Delete Account");
         if (!confirmed)
             return;
 
@@ -133,15 +142,15 @@ public partial class AccountDetailsViewModel : ViewModelBase
         {
             await _accountService.DeleteAccountAsync();
             Devices.Clear();
-            _onLogout();
+            LoggedOut?.Invoke();
         }
         catch (NetworkFailureException)
         {
-            App.NotificationService.ShowError("Network error.");
+            _notificationService.ShowError("Network error.");
         }
         catch
         {
-            App.NotificationService.ShowError("Failed to delete account.");
+            _notificationService.ShowError("Failed to delete account.");
         }
         finally
         {

@@ -3,10 +3,9 @@ using System.Runtime.InteropServices;
 
 namespace Synclo.Services;
 
-public static class Utils
+public sealed class Utils(ISettingsService settingsService)
 {
-    // Fetch device name based on OS
-    public static string GetDeviceName()
+    public string GetDeviceName()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return Environment.MachineName;
@@ -18,19 +17,17 @@ public static class Utils
         return "Unknown Device";
     }
 
-    // Get persistent UUID for this device 
-    public static string GetOrCreateDeviceId()
+    public string GetOrCreateDeviceId()
     {
-        var settings = App.Settings.Settings;
+        var settings = settingsService.Settings;
 
         if (!string.IsNullOrWhiteSpace(settings.device_id))
             return settings.device_id;
 
-        // generate uuid once
         var newId = Guid.NewGuid().ToString();
 
         settings.device_id = newId;
-        App.Settings.Save();
+        settingsService.Save();
 
         return newId;
     }

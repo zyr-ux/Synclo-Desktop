@@ -7,31 +7,38 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Synclo.Factory;
+using Synclo.Services;
 
 namespace Synclo.ViewModels;
 
 public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    private readonly HomeViewModel _homeViewModel = new();
-    private readonly SettingsViewModel _settingsViewModel = new();
-    private readonly AccountViewModel _accountViewModel = new();
-
-    [ObservableProperty]
-    private ViewModelBase _currentViewModel;
-
-    [ObservableProperty]
-    private string _statusText = string.Empty;
-
-    [ObservableProperty]
-    private IBrush _statusColor = Brushes.Gray;
-
+    private readonly IViewModelFactory _factory;
+    private readonly NotificationService _notificationService;
+    private readonly AccountService _accountService;
+    private readonly APIService _apiService;
+    private readonly WebSocketService _webSocketService;
+    [ObservableProperty] private ViewModelBase _currentViewModel;
+    [ObservableProperty] private string _statusText = string.Empty;
+    [ObservableProperty] private IBrush _statusColor = Brushes.Gray;
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(10));
     private readonly CancellationTokenSource _cts = new();
     private Task? _pollingTask;
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(
+        IViewModelFactory factory,
+        NotificationService notificationService,
+        AccountService accountService,
+        APIService apiService,
+        WebSocketService webSocketService)
     {
-        CurrentViewModel = _homeViewModel;
+        _factory = factory;
+        _notificationService = notificationService;
+        _accountService = accountService;
+        _apiService = apiService;
+        _webSocketService = webSocketService;
+        CurrentViewModel = _factory.Create<HomeViewModel>();
         _ = Task.Run(CheckStatus);
     }
 
@@ -39,11 +46,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            await App.APIService.AccountService.EnforceLocalKdfVersionAsync();
+            await _accountService.EnforceLocalKdfVersionAsync();
         }
         catch (SecurityException ex)
         {
-            App.NotificationService.ShowError(ex.Message, "Security Update");
+            _notificationService.ShowError(ex.Message, "Security Update");
             return;
         }
         catch
@@ -56,7 +63,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void StartBackgroundServices()
     {
-        _ = App.APIService.WebSocketService.ConnectAsync();
+        _ = _webSocketService.ConnectAsync();
 
         if (_pollingTask == null)
             _pollingTask = PollingLoop();
@@ -90,7 +97,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await App.APIService.Health();
+            await _apiService.Health();
             Dispatcher.UIThread.Post(() =>
             {
                 StatusText = "Online";
@@ -122,22 +129,28 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    private void ShowHome() => CurrentViewModel = _homeViewModel;
+    private void ShowHome() => SwitchTo<HomeViewModel>();
 
     [RelayCommand]
-    private void ShowSettings() => CurrentViewModel = _settingsViewModel;
+    private void ShowSettings() => SwitchTo<SettingsViewModel>();
 
     [RelayCommand]
-    private void ShowAccount() => CurrentViewModel = _accountViewModel;
+    private void ShowAccount() => SwitchTo<AccountViewModel>();
 
+    private void SwitchTo<T>() where T : ViewModelBase
+    {
+        if (CurrentViewModel is IDisposable d)
+            d.Dispose();
+
+        CurrentViewModel = _factory.Create<T>();
+    }
+    
     public void Dispose()
     {
         _cts.Cancel();
         _timer.Dispose();
         _cts.Dispose();
 
-        (_homeViewModel as IDisposable)?.Dispose();
-        (_settingsViewModel as IDisposable)?.Dispose();
-        (_accountViewModel as IDisposable)?.Dispose();
+        (CurrentViewModel as IDisposable)?.Dispose();
     }
 }

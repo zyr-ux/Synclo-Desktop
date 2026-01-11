@@ -1,19 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Avalonia;
 using Avalonia.Media;
-using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Material.Icons;
 using Synclo.Services;
+using Synclo.Themes;
 
 namespace Synclo.ViewModels;
 
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settings;
+    private readonly APIService _apiService;
+    private readonly IThemeService _themeService;
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
     
@@ -21,33 +22,19 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
     [ObservableProperty] private double _gridOpacity;
 
-    public SettingsViewModel()
+    public SettingsViewModel(ISettingsService settings, APIService apiService, IThemeService themeService)
     {
-        _settings = App.Settings;
+        _settings = settings;
+        _apiService = apiService;
+        _themeService = themeService;
         SelectedTheme = _settings.Settings.Theme;
     }
 
     public List<string> AvailableThemes { get; } = new() { "System", "Light", "Dark" };
 
-    // Theme changing code
     partial void OnSelectedThemeChanged(string value)
     {
-        var app = Application.Current!;
-        switch (value)
-        {
-            case "Light":
-                app.RequestedThemeVariant = ThemeVariant.Light;
-                break;
-
-            case "Dark":
-                app.RequestedThemeVariant = ThemeVariant.Dark;
-                break;
-
-            default:
-                app.RequestedThemeVariant = ThemeVariant.Default;
-                break;
-        }
-
+        _themeService.ApplyTheme(value);
         _settings.Settings.Theme = value;
         _settings.Save();
     }
@@ -59,7 +46,7 @@ public partial class SettingsViewModel : ViewModelBase
     
         try
         {
-            await App.APIService.Health().WaitAsync(TimeSpan.FromSeconds(0.5));
+            await _apiService.Health().WaitAsync(TimeSpan.FromSeconds(0.5));
             HealthCheckIcon = MaterialIconKind.Check;
             HealthCheckColor = Brushes.LimeGreen;
         }

@@ -5,22 +5,24 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public class ClipboardService(APIService api)
+public class ClipboardService(APIService api, CryptographyService cryptographyService, ISecureStorage secureStorage)
 {
     private readonly APIService _api = api ?? throw new ArgumentNullException(nameof(api));
+    private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
+    private readonly ISecureStorage _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
 
     public async Task<ClipboardEntry> SyncClipboardAsync(string content)
     {
         if (string.IsNullOrEmpty(content))
             throw new ArgumentException("Content cannot be null or empty", nameof(content));
 
-        var masterKeyBase64 = await SecureStorage.LoadAsync(CryptographyService.MasterKey);
+        var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
         if (string.IsNullOrEmpty(masterKeyBase64))
             throw new InvalidOperationException("Master key not found. User must be logged in.");
 
         var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
 
-        var (ciphertext, nonce) = _api.CryptographyService.EncryptClipboard(content, masterKey);
+        var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
 
         var request = new ClipboardSyncRequest
         {
@@ -40,7 +42,7 @@ public class ClipboardService(APIService api)
 
     public async Task<string> GetLatestClipboardAsync()
     {
-        var masterKeyBase64 = await SecureStorage.LoadAsync(CryptographyService.MasterKey);
+        var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
         if (string.IsNullOrEmpty(masterKeyBase64))
             throw new InvalidOperationException("Master key not found. User must be logged in.");
 
@@ -57,7 +59,7 @@ public class ClipboardService(APIService api)
 
     public async Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20)
     {
-        var masterKeyBase64 = await SecureStorage.LoadAsync(CryptographyService.MasterKey);
+        var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
         if (string.IsNullOrEmpty(masterKeyBase64))
             throw new InvalidOperationException("Master key not found. User must be logged in.");
 
@@ -87,6 +89,6 @@ public class ClipboardService(APIService api)
         var ciphertext = CryptographyService.FromBase64Static(entry.ciphertext);
         var nonce = CryptographyService.FromBase64Static(entry.nonce);
 
-        return _api.CryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
+        return _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
     }
 }

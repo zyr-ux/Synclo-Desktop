@@ -1,20 +1,26 @@
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Synclo.Factory;
 using Synclo.Services;
 
 namespace Synclo.ViewModels;
 
 public partial class AccountViewModel : ViewModelBase
 {
+    private readonly IViewModelFactory _factory;
     private readonly AccountService _accountService;
-    private readonly DeviceService _deviceService;
+    private readonly WebSocketService _webSocketService;
 
     [ObservableProperty] private ViewModelBase? _currentViewModel;
 
-    public AccountViewModel()
+    public AccountViewModel(
+        IViewModelFactory factory,
+        AccountService accountService,
+        WebSocketService webSocketService)
     {
-        _accountService = App.APIService.AccountService;
-        _deviceService = App.APIService.DeviceService;
+        _factory = factory;
+        _accountService = accountService;
+        _webSocketService = webSocketService;
         _ = InitializeAsync();
     }
 
@@ -24,7 +30,7 @@ public partial class AccountViewModel : ViewModelBase
         {
             var email = await _accountService.GetStoredEmailAsync() ?? "";
             ShowAccountDetails(email);
-            _ = App.APIService.WebSocketService.ConnectAsync();
+            _ = _webSocketService.ConnectAsync();
         }
         else
         {
@@ -34,18 +40,22 @@ public partial class AccountViewModel : ViewModelBase
 
     private void ShowLogin()
     {
-        CurrentViewModel = new LoginViewModel(_accountService, OnLoginSuccess);
+        var loginViewModel = _factory.Create<LoginViewModel>();
+        loginViewModel.LoginSucceeded += OnLoginSuccess;
+        CurrentViewModel = loginViewModel;
     }
 
     private void ShowAccountDetails(string email)
     {
-        CurrentViewModel = new AccountDetailsViewModel(_accountService, _deviceService, email, OnLogout);
+        var accountDetailsViewModel = _factory.Create<AccountDetailsViewModel, string>(email);
+        accountDetailsViewModel.LoggedOut += OnLogout;
+        CurrentViewModel = accountDetailsViewModel;
     }
 
     private void OnLoginSuccess(string email)
     {
         ShowAccountDetails(email);
-        _ = App.APIService.WebSocketService.ConnectAsync();
+        _ = _webSocketService.ConnectAsync();
     }
 
     private void OnLogout()

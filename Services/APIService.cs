@@ -15,36 +15,35 @@ public sealed class APIService : IDisposable
 {
     public const string BaseUrl = "https://synclo.zyrux.dev";
     private readonly HttpClient _http;
+    private readonly ISecureStorage _secureStorage;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private bool _disposed;
-    
-    public AccountService AccountService { get; }
-    public CryptographyService CryptographyService { get; }
-    public DeviceService DeviceService { get; }
-    public WebSocketService WebSocketService { get; }
-    public ClipboardService ClipboardService { get; }
+    private Func<CancellationToken, Task<string>>? _refreshTokenFunc;
 
     public event Action<string>? TokenRefreshed;
 
-    public APIService(ISettingsService settings)
+    public APIService(HttpClient http, ISecureStorage secureStorage)
     {
-        _http = new HttpClient
+        _http = http;
+        _secureStorage = secureStorage;
+        
+        if (_http.BaseAddress == null)
         {
-            BaseAddress = new Uri(BaseUrl.TrimEnd('/')),
-            Timeout = TimeSpan.FromSeconds(15)
-        };
+            _http.BaseAddress = new Uri(BaseUrl.TrimEnd('/'));
+            _http.Timeout = TimeSpan.FromSeconds(15);
+        }
+        
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true
         };
+    }
 
-        CryptographyService = new CryptographyService();
-        DeviceService = new DeviceService(this);
-        AccountService = new AccountService(this, _http, settings, DeviceService);
-        WebSocketService = new WebSocketService(this);
-        ClipboardService = new ClipboardService(this);
+    public void SetRefreshTokenFunc(Func<CancellationToken, Task<string>> refreshTokenFunc)
+    {
+        _refreshTokenFunc = refreshTokenFunc;
     }
     
     public Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default)
@@ -80,10 +79,13 @@ public sealed class APIService : IDisposable
 
         response.Dispose();
 
+        if (_refreshTokenFunc == null)
+            throw new InvalidOperationException("Token refresh function not configured");
+
         await _refreshLock.WaitAsync(ct);
         try
         {
-            var newToken = await AccountService.RefreshTokenAsync(ct);
+            var newToken = await _refreshTokenFunc(ct);
             TokenRefreshed?.Invoke(newToken);
             return await SendReqHelper(method, url, body, ct);
         }
@@ -98,7 +100,7 @@ public sealed class APIService : IDisposable
     {
         using var req = new HttpRequestMessage(method, url);
 
-        var token = await SecureStorage.LoadAsync(AccountService.AccessToken);
+        var token = await _secureStorage.LoadAsync(AccountService.AccessToken);
         if (!string.IsNullOrWhiteSpace(token))
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -139,7 +141,6 @@ public sealed class APIService : IDisposable
         if (_disposed) return;
 
         _disposed = true;
-        WebSocketService.Dispose();
         _http.Dispose();
         _refreshLock.Dispose();
     }

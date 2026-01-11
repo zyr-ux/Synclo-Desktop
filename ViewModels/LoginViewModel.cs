@@ -10,17 +10,19 @@ namespace Synclo.ViewModels;
 public partial class LoginViewModel : ViewModelBase
 {
     private readonly AccountService _accountService;
-    private readonly Action<string> _onLoginSuccess;
+    private readonly NotificationService _notificationService;
 
     [ObservableProperty] private string _email = string.Empty;
     [ObservableProperty] private string _password = string.Empty;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
-    public LoginViewModel(AccountService accountService, Action<string> onLoginSuccess)
+    public event Action<string>? LoginSucceeded;
+
+    public LoginViewModel(AccountService accountService, NotificationService notificationService)
     {
         _accountService = accountService;
-        _onLoginSuccess = onLoginSuccess;
+        _notificationService = notificationService;
     }
 
     [RelayCommand]
@@ -32,13 +34,13 @@ public partial class LoginViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(Email))
         {
-            App.NotificationService.ShowWarning("Email is required", "Login");
+            _notificationService.ShowWarning("Email is required", "Login");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(Password))
         {
-            App.NotificationService.ShowWarning("Password is required", "Login");
+            _notificationService.ShowWarning("Password is required", "Login");
             return;
         }
 
@@ -50,32 +52,32 @@ public partial class LoginViewModel : ViewModelBase
             await _accountService.LoginAsync(Email, Password);
             Password = string.Empty;
             StatusMessage = string.Empty;
-            App.NotificationService.ShowSuccess("Logged in successfully.", "Login");
-            _onLoginSuccess(Email);
+            _notificationService.ShowSuccess("Logged in successfully.", "Login");
+            LoginSucceeded?.Invoke(Email);
         }
         catch (InvalidRequestException ex)
         {
-            App.NotificationService.ShowWarning(ex.Message, "Login");
+            _notificationService.ShowWarning(ex.Message, "Login");
         }
         catch (InvalidCredentialsException)
         {
-            App.NotificationService.ShowError("Incorrect email or password.", "Login");
+            _notificationService.ShowError("Incorrect email or password.", "Login");
         }
         catch (SecurityBreachException)
         {
-            App.NotificationService.ShowError("Your session was terminated for security. Please log in again.", "Login");
+            _notificationService.ShowError("Your session was terminated for security. Please log in again.", "Login");
         }
         catch (NetworkFailureException)
         {
-            App.NotificationService.ShowError("Network issue detected. Please check your connection.", "Login");
+            _notificationService.ShowError("Network issue detected. Please check your connection.", "Login");
         }
         catch (ServerFailureException)
         {
-            App.NotificationService.ShowError("Something went wrong on our side. Please try again.", "Login");
+            _notificationService.ShowError("Something went wrong on our side. Please try again.", "Login");
         }
         catch (Exception)
         {
-            App.NotificationService.ShowError("Login failed. Please try again.", "Login");
+            _notificationService.ShowError("Login failed. Please try again.", "Login");
         }
         finally
         {
@@ -93,19 +95,19 @@ public partial class LoginViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(Email))
         {
-            App.NotificationService.ShowWarning("Email is required", "Register");
+            _notificationService.ShowWarning("Email is required", "Register");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(Password))
         {
-            App.NotificationService.ShowWarning("Password is required", "Register");
+            _notificationService.ShowWarning("Password is required", "Register");
             return;
         }
 
         if (Password.Length < 8)
         {
-            App.NotificationService.ShowWarning("Password must be at least 8 characters", "Register");
+            _notificationService.ShowWarning("Password must be at least 8 characters", "Register");
             return;
         }
 
@@ -116,28 +118,28 @@ public partial class LoginViewModel : ViewModelBase
         {
             await _accountService.RegisterAsync(Email, Password);
             Password = string.Empty;
-            App.NotificationService.ShowSuccess("Account created successfully.", "Register");
-            _onLoginSuccess(Email);
+            _notificationService.ShowSuccess("Account created successfully.", "Register");
+            LoginSucceeded?.Invoke(Email);
         }
         catch (InvalidRequestException ex)
         {
-            App.NotificationService.ShowWarning(ex.Message, "Register");
+            _notificationService.ShowWarning(ex.Message, "Register");
         }
         catch (UserAlreadyExistsException)
         {
-            App.NotificationService.ShowError("This email is already registered.", "Register");
+            _notificationService.ShowError("This email is already registered.", "Register");
         }
         catch (NetworkFailureException)
         {
-            App.NotificationService.ShowError("Network issue detected. Please check your connection.", "Register");
+            _notificationService.ShowError("Network issue detected. Please check your connection.", "Register");
         }
         catch (ServerFailureException)
         {
-            App.NotificationService.ShowError("Something went wrong on our side. Please try again.", "Register");
+            _notificationService.ShowError("Something went wrong on our side. Please try again.", "Register");
         }
         catch (Exception)
         {
-            App.NotificationService.ShowError("Registration failed. Please try again.", "Register");
+            _notificationService.ShowError("Registration failed. Please try again.", "Register");
         }
         finally
         {

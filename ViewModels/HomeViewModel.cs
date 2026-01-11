@@ -13,19 +13,22 @@ namespace Synclo.ViewModels;
 public partial class HomeViewModel : ViewModelBase
 {
     private readonly ClipboardService _clipboardService;
+    private readonly NotificationService _notificationService;
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private ObservableCollection<ClipboardEntry> _historyEntries = new();
     [ObservableProperty] private bool _isLoading;
 
-    public HomeViewModel()
+    public HomeViewModel(ClipboardService clipboardService,
+        NotificationService notificationService)
     {
-        _clipboardService = new ClipboardService(App.APIService);
+        _clipboardService = clipboardService;
+        _notificationService = notificationService;
         _ = RefreshClipboardHistory();
     }
 
     [RelayCommand]
-    public async Task RefreshClipboardHistory()
+    private async Task RefreshClipboardHistory()
     {
         try
         {
@@ -35,12 +38,12 @@ public partial class HomeViewModel : ViewModelBase
             var history = await _clipboardService.GetClipboardHistoryAsync();
             HistoryEntries.Clear();
             foreach (var entry in history.history) HistoryEntries.Add(entry);
-            App.NotificationService.ShowSuccess("Clipboard history refreshed.");
+            _notificationService.ShowSuccess("Clipboard history refreshed.");
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-            App.NotificationService.ShowError(ex.Message);
+            _notificationService.ShowError(ex.Message);
         }
         finally
         {
@@ -49,7 +52,7 @@ public partial class HomeViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public async Task ItemClicked(ClipboardEntry entry)
+    private async Task ItemClicked(ClipboardEntry entry)
     {
         try
         {
@@ -61,12 +64,12 @@ public partial class HomeViewModel : ViewModelBase
                 var clipboard = desktop.MainWindow?.Clipboard;
                 if (clipboard != null)
                     await clipboard.SetTextAsync(entry.plaintext);
-                App.NotificationService.ShowSuccess("Copied to clipboard.");
+                _notificationService.ShowSuccess("Copied to clipboard.");
             }
         }
         catch (Exception ex)
         {
-            App.NotificationService.ShowError(ex.Message);
+            _notificationService.ShowError(ex.Message);
         }
     }
 }

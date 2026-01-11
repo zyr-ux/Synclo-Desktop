@@ -11,6 +11,7 @@ namespace Synclo.Services;
 public sealed class WebSocketService : IDisposable
 {
     private readonly APIService APIService;
+    private readonly ISecureStorage _secureStorage;
     private const int BufferSize = 8192;
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private CancellationTokenSource? _cts;
@@ -20,9 +21,10 @@ public sealed class WebSocketService : IDisposable
 
     private ClientWebSocket? _socket;
 
-    public WebSocketService(APIService api)
+    public WebSocketService(APIService api, ISecureStorage secureStorage)
     {
         APIService = api;
+        _secureStorage = secureStorage;
         APIService.TokenRefreshed += OnTokenRefreshed;
     }
 
@@ -69,7 +71,7 @@ public sealed class WebSocketService : IDisposable
     {
         if (_disposed || _manualDisconnect || IsConnected) return;
 
-        var token = await SecureStorage.LoadAsync(AccountService.AccessToken);
+        var token = await _secureStorage.LoadAsync(AccountService.AccessToken);
         if (string.IsNullOrWhiteSpace(token)) return;
 
         await DisconnectInternal();
