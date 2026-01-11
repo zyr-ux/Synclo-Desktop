@@ -31,7 +31,7 @@ public class App : Application
         // View models
         collection.AddSingleton<IViewModelFactory, ViewModelFactory>();
         collection.AddSingleton<MainWindowViewModel>();
-        collection.AddTransient<HomeViewModel>();
+        collection.AddSingleton<HomeViewModel>();
         collection.AddTransient<AccountViewModel>();
         collection.AddTransient<SettingsViewModel>();
         collection.AddTransient<LoginViewModel>();
