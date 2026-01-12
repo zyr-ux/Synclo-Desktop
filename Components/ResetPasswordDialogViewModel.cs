@@ -8,11 +8,8 @@ using Synclo.ViewModels;
 
 namespace Synclo.Components;
 
-public partial class ResetPasswordDialogViewModel : ViewModelBase
+public partial class ResetPasswordDialogViewModel(AccountService accountService, Action<bool?> close) : ViewModelBase
 {
-    private readonly AccountService _accountService;
-    private readonly Action<bool?> _close;
-
     [ObservableProperty] private string _currentPassword = string.Empty;
     [ObservableProperty] private string _newPassword = string.Empty;
     [ObservableProperty] private string _confirmPassword = string.Empty;
@@ -20,16 +17,10 @@ public partial class ResetPasswordDialogViewModel : ViewModelBase
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private bool _isBusy;
 
-    public ResetPasswordDialogViewModel(AccountService accountService, Action<bool?> close)
-    {
-        _accountService = accountService;
-        _close = close;
-    }
-
     [RelayCommand]
     private void Cancel()
     {
-        _close(false);
+        close(false);
     }
 
     [RelayCommand]
@@ -65,8 +56,8 @@ public partial class ResetPasswordDialogViewModel : ViewModelBase
         StatusMessage = "Updating password...";
         try
         {
-            await _accountService.ChangePasswordAsync(CurrentPassword, NewPassword);
-            _close(true);
+            await accountService.ChangePasswordAsync(CurrentPassword, NewPassword);
+            close(true);
         }
         catch (InvalidCredentialsException)
         {
