@@ -44,3 +44,11 @@ TestResults/
 ## Crash dumps (Useful for debugging crashes on local)
 *.dmp
 *.dump
+
+## Migration Guides
+Client-Migration-Guide.md
+Client-Password-Change-Implementation.md
+Clipboard System Prompt.md
+DI-Refactoring-Summary.md
+Migration-Guide.md
+Migration-Progress.md
