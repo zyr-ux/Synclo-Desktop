@@ -65,6 +65,7 @@ public class App : Application
         var apiService = services.GetRequiredService<APIService>();
         var accountService = services.GetRequiredService<AccountService>();
         apiService.SetRefreshTokenFunc(accountService.RefreshTokenAsync);
+        var webSocketService = services.GetRequiredService<WebSocketService>();
         var settingsService = services.GetRequiredService<ISettingsService>();
         var themeService = services.GetRequiredService<IThemeService>();
         themeService.ApplyTheme(settingsService.Settings.Theme);
@@ -81,10 +82,8 @@ public class App : Application
             Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
             desktop.Exit += (_, _) =>
             {
-                var api = services.GetRequiredService<APIService>();
-                var webSocket = services.GetRequiredService<WebSocketService>();
-                webSocket.Dispose();
-                api.Dispose();
+                webSocketService.Dispose();
+                apiService.Dispose();
                 mainVM.Dispose();
             };
         }
