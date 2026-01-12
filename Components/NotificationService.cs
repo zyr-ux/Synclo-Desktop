@@ -16,22 +16,26 @@ public sealed class NotificationService
 
     public void ShowInfo(string message, string? title = null)
     {
-        _manager?.Show(new Notification(title ?? "Info", message, NotificationType.Information));
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            _manager?.Show(new Notification(title ?? "Info", message, NotificationType.Information)));
     }
 
     public void ShowSuccess(string message, string? title = null)
     {
-        _manager?.Show(new Notification(title ?? "Success", message, NotificationType.Success));
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            _manager?.Show(new Notification(title ?? "Success", message, NotificationType.Success)));
     }
 
     public void ShowWarning(string message, string? title = null)
     {
-        _manager?.Show(new Notification(title ?? "Warning", message, NotificationType.Warning));
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            _manager?.Show(new Notification(title ?? "Warning", message, NotificationType.Warning)));
     }
 
     public void ShowError(string message, string? title = null)
     {
-        _manager?.Show(new Notification(title ?? "Error", message, NotificationType.Error));
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            _manager?.Show(new Notification(title ?? "Error", message, NotificationType.Error)));
     }
 }
 
