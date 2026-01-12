@@ -2,9 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Synclo.Components;
 
-namespace Synclo.Services;
+namespace Synclo.Components;
 
 public class DialogService : DialogService.IDialogService
 {
