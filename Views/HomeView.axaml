@@ -46,7 +46,7 @@
             </ItemsControl.ItemsPanel>
 
             <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="models:ClipboardEntry">
+                <DataTemplate DataType="models:ClipboardDbModel">
                     <StackPanel>
                         <Grid ColumnDefinitions="*, Auto">
                             <Button Grid.Column="0"
@@ -54,7 +54,7 @@
                                     Padding="0"
                                     Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
                                     CommandParameter="{Binding}">
-                                <TextBlock Text="{Binding plaintext}"
+                                <TextBlock Text="{Binding Content}"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource Accent}"
                                            FontSize="18"
@@ -64,7 +64,7 @@
                             </Button>
 
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding timestamp, StringFormat={}{0:h:mm tt}}"
+                                       Text="{Binding CreatedAt, StringFormat={}{0:h:mm tt}}"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource Accent}"
                                        FontSize="16"

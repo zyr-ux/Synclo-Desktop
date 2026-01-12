@@ -127,6 +127,9 @@ public sealed class AccountService(
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
             settings.Save();
+
+            // Notify subscribers (e.g., ClipboardSyncService) of successful login
+            if (OnLogin != null) await OnLogin.Invoke();
         }
         catch (InvalidRequestException) { throw; }
         catch (InvalidCredentialsException) { throw; }
@@ -203,6 +206,9 @@ public sealed class AccountService(
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
             settings.Save();
+
+            // Notify subscribers (e.g., ClipboardSyncService) of successful registration
+            if (OnLogin != null) await OnLogin.Invoke();
         }
         catch (InvalidRequestException) { throw; }
         catch (UserAlreadyExistsException) { throw; }
@@ -347,10 +353,19 @@ public sealed class AccountService(
         }
     }
 
-    // -------------------- LOGOUT --------------------
+    // -------------------- LOGIN / LOGOUT EVENTS --------------------
+
+    public event Func<Task>? OnLogin;
+    public event Func<Task>? OnLogout;
 
     public async Task LogoutAsync()
     {
+        // Notify subscribers (e.g., ClipboardSyncService) before clearing state
+        if (OnLogout != null)
+        {
+            await OnLogout.Invoke();
+        }
+
         await webSocketService.DisconnectAsync();
         var deviceId = settings.Settings.device_id;
         if (!string.IsNullOrWhiteSpace(deviceId))

@@ -11,6 +11,8 @@ using Synclo.Components;
 using Synclo.Factory;
 using Synclo.SecretsManager;
 using Synclo.Services;
+using Synclo.Services.ClipboardService;
+using Synclo.Services.Startup;
 using Synclo.Themes;
 using Synclo.ViewModels;
 using Synclo.Views;
@@ -44,10 +46,28 @@ public class App : Application
         collection.AddSingleton<DeviceService>();
         collection.AddSingleton<WebSocketService>();
         collection.AddSingleton<AccountService>();
-        collection.AddSingleton<ClipboardService>();
+        collection.AddSingleton<ClipboardApiService>();
+        
+        // Clipboard subsystem
+        collection.AddSingleton<IClipboardRepository, ClipboardRepository>();
+        collection.AddSingleton<IClipboardMonitor>(_ => {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return new ClipboardMonitorWindows();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return new ClipboardMonitorMacOS();
+            return new ClipboardMonitorLinux();
+        });
+        collection.AddSingleton<IStartupManager>(_ => {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return new StartupManagerWindows();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return new StartupManagerMacOS();
+            return new StartupManagerLinux();
+        });
+        collection.AddSingleton<ClipboardSyncService>();
         
         // Other related services
-        collection.AddTransient<CryptographyService>();
+        collection.AddSingleton<CryptographyService>();
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<NotificationService>();
         collection.AddSingleton<DialogService.IDialogService, DialogService>();
@@ -70,6 +90,15 @@ public class App : Application
         var themeService = services.GetRequiredService<IThemeService>();
         themeService.ApplyTheme(settingsService.Settings.Theme);
         
+        // Initialize clipboard subsystem with proper sequencing
+        var clipboardRepository = services.GetRequiredService<IClipboardRepository>();
+        var clipboardSyncService = services.GetRequiredService<ClipboardSyncService>();
+        Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await clipboardRepository.InitializeAsync();
+            await clipboardSyncService.InitializeAsync();
+        });
+        
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             DisableAvaloniaDataAnnotationValidation();
@@ -80,8 +109,9 @@ public class App : Application
                 DataContext = mainVM
             };
             Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
-            desktop.Exit += (_, _) =>
+            desktop.Exit += async (_, _) =>
             {
+                await clipboardSyncService.ShutdownAsync();
                 webSocketService.Dispose();
                 apiService.Dispose();
                 mainVM.Dispose();

@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -35,6 +36,12 @@ public partial class LoginViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(Email))
         {
             _notificationService.ShowWarning("Email is required", "Login");
+            return;
+        }
+
+        if (!IsValidEmail(Email))
+        {
+            _notificationService.ShowWarning("Please enter a valid email address", "Login");
             return;
         }
 
@@ -99,6 +106,12 @@ public partial class LoginViewModel : ViewModelBase
             return;
         }
 
+        if (!IsValidEmail(Email))
+        {
+            _notificationService.ShowWarning("Please enter a valid email address", "Register");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Password))
         {
             _notificationService.ShowWarning("Password is required", "Register");
@@ -146,6 +159,13 @@ public partial class LoginViewModel : ViewModelBase
             IsBusy = false;
             StatusMessage = string.Empty;
         }
+    }
+
+    private static bool IsValidEmail(string email)
+    {
+        // Simple email validation regex
+        var pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
+        return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
     }
 }
 

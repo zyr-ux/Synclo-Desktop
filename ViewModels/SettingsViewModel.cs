@@ -6,6 +6,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Material.Icons;
 using Synclo.Services;
+using Synclo.Services.ClipboardService;
+using Synclo.Services.Startup;
 using Synclo.Themes;
 
 namespace Synclo.ViewModels;
@@ -15,19 +17,49 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ISettingsService _settings;
     private readonly APIService _apiService;
     private readonly IThemeService _themeService;
+    private readonly ClipboardSyncService _clipboardSyncService;
+    private readonly IStartupManager _startupManager;
+    
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
     
     [ObservableProperty] private MaterialIconKind _healthCheckIcon = MaterialIconKind.QuestionMark;
     [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
     [ObservableProperty] private double _gridOpacity;
+    
+    [ObservableProperty] private bool _isAutoSyncEnabled;
+    [ObservableProperty] private bool _isStartOnBootEnabled;
 
-    public SettingsViewModel(ISettingsService settings, APIService apiService, IThemeService themeService)
+    public SettingsViewModel(
+        ISettingsService settings, 
+        APIService apiService, 
+        IThemeService themeService,
+        ClipboardSyncService clipboardSyncService,
+        IStartupManager startupManager)
     {
         _settings = settings;
         _apiService = apiService;
         _themeService = themeService;
+        _clipboardSyncService = clipboardSyncService;
+        _startupManager = startupManager;
+        
         SelectedTheme = _settings.Settings.Theme;
+        IsAutoSyncEnabled = _settings.Settings.auto_sync_enabled;
+        
+        // Load start on boot status
+        _ = LoadStartOnBootStatusAsync();
+    }
+
+    private async Task LoadStartOnBootStatusAsync()
+    {
+        try
+        {
+            IsStartOnBootEnabled = await _startupManager.IsEnabledAsync();
+        }
+        catch
+        {
+            IsStartOnBootEnabled = false;
+        }
     }
 
     public List<string> AvailableThemes { get; } = new() { "System", "Light", "Dark" };
@@ -37,6 +69,52 @@ public partial class SettingsViewModel : ViewModelBase
         _themeService.ApplyTheme(value);
         _settings.Settings.Theme = value;
         _settings.Save();
+    }
+
+    partial void OnIsAutoSyncEnabledChanged(bool value)
+    {
+        _settings.Settings.auto_sync_enabled = value;
+        _settings.Save();
+        
+        // Start/stop clipboard monitoring
+        _ = _clipboardSyncService.SetEnabledAsync(value);
+    }
+
+    partial void OnIsStartOnBootEnabledChanged(bool value)
+    {
+        _settings.Settings.start_on_boot = value;
+        _settings.Save();
+        
+        // Configure autostart
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (value)
+                {
+                    await _startupManager.EnableAsync();
+                }
+                else
+                {
+                    await _startupManager.DisableAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Revert the toggle state on UI thread and notify user
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    // Use the backing field to avoid re-triggering OnChanged
+                    _isStartOnBootEnabled = !value;
+                    OnPropertyChanged(nameof(IsStartOnBootEnabled));
+                    _settings.Settings.start_on_boot = !value;
+                    _settings.Save();
+                });
+                
+                // Show notification - NotificationService is typically thread-safe
+                System.Diagnostics.Debug.WriteLine($"Failed to configure autostart: {ex.Message}");
+            }
+        });
     }
 
     [RelayCommand]

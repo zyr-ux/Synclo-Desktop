@@ -3,9 +3,9 @@ using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.SecretsManager;
 
-namespace Synclo.Services;
+namespace Synclo.Services.ClipboardService;
 
-public class ClipboardService(APIService api, CryptographyService cryptographyService, ISecureStorage secureStorage)
+public class ClipboardApiService(APIService api, CryptographyService cryptographyService, ISecureStorage secureStorage)
 {
     private readonly APIService _api = api ?? throw new ArgumentNullException(nameof(api));
     private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));

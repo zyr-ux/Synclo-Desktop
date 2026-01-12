@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Security;
 using System.Threading;
@@ -116,11 +117,25 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private static async Task<bool> CheckInternet()
     {
+        // Try ICMP ping first (fastest when not blocked)
         try
         {
             using var ping = new Ping();
             var reply = await ping.SendPingAsync("1.1.1.1", 1000);
-            return reply.Status == IPStatus.Success;
+            if (reply.Status == IPStatus.Success)
+                return true;
+        }
+        catch
+        {
+            // Ping may be blocked, fall through to HTTP check
+        }
+        
+        // Fallback: HTTP check for networks that block ICMP
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            using var response = await http.GetAsync("https://www.google.com/generate_204");
+            return response.IsSuccessStatusCode;
         }
         catch
         {

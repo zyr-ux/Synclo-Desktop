@@ -13,4 +13,5 @@ public sealed class AppSettings
     public int blob_version { get; set; } = 1;
     public DateTime? last_sync { get; set; }
     public bool auto_sync_enabled { get; set; } = true;
+    public bool start_on_boot { get; set; } = false;
 }

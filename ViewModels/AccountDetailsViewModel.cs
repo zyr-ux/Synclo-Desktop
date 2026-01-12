@@ -113,8 +113,9 @@ public partial class AccountDetailsViewModel : ViewModelBase
                 await _deviceService.SaveAsync(Devices.ToList());
             }
         }
-        catch
+        catch (Exception)
         {
+            _notificationService.ShowError("Failed to log out device. Please try again.");
         }
     }
 
