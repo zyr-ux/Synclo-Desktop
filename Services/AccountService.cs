@@ -84,7 +84,11 @@ public sealed class AccountService(
                 device_name = utils.GetDeviceName()
             };
 
-            using var res = await api.PostAsync("/api/login", req, ct);
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/login")
+            {
+                Content = api.Serialize(req)
+            };
+            using var res = await http.SendAsync(httpReq, ct);
             var content = await res.Content.ReadAsStringAsync(ct);
 
             if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest)
@@ -161,7 +165,11 @@ public sealed class AccountService(
                 device_name = utils.GetDeviceName()
             };
 
-            using var res = await api.PostAsync("/api/register", req, ct);
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/register")
+            {
+                Content = api.Serialize(req)
+            };
+            using var res = await http.SendAsync(httpReq, ct);
             var content = await res.Content.ReadAsStringAsync(ct);
 
             if (!res.IsSuccessStatusCode)
@@ -241,7 +249,16 @@ public sealed class AccountService(
             new_kdf_version = SupportedKdfVersion
         };
 
-        using var res = await api.PostAsync("/api/password/change", req, ct);
+        using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/password/change")
+        {
+            Content = api.Serialize(req)
+        };
+        
+        var token = await secureStorage.LoadAsync(AccessToken);
+        if (!string.IsNullOrWhiteSpace(token))
+            httpReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        using var res = await http.SendAsync(httpReq, ct);
         var content = await res.Content.ReadAsStringAsync(ct);
 
         if (res.StatusCode == HttpStatusCode.Unauthorized)
@@ -270,7 +287,11 @@ public sealed class AccountService(
 
         try
         {
-            using var res = await api.PostAsync("/api/refresh", body, ct);
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/refresh")
+            {
+                Content = api.Serialize(body)
+            };
+            using var res = await http.SendAsync(httpReq, ct);
 
             if (!res.IsSuccessStatusCode)
             {
