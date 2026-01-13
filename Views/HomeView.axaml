@@ -5,80 +5,87 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              xmlns:vm="clr-namespace:Synclo.ViewModels"
              xmlns:models="clr-namespace:Synclo.Models"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d"
+             d:DesignWidth="800"
+             d:DesignHeight="450"
              x:Class="Synclo.Views.HomeView"
              x:DataType="vm:HomeViewModel"
              Background="{DynamicResource PrimaryBackground}">
 
+    <Grid RowDefinitions="Auto,*,Auto"
+          Margin="30">
 
-    <Grid RowDefinitions="Auto, *, Auto" Margin="30">
-        
-        <StackPanel Grid.Row="0" Orientation="Horizontal">
-            <!-- title -->
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal">
             <TextBlock Text="History"
                        FontSize="36"
                        FontFamily="{DynamicResource Inconsolata-Bold}"
-                       Foreground="#FFCC66" />
-            
-            <!-- refresh button -->
+                       Foreground="#FFCC66"/>
+
             <Button Classes="icon-button"
-                    HorizontalAlignment="Right"
                     Margin="20 0 0 0"
                     VerticalAlignment="Center"
                     IsEnabled="{Binding !IsLoading}"
                     Command="{Binding RefreshClipboardHistoryCommand}">
-                <materialIcons:MaterialIcon
-                    Kind="Refresh"
-                    VerticalAlignment="Center"
-                    Width="26"
-                    Height="26" />
+                <materialIcons:MaterialIcon Kind="Refresh"
+                                            Width="26"
+                                            Height="26"
+                                            VerticalAlignment="Center"/>
             </Button>
         </StackPanel>
-        
-        <!--history list-->
-        <ItemsControl Grid.Row="1" 
-                      ItemsSource="{Binding HistoryEntries}"
-                      Margin="0,30,0,0">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Spacing="25" />
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
 
-            <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="models:ClipboardDbModel">
-                    <StackPanel>
-                        <Grid ColumnDefinitions="*, Auto">
-                            <Button Grid.Column="0"
-                                    Classes="textButton"
-                                    Padding="0"
-                                    Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                                    CommandParameter="{Binding}">
-                                <TextBlock Text="{Binding Content}"
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,30,0,0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+
+            <ItemsControl ItemsSource="{Binding HistoryEntries}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="25"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="models:ClipboardDbModel">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="*,Auto">
+
+                                <Button Grid.Column="0"
+                                        Classes="textButton"
+                                        Padding="0"
+                                        HorizontalAlignment="Stretch"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                        CommandParameter="{Binding}">
+
+                                    <TextBlock Text="{Binding Content}"
+                                               Foreground="{DynamicResource Accent}"
+                                               FontSize="18"
+                                               FontFamily="{DynamicResource Inconsolata-Medium}"
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               HorizontalAlignment="Stretch"
+                                               Margin="0,0,20,0"/>
+                                </Button>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CreatedAt, StringFormat={}{0:h:mm tt}}"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource Accent}"
-                                           FontSize="18"
-                                           TextTrimming="CharacterEllipsis"
-                                           Margin="0,0,20,0"
+                                           FontSize="16"
                                            FontFamily="{DynamicResource Inconsolata-Medium}"/>
-                            </Button>
+                            </Grid>
 
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding CreatedAt, StringFormat={}{0:h:mm tt}}"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Accent}"
-                                       FontSize="16"
-                                       FontFamily="{DynamicResource Inconsolata-Medium}"/>
-                        </Grid>
-
-                        <Border Height="1"
-                                Background="{DynamicResource Accent}"
-                                Margin="0,8,0,0" 
-                                Opacity="0.5"/>
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                            <Border Height="1"
+                                    Background="{DynamicResource Accent}"
+                                    Margin="0,8,0,0"
+                                    Opacity="0.5"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
 
     </Grid>
 </UserControl>
