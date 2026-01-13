@@ -13,14 +13,14 @@ namespace Synclo.Services;
 
 public sealed class APIService : IDisposable
 {
-    public const string BaseUrl = "https://synclo.zyrux.dev";
+    private const string BaseUrl = "https://synclo.zyrux.dev";
     private readonly HttpClient _http;
     private readonly ISecureStorage _secureStorage;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private bool _disposed;
-    private Func<CancellationToken, Task<string>>? _refreshTokenFunc;
 
+    public event Func<CancellationToken, Task<string>>? OnTokenExpired;
     public event Action<string>? TokenRefreshed;
 
     public APIService(HttpClient http, ISecureStorage secureStorage)
@@ -41,11 +41,7 @@ public sealed class APIService : IDisposable
         };
     }
 
-    public void SetRefreshTokenFunc(Func<CancellationToken, Task<string>> refreshTokenFunc)
-    {
-        _refreshTokenFunc = refreshTokenFunc;
-    }
-    
+
     public Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default)
     {
         return SendAuthReqAsync(HttpMethod.Get, url, null, ct);
@@ -79,13 +75,13 @@ public sealed class APIService : IDisposable
 
         response.Dispose();
 
-        if (_refreshTokenFunc == null)
-            throw new InvalidOperationException("Token refresh function not configured");
+        if (OnTokenExpired == null)
+            throw new InvalidOperationException("No token refresh handler configured");
 
         await _refreshLock.WaitAsync(ct);
         try
         {
-            var newToken = await _refreshTokenFunc(ct);
+            var newToken = await OnTokenExpired.Invoke(ct);
             TokenRefreshed?.Invoke(newToken);
             return await SendReqHelper(method, url, body, ct);
         }
