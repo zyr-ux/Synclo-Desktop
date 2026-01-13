@@ -10,8 +10,9 @@ namespace Synclo.Services;
 
 public sealed class WebSocketService : IDisposable
 {
-    private readonly APIService APIService;
+    private readonly APIService _apiService;
     private readonly ISecureStorage _secureStorage;
+    private readonly IRefreshTokenService _refreshTokenService;
     private const int BufferSize = 8192;
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private CancellationTokenSource? _cts;
@@ -21,16 +22,16 @@ public sealed class WebSocketService : IDisposable
 
     private ClientWebSocket? _socket;
 
-    public WebSocketService(APIService api, ISecureStorage secureStorage)
+    public WebSocketService(APIService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
     {
-        APIService = api;
+        _apiService = api;
         _secureStorage = secureStorage;
-        APIService.TokenRefreshed += OnTokenRefreshed;
+        _refreshTokenService = refreshTokenService;
+        _apiService.TokenRefreshed += OnTokenRefreshed;
     }
 
-    public bool IsConnected => _socket is { State: WebSocketState.Open };
+    private bool IsConnected => _socket is { State: WebSocketState.Open };
     public event Action<string>? OnMessageReceived;
-    public event Action? OnDisconnected;
 
     private void OnTokenRefreshed(string token)
     {
@@ -66,7 +67,7 @@ public sealed class WebSocketService : IDisposable
     }
 
     #region Internal Methods
-
+    
     private async Task ConnectInternal()
     {
         if (_disposed || _manualDisconnect || IsConnected) return;
@@ -83,6 +84,35 @@ public sealed class WebSocketService : IDisposable
 
         try
         {
+            await _socket.ConnectAsync(new Uri(url), _cts.Token);
+            _retryCount = 0;
+            _ = ReceiveLoop();
+        }
+        catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket || ex.Message.Contains("403"))
+        {
+            await Handle403AndRetry();
+        }
+        catch
+        {
+            _ = ScheduleReconnectBackground();
+        }
+    }
+
+    private async Task Handle403AndRetry()
+    {
+        try
+        {
+            await _refreshTokenService.RefreshAsync(_cts?.Token ?? CancellationToken.None);
+
+            var newToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
+            if (string.IsNullOrWhiteSpace(newToken)) return;
+
+            await DisconnectInternal();
+
+            _socket = new ClientWebSocket();
+            _cts = new CancellationTokenSource();
+
+            var url = $"wss://synclo.zyrux.dev/api/ws/clipboard?token={newToken}";
             await _socket.ConnectAsync(new Uri(url), _cts.Token);
             _retryCount = 0;
             _ = ReceiveLoop();
@@ -139,13 +169,17 @@ public sealed class WebSocketService : IDisposable
 
         if (_manualDisconnect) return;
 
-        if (status is WebSocketCloseStatus.PolicyViolation or WebSocketCloseStatus.ProtocolError)
+        if (status is WebSocketCloseStatus.PolicyViolation)
+        {
+            await Handle403AndRetry();
+            return;
+        }
+
+        if (status is WebSocketCloseStatus.ProtocolError)
         {
             _ = ScheduleReconnectBackground();
             return;
         }
-
-        OnDisconnected?.Invoke();
     }
 
     public async Task SendAsync(string text)
@@ -236,7 +270,7 @@ public sealed class WebSocketService : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        APIService.TokenRefreshed -= OnTokenRefreshed;
+        _apiService.TokenRefreshed -= OnTokenRefreshed;
 
         _cts?.Cancel();
         _ = DisconnectInternal();

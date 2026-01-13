@@ -14,10 +14,10 @@ public sealed class AccountService(
     HttpClient http,
     ISettingsService settings,
     DeviceService deviceService,
-    WebSocketService webSocketService,
     CryptographyService cryptographyService,
     ISecureStorage secureStorage,
-    Utils utils)
+    Utils utils,
+    IRefreshTokenService refreshTokenService)
 {
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
@@ -246,7 +246,7 @@ public sealed class AccountService(
         var newWrappedMk =
             cryptographyService.WrapMasterKey(masterKey, newWrappingKey);
 
-        var req = new
+        var req = new PasswordChangeRequest
         {
             old_auth_key = CryptographyService.ToBase64Static(oldAuthKey),
             new_auth_key = CryptographyService.ToBase64Static(newAuthKey),
@@ -285,72 +285,7 @@ public sealed class AccountService(
 
     public async Task<string> RefreshTokenAsync(CancellationToken ct = default)
     {
-        var refreshToken = await secureStorage.LoadAsync(RefreshToken);
-        if (string.IsNullOrWhiteSpace(refreshToken))
-            throw new SessionExpiredException();
-
-        var body = new { refresh_token = refreshToken };
-
-        try
-        {
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/refresh")
-            {
-                Content = api.Serialize(body)
-            };
-            using var res = await http.SendAsync(httpReq, ct);
-
-            if (!res.IsSuccessStatusCode)
-            {
-                if (res.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    var errorContent = await res.Content.ReadAsStringAsync(ct);
-                    if (errorContent.Contains("reused") || errorContent.Contains("family"))
-                    {
-                        await LogoutAsync();
-                        throw new SecurityBreachException("Refresh token reuse detected.");
-                    }
-                }
-
-                await LogoutAsync();
-                throw new SessionExpiredException();
-            }
-
-            var content = await res.Content.ReadAsStringAsync(ct);
-            var data = api.Deserialize<AuthResponse>(content);
-
-            if (data == null ||
-                string.IsNullOrWhiteSpace(data.access_token) ||
-                string.IsNullOrWhiteSpace(data.refresh_token))
-            {
-                await LogoutAsync();
-                throw new SessionExpiredException();
-            }
-
-            if (data.kdf_version.HasValue &&
-                data.kdf_version.Value != SupportedKdfVersion)
-            {
-                await LogoutAsync();
-                throw new SecurityException(
-                    $"Account upgraded to security version {data.kdf_version}. Please update the app.");
-            }
-
-            await secureStorage.SaveAsync(AccessToken, data.access_token);
-            await secureStorage.SaveAsync(RefreshToken, data.refresh_token);
-
-            if (!string.IsNullOrWhiteSpace(data.salt))
-                await secureStorage.SaveAsync(CryptographyService.Salt, data.salt);
-
-            if (data.kdf_version.HasValue)
-                await secureStorage.SaveAsync(
-                    CryptographyService.KdfVersion,
-                    data.kdf_version.Value.ToString());
-
-            return data.access_token;
-        }
-        catch (HttpRequestException)
-        {
-            throw new NetworkFailureException();
-        }
+        return await refreshTokenService.RefreshAsync(ct);
     }
 
     // -------------------- LOGIN / LOGOUT EVENTS --------------------
@@ -360,13 +295,11 @@ public sealed class AccountService(
 
     public async Task LogoutAsync()
     {
-        // Notify subscribers (e.g., ClipboardSyncService) before clearing state
         if (OnLogout != null)
         {
             await OnLogout.Invoke();
         }
 
-        await webSocketService.DisconnectAsync();
         var deviceId = settings.Settings.device_id;
         if (!string.IsNullOrWhiteSpace(deviceId))
         {
