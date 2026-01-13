@@ -11,7 +11,7 @@ public class ClipboardApiService(APIService api, CryptographyService cryptograph
     private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
     private readonly ISecureStorage _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
 
-    public async Task<ClipboardEntry> SyncClipboardAsync(string content)
+    public async Task<string> SyncClipboardAsync(string content)
     {
         if (string.IsNullOrEmpty(content))
             throw new ArgumentException("Content cannot be null or empty", nameof(content));
@@ -35,9 +35,24 @@ public class ClipboardApiService(APIService api, CryptographyService cryptograph
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();
-        var entry = _api.Deserialize<ClipboardEntry>(json);
         
-        return entry;
+        if (string.IsNullOrWhiteSpace(json))
+            throw new InvalidOperationException("Server returned empty response");
+            
+        ClipboardSyncResponse? syncResponse;
+        try
+        {
+            syncResponse = _api.Deserialize<ClipboardSyncResponse>(json);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to deserialize server response. JSON: {json}", ex);
+        }
+        
+        if (syncResponse == null)
+            throw new InvalidOperationException("Server returned null response");
+        
+        return syncResponse.id;
     }
 
     public async Task<string> GetLatestClipboardAsync()

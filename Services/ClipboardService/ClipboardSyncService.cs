@@ -284,18 +284,19 @@ public class ClipboardSyncService : IDisposable
             {
                 try
                 {
-                    var syncedEntry = await _clipboardApiService.SyncClipboardAsync(content);
+                    var serverId = await _clipboardApiService.SyncClipboardAsync(content);
 
-                    // Delete the temporary entry and insert with server ID
+                    var tempEntry = await _repository.GetByIdAsync(tempId);
+                    
                     await _repository.DeleteByIdAsync(tempId);
                     
                     var syncedDbEntry = new ClipboardDbModel
                     {
-                        Id = syncedEntry.id,
+                        Id = serverId,
                         Content = content,
                         ContentHash = contentHash,
-                        Ciphertext = syncedEntry.ciphertext,
-                        Nonce = syncedEntry.nonce,
+                        Ciphertext = tempEntry?.Ciphertext ?? string.Empty,
+                        Nonce = tempEntry?.Nonce ?? string.Empty,
                         BlobVersion = _settingsService.Settings.blob_version,
                         IsRemoteDeleted = false,
                         CreatedAt = DateTime.UtcNow,
@@ -304,13 +305,11 @@ public class ClipboardSyncService : IDisposable
                     
                     await _repository.UpsertAsync(syncedDbEntry);
 
-                    // Update last_sync timestamp
                     _settingsService.Settings.last_sync = DateTime.UtcNow;
                     _settingsService.Save();
                 }
                 catch (Exception ex)
                 {
-                    // Entry remains in SQLite as local-only (SyncedAt = null indicates not synced)
                     _notificationService.ShowError($"Failed to sync clipboard: {ex.Message}");
                 }
             });

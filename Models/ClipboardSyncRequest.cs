@@ -1,12 +1,9 @@
 namespace Synclo.Models;
 
-/// <summary>
-/// Request body for syncing encrypted clipboard content.
-/// </summary>
 public class ClipboardSyncRequest
 {
-    public string ciphertext { get; set; } // Base64 encoded
-    public string nonce { get; set; } // Base64 encoded
+    public required string ciphertext { get; set; }
+    public required string nonce { get; set; }
     public int blob_version { get; set; } = 1;
 }
 
