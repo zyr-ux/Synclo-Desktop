@@ -44,8 +44,9 @@ public class App : Application
         collection.AddSingleton<HttpClient>();
         collection.AddSingleton<APIService>();
         collection.AddSingleton<DeviceService>();
-        collection.AddSingleton<WebSocketService>();
+        collection.AddSingleton<IRefreshTokenService, RefreshTokenService>();
         collection.AddSingleton<AccountService>();
+        collection.AddSingleton<WebSocketService>();
         collection.AddSingleton<ClipboardApiService>();
         
         // Clipboard subsystem
@@ -83,8 +84,8 @@ public class App : Application
         
         var services = collection.BuildServiceProvider();
         var apiService = services.GetRequiredService<APIService>();
+        var refreshTokenService = services.GetRequiredService<IRefreshTokenService>();
         var accountService = services.GetRequiredService<AccountService>();
-        apiService.SetRefreshTokenFunc(accountService.RefreshTokenAsync);
         var webSocketService = services.GetRequiredService<WebSocketService>();
         var settingsService = services.GetRequiredService<ISettingsService>();
         var themeService = services.GetRequiredService<IThemeService>();
@@ -98,6 +99,10 @@ public class App : Application
             await clipboardRepository.InitializeAsync();
             await clipboardSyncService.InitializeAsync();
         });
+        
+        // Event handlers
+        apiService.OnTokenExpired += refreshTokenService.RefreshAsync;
+        accountService.OnLogout += webSocketService.DisconnectAsync;
         
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
