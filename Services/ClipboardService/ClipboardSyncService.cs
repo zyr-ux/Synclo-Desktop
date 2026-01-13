@@ -193,6 +193,33 @@ public class ClipboardSyncService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Deletes a clipboard entry from both the server and local database.
+    /// Server deletion happens first to ensure consistency.
+    /// </summary>
+    /// <param name="clipboardId">The ID of the clipboard entry to delete</param>
+    public async Task DeleteClipboardEntryAsync(string clipboardId)
+    {
+        if (string.IsNullOrEmpty(clipboardId))
+            throw new ArgumentException("Clipboard ID cannot be null or empty", nameof(clipboardId));
+
+        try
+        {
+            // Step 1: Delete from server first
+            var response = await _clipboardApiService.DeleteClipboardAsync(clipboardId);
+            
+            // Step 2: Delete from local database after successful server deletion
+            await _repository.DeleteByIdAsync(clipboardId);
+            
+            //_notificationService.ShowSuccess("Clipboard entry deleted successfully");
+        }
+        catch (Exception ex)
+        {
+            _notificationService.ShowError($"Failed to delete clipboard entry: {ex.Message}");
+            throw;
+        }
+    }
+
     private void OnClipboardChanged(string content)
     {
         // Cancel and dispose any pending debounce

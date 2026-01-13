@@ -94,6 +94,23 @@ public class ClipboardApiService(APIService api, CryptographyService cryptograph
         return historyResponse;
     }
 
+    public async Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId)
+    {
+        if (string.IsNullOrEmpty(clipboardId))
+            throw new ArgumentException("Clipboard ID cannot be null or empty", nameof(clipboardId));
+
+        var response = await _api.DeleteAsync($"/api/clipboard/{clipboardId}");
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        var deleteResponse = _api.Deserialize<ClipboardDeleteResponse>(json);
+        
+        if (deleteResponse == null)
+            throw new InvalidOperationException("Server returned null response");
+        
+        return deleteResponse;
+    }
+
     private string DecryptClipboardEntry(ClipboardEntry entry, byte[] masterKey)
     {
         if (entry == null)
