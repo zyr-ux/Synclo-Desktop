@@ -2,361 +2,639 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Synclo.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Synclo.Services.ClipboardService;
 
-/// <summary>
-/// SQLite implementation of clipboard repository.
-/// Thread-safe database operations for clipboard entries.
-/// </summary>
-public class ClipboardRepository : IClipboardRepository, IDisposable
+// ---------------------------------------------------------
+// 1. RepoChange Definitions
+// ---------------------------------------------------------
+public enum RepoChangeType
+{
+    Upsert,
+    Delete,
+    Reset
+}
+
+public readonly struct RepoChangeEvent
+{
+    public RepoChangeType Type { get; }
+    public IReadOnlyList<ClipboardDbModel> Items { get; }
+    
+    public RepoChangeEvent(RepoChangeType type, IReadOnlyList<ClipboardDbModel>? items = null)
+    {
+        Type = type;
+        Items = items ?? Array.Empty<ClipboardDbModel>();
+    }
+    
+    public static RepoChangeEvent Upsert(List<ClipboardDbModel> items) =>
+        new(RepoChangeType.Upsert, items);
+    
+    public static RepoChangeEvent Delete(string id) =>
+        new(RepoChangeType.Delete, new[] { new ClipboardDbModel { Id = id } });
+    
+    public static RepoChangeEvent Reset() =>
+        new(RepoChangeType.Reset);
+}
+
+// ---------------------------------------------------------
+// 2. Main Class Implementation
+// ---------------------------------------------------------
+public sealed class ClipboardRepository : IClipboardRepository, IDisposable
 {
     private readonly string _dbPath;
-    private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly ILogger<ClipboardRepository> _logger;
+    private readonly RepositoryConfig _config;
+    
+    // Locks
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
+    private readonly object _memLock = new();
+    
+    // Cache State
+    private readonly Dictionary<string, ClipboardDbModel> _cache = new();
+    private volatile bool _cacheInitialized;
+    
     private bool _disposed;
-
+    
+    // Task Scheduling
+    private static readonly TaskScheduler _dbScheduler =
+        new ConcurrentExclusiveSchedulerPair(TaskScheduler.Default, 1).ExclusiveScheduler;
+    private static readonly TaskFactory _db =
+        new(CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskContinuationOptions.None, _dbScheduler);
+    
+    // INTERFACE EVENT IMPLEMENTATION
     public event Action? OnDataChanged;
+    
+    // Additional "Smart" Event (Optional, for advanced usage)
+    public event Action<RepoChangeEvent>? OnDetailedChange;
 
-    public ClipboardRepository()
+    public ClipboardRepository(ILogger<ClipboardRepository> logger, RepositoryConfig config)
     {
-        // Database location: %APPDATA%/Synclo/clipboard.db (Windows) or equivalent
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var syncloDir = Path.Combine(appDataPath, "Synclo");
-        Directory.CreateDirectory(syncloDir);
-        _dbPath = Path.Combine(syncloDir, "clipboard.db");
+        var dir = Path.Combine(appDataPath, "Synclo");
+        Directory.CreateDirectory(dir);
+        _dbPath = Path.Combine(dir, "clipboard.db");
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
-        await _lock.WaitAsync();
-        try
+        return _db.StartNew(async () =>
         {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var createTableCmd = connection.CreateCommand();
-            createTableCmd.CommandText = @"
-                CREATE TABLE IF NOT EXISTS clipboard_entries (
-                    id TEXT PRIMARY KEY,
-                    content TEXT NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    ciphertext TEXT NOT NULL,
-                    nonce TEXT NOT NULL,
-                    blob_version INTEGER NOT NULL,
-                    is_remote_deleted INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL,
-                    synced_at TEXT
-                );
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
                 
-                CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
-                CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
-            ";
-            await createTableCmd.ExecuteNonQueryAsync();
-        }
-        finally
+                // Verify WAL mode is enabled
+                await VerifyWALModeAsync(connection).ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA temp_store=MEMORY;
+PRAGMA busy_timeout=5000;
+
+CREATE TABLE IF NOT EXISTS clipboard_entries (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    blob_version INTEGER NOT NULL,
+    is_remote_deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    synced_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
+CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_synced_at ON clipboard_entries(synced_at);
+CREATE INDEX IF NOT EXISTS idx_is_remote_deleted ON clipboard_entries(is_remote_deleted);
+";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                _logger.LogInformation("Database initialized successfully. WAL mode verified.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to initialize database");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+        }).Unwrap();
+    }
+
+    private async Task VerifyWALModeAsync(SqliteConnection connection)
+    {
+        try
         {
-            _lock.Release();
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA journal_mode";
+            var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+        
+            // Fixed: Handle null result and proper string comparison
+            if (result == null || !string.Equals(result.ToString(), "wal", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning($"WAL mode not enabled. Current mode: {result?.ToString() ?? "null"}. This may impact concurrency performance.");
+            }
+            else
+            {
+                _logger.LogInformation("WAL mode enabled successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify WAL mode");
+            throw;
         }
     }
 
-    public async Task<List<ClipboardDbModel>> GetAllAsync()
+    // ---------------------------------------------------------
+    // READS
+    // ---------------------------------------------------------
+    public IReadOnlyList<ClipboardDbModel>? TryGetCached(int limit)
     {
-        await _lock.WaitAsync();
-        try
+        if (!_cacheInitialized) return null;
+        lock (_memLock)
         {
-            var entries = new List<ClipboardDbModel>();
+            return _cache.Values
+                .OrderByDescending(e => e.CreatedAt)
+                .ThenByDescending(e => e.Id)  // Stable sort: use Id as tiebreaker
+                .Take(limit)
+                .ToList();
+        }
+    }
+
+    // INTERFACE IMPLEMENTATION: Parameterless GetAllAsync
+    public Task<List<ClipboardDbModel>> GetAllAsync()
+    {
+        // Default to a reasonable limit (e.g. 100) to satisfy the interface safely
+        return GetAllAsync(_config.DefaultHistoryLimit, 0);
+    }
+
+    public Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0)
+    {
+        return _db.StartNew(async () =>
+        {
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT id, content, content_hash, ciphertext, nonce, blob_version,
+       is_remote_deleted, created_at, synced_at
+FROM clipboard_entries
+ORDER BY created_at DESC, ROWID DESC
+LIMIT $limit OFFSET $offset
+";
+                cmd.Parameters.AddWithValue("$limit", limit);
+                cmd.Parameters.AddWithValue("$offset", offset);
+                
+                var list = new List<ClipboardDbModel>();
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    list.Add(MapFromReader(reader));
+                }
+                
+                // Batch update cache
+                lock (_memLock)
+                {
+                    foreach (var entry in list) _cache[entry.Id] = entry;
+                    TrimCache();
+                    _cacheInitialized = true;
+                }
+                
+                return list;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get all clipboard entries");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+        }).Unwrap();
+    }
+
+    public Task<ClipboardDbModel?> GetByIdAsync(string id)
+    {
+        lock (_memLock)
+        {
+            if (_cache.TryGetValue(id, out var cached)) return Task.FromResult<ClipboardDbModel?>(cached);
+        }
+        
+        return _db.StartNew(async () =>
+        {
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE id = $id";
+                cmd.Parameters.AddWithValue("$id", id);
+                
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                if (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    var entry = MapFromReader(reader);
+                    lock (_memLock) { _cache[entry.Id] = entry; TrimCache(); }
+                    return entry;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to get entry by ID: {id}");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+        }).Unwrap();
+    }
+
+    public Task<ClipboardDbModel?> GetByHashAsync(string hash)
+    {
+        return _db.StartNew(async () =>
+        {
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE content_hash = $hash LIMIT 1";
+                cmd.Parameters.AddWithValue("$hash", hash);
+                
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                if (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    var entry = MapFromReader(reader);
+                    lock (_memLock) { _cache[entry.Id] = entry; TrimCache(); }
+                    return entry;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to get entry by hash: {hash}");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+        }).Unwrap();
+    }
+
+    public Task<List<ClipboardDbModel>> GetUnsyncedAsync()
+    {
+        return _db.StartNew(async () =>
+        {
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                var list = new List<ClipboardDbModel>();
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE synced_at IS NULL AND is_remote_deleted = 0 ORDER BY created_at ASC";
+                
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    list.Add(MapFromReader(reader));
+                }
+                return list;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get unsynced entries");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+        }).Unwrap();
+    }
+
+    // ---------------------------------------------------------
+    // WRITES
+    // ---------------------------------------------------------
+    /// <summary>
+    /// Insert or update a single clipboard entry (convenience method)
+    /// </summary>
+    public Task UpsertAsync(ClipboardDbModel entry)
+    {
+        if (entry == null)
+            throw new ArgumentNullException(nameof(entry));
+        if (string.IsNullOrEmpty(entry.Id))
+            throw new ArgumentException("Entry ID cannot be null or empty", nameof(entry));
+        if (string.IsNullOrEmpty(entry.Content))
+            throw new ArgumentException("Entry Content cannot be null or empty", nameof(entry));
+        if (string.IsNullOrEmpty(entry.ContentHash))
+            throw new ArgumentException("Entry ContentHash cannot be null or empty", nameof(entry));
+        
+        return UpsertAsync(new[] { entry });
+    }
+
+    /// <summary>
+    /// Insert or update multiple clipboard entries with optimized batching.
+    /// Fires a single event after all changes complete.
+    /// </summary>
+    public Task UpsertAsync(IEnumerable<ClipboardDbModel> entries)
+    {
+        if (entries == null)
+            throw new ArgumentNullException(nameof(entries));
+        
+        var entryList = entries.ToList();
+        if (entryList.Count == 0)
+            return Task.CompletedTask;
+        
+        // Validate all entries
+        foreach (var entry in entryList)
+        {
+            if (entry == null)
+                throw new ArgumentException("Entry collection contains null entry", nameof(entries));
+            if (string.IsNullOrEmpty(entry.Id))
+                throw new ArgumentException($"Entry with null/empty ID found", nameof(entries));
+            if (string.IsNullOrEmpty(entry.Content))
+                throw new ArgumentException($"Entry {entry.Id} has null/empty Content", nameof(entries));
+            if (string.IsNullOrEmpty(entry.ContentHash))
+                throw new ArgumentException($"Entry {entry.Id} has null/empty ContentHash", nameof(entries));
+        }
+        
+        return _db.StartNew(async () =>
+        {
+            RepoChangeEvent? eventToFire = null;
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var changed = new List<ClipboardDbModel>();
+                
+                // Smart batching: Use transaction only for multiple items
+                if (entryList.Count == 1)
+                {
+                    // Single item - direct insert (no transaction overhead)
+                    var entry = entryList[0];
+                    bool skip;
+                    lock (_memLock)
+                    {
+                        skip = _cache.TryGetValue(entry.Id, out var existing) &&
+                               existing.ContentHash == entry.ContentHash &&
+                               existing.BlobVersion == entry.BlobVersion &&
+                               existing.SyncedAt == entry.SyncedAt;
+                    }
+                    
+                    if (!skip)
+                    {
+                        var cmd = connection.CreateCommand();
+                        cmd.CommandText = @"
+INSERT OR REPLACE INTO clipboard_entries
+(id, content, content_hash, ciphertext, nonce, blob_version, is_remote_deleted, created_at, synced_at)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
+                        AddParams(cmd, entry);
+                        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                        
+                        lock (_memLock)
+                        {
+                            _cache[entry.Id] = entry;
+                            TrimCache();
+                        }
+                        changed.Add(entry);
+                    }
+                }
+                else
+                {
+                    // Multiple items - use transaction for atomicity
+                    using var tx = connection.BeginTransaction();
+                    foreach (var entry in entryList)
+                    {
+                        bool skip;
+                        lock (_memLock)
+                        {
+                            skip = _cache.TryGetValue(entry.Id, out var existing) &&
+                                   existing.ContentHash == entry.ContentHash &&
+                                   existing.BlobVersion == entry.BlobVersion &&
+                                   existing.SyncedAt == entry.SyncedAt;
+                        }
+                        
+                        if (skip) continue;
+                        
+                        var cmd = connection.CreateCommand();
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"
+INSERT OR REPLACE INTO clipboard_entries
+(id, content, content_hash, ciphertext, nonce, blob_version, is_remote_deleted, created_at, synced_at)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
+                        AddParams(cmd, entry);
+                        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                        
+                        lock (_memLock) { _cache[entry.Id] = entry; }
+                        changed.Add(entry);
+                    }
+                    tx.Commit();
+                    
+                    lock (_memLock) { TrimCache(); }
+                }
+                
+                // Fire single event only if changes occurred
+                if (changed.Count > 0)
+                    eventToFire = RepoChangeEvent.Upsert(changed);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to upsert clipboard entries");
+                throw;
+            }
+            finally { _dbLock.Release(); }
             
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                       is_remote_deleted, created_at, synced_at
-                FROM clipboard_entries
-                ORDER BY created_at DESC
-            ";
-
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                entries.Add(MapFromReader(reader));
-            }
-
-            return entries;
-        }
-        finally
-        {
-            _lock.Release();
-        }
+            // Fire event outside the lock
+            if (eventToFire.HasValue)
+                NotifyObservers(eventToFire.Value);
+        }).Unwrap();
     }
 
-    public async Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0)
+    // INTERFACE IMPLEMENTATION: MarkAsDeletedAsync
+    public Task MarkAsDeletedAsync(string id)
     {
-        await _lock.WaitAsync();
-        try
+        return _db.StartNew(async () =>
         {
-            var entries = new List<ClipboardDbModel>();
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+UPDATE clipboard_entries
+SET is_remote_deleted = 1
+WHERE id = $id
+";
+                cmd.Parameters.AddWithValue("$id", id);
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                lock (_memLock)
+                {
+                    // Just remove from cache - model is immutable
+                    _cache.Remove(id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to mark entry as deleted: {id}");
+                throw;
+            }
+            finally { _dbLock.Release(); }
             
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
+            NotifyObservers(RepoChangeEvent.Delete(id));
+        }).Unwrap();
+    }
 
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                       is_remote_deleted, created_at, synced_at
-                FROM clipboard_entries
-                ORDER BY created_at DESC
-                LIMIT $limit OFFSET $offset
-            ";
-            command.Parameters.AddWithValue("$limit", limit);
-            command.Parameters.AddWithValue("$offset", offset);
-
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+    public Task DeleteByIdAsync(string id)
+    {
+        return _db.StartNew(async () =>
+        {
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                entries.Add(MapFromReader(reader));
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM clipboard_entries WHERE id = $id";
+                cmd.Parameters.AddWithValue("$id", id);
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                lock (_memLock) { _cache.Remove(id); }
             }
-
-            return entries;
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
-
-    public async Task<ClipboardDbModel?> GetByIdAsync(string id)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                       is_remote_deleted, created_at, synced_at
-                FROM clipboard_entries
-                WHERE id = $id
-            ";
-            command.Parameters.AddWithValue("$id", id);
-
-            using var reader = await command.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
+            catch (Exception ex)
             {
-                return MapFromReader(reader);
+                _logger.LogError(ex, $"Failed to delete entry by ID: {id}");
+                throw;
             }
-
-            return null;
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
-
-    public async Task<ClipboardDbModel?> GetByHashAsync(string hash)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                       is_remote_deleted, created_at, synced_at
-                FROM clipboard_entries
-                WHERE content_hash = $hash
-                ORDER BY created_at DESC
-                LIMIT 1
-            ";
-            command.Parameters.AddWithValue("$hash", hash);
-
-            using var reader = await command.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
-            {
-                return MapFromReader(reader);
-            }
-
-            return null;
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
-
-    public async Task UpsertAsync(ClipboardDbModel entry)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                INSERT OR REPLACE INTO clipboard_entries 
-                (id, content, content_hash, ciphertext, nonce, blob_version, 
-                 is_remote_deleted, created_at, synced_at)
-                VALUES ($id, $content, $content_hash, $ciphertext, $nonce, $blob_version, 
-                        $is_remote_deleted, $created_at, $synced_at)
-            ";
-            command.Parameters.AddWithValue("$id", entry.Id);
-            command.Parameters.AddWithValue("$content", entry.Content);
-            command.Parameters.AddWithValue("$content_hash", entry.ContentHash);
-            command.Parameters.AddWithValue("$ciphertext", entry.Ciphertext);
-            command.Parameters.AddWithValue("$nonce", entry.Nonce);
-            command.Parameters.AddWithValue("$blob_version", entry.BlobVersion);
-            command.Parameters.AddWithValue("$is_remote_deleted", entry.IsRemoteDeleted ? 1 : 0);
-            command.Parameters.AddWithValue("$created_at", entry.CreatedAt.ToString("O"));
-            command.Parameters.AddWithValue("$synced_at", 
-                entry.SyncedAt.HasValue ? entry.SyncedAt.Value.ToString("O") : (object)DBNull.Value);
-
-            await command.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            _lock.Release();
-        }
-        
-        // Fire event OUTSIDE the lock to prevent deadlock if subscribers call back into repository
-        OnDataChanged?.Invoke();
-    }
-
-    public async Task MarkAsDeletedAsync(string id)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                UPDATE clipboard_entries
-                SET is_remote_deleted = 1
-                WHERE id = $id
-            ";
-            command.Parameters.AddWithValue("$id", id);
-
-            await command.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            _lock.Release();
-        }
-        
-        // Fire event OUTSIDE the lock to prevent deadlock
-        OnDataChanged?.Invoke();
-    }
-
-    public async Task DeleteByIdAsync(string id)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM clipboard_entries WHERE id = $id";
-            command.Parameters.AddWithValue("$id", id);
-
-            await command.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            _lock.Release();
-        }
-        
-        // Fire event OUTSIDE the lock to prevent deadlock
-        OnDataChanged?.Invoke();
-    }
-
-    public async Task DeleteAllMarkedAsync()
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                DELETE FROM clipboard_entries
-                WHERE is_remote_deleted = 1
-            ";
-
-            await command.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
-
-    public async Task<List<ClipboardDbModel>> GetUnsyncedAsync()
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            var entries = new List<ClipboardDbModel>();
+            finally { _dbLock.Release(); }
             
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
+            NotifyObservers(RepoChangeEvent.Delete(id));
+        }).Unwrap();
+    }
 
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                       is_remote_deleted, created_at, synced_at
-                FROM clipboard_entries
-                WHERE synced_at IS NULL AND is_remote_deleted = 0
-                ORDER BY created_at ASC
-            ";
-
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                entries.Add(MapFromReader(reader));
-            }
-
-            return entries;
-        }
-        finally
+    public Task DeleteAllMarkedAsync()
+    {
+        return _db.StartNew(async () =>
         {
-            _lock.Release();
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_remote_deleted = 1";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                lock (_memLock)
+                {
+                    var toRemove = _cache.Values.Where(x => x.IsRemoteDeleted).Select(x => x.Id).ToList();
+                    foreach (var id in toRemove) _cache.Remove(id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete all marked entries");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+        }).Unwrap();
+    }
+
+    public Task ClearAllAsync()
+    {
+        return _db.StartNew(async () =>
+        {
+            await _dbLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+                
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM clipboard_entries";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                lock (_memLock) { _cache.Clear(); }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to clear all entries");
+                throw;
+            }
+            finally { _dbLock.Release(); }
+            
+            NotifyObservers(RepoChangeEvent.Reset());
+        }).Unwrap();
+    }
+
+    // ---------------------------------------------------------
+    // HELPERS
+    // ---------------------------------------------------------
+    private void NotifyObservers(RepoChangeEvent change)
+    {
+        try
+        {
+            // 1. Fire the interface requirement (Simple)
+            OnDataChanged?.Invoke();
+            
+            // 2. Fire the detailed event (For smarter subscribers)
+            OnDetailedChange?.Invoke(change);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error notifying observers");
         }
     }
 
-    public async Task ClearAllAsync()
+    private void TrimCache()
     {
-        await _lock.WaitAsync();
-        try
-        {
-            using var connection = new SqliteConnection($"Data Source={_dbPath}");
-            await connection.OpenAsync();
-
-            var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM clipboard_entries";
-
-            await command.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        if (_cache.Count <= _config.MaxCacheSize) return;
         
-        // Fire event OUTSIDE the lock to prevent deadlock
-        OnDataChanged?.Invoke();
+        var itemsToRemove = _cache.Values
+            .OrderBy(x => x.CreatedAt)
+            .Take(_cache.Count - _config.MaxCacheSize)
+            .Select(x => x.Id)
+            .ToList();
+        
+        foreach (var id in itemsToRemove)
+        {
+            _cache.Remove(id);
+        }
+    }
+
+    private static void AddParams(SqliteCommand cmd, ClipboardDbModel entry)
+    {
+        cmd.Parameters.AddWithValue("$id", entry.Id);
+        cmd.Parameters.AddWithValue("$content", entry.Content);
+        cmd.Parameters.AddWithValue("$hash", entry.ContentHash);
+        cmd.Parameters.AddWithValue("$cipher", entry.Ciphertext);
+        cmd.Parameters.AddWithValue("$nonce", entry.Nonce);
+        cmd.Parameters.AddWithValue("$ver", entry.BlobVersion);
+        cmd.Parameters.AddWithValue("$del", entry.IsRemoteDeleted ? 1 : 0);
+        cmd.Parameters.AddWithValue("$created", entry.CreatedAt.ToString("O"));
+        cmd.Parameters.AddWithValue("$synced", entry.SyncedAt?.ToString("O") ?? (object)DBNull.Value);
     }
 
     private static ClipboardDbModel MapFromReader(SqliteDataReader reader)
@@ -379,6 +657,23 @@ public class ClipboardRepository : IClipboardRepository, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _lock.Dispose();
+        
+        try
+        {
+            _dbLock.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during disposal");
+        }
     }
+}
+
+/// <summary>
+/// Configuration for repository settings
+/// </summary>
+public class RepositoryConfig
+{
+    public int MaxCacheSize { get; set; } = 500;
+    public int DefaultHistoryLimit { get; set; } = 100;
 }

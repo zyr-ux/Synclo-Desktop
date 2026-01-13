@@ -78,11 +78,16 @@ public sealed class APIService : IDisposable
         if (OnTokenExpired == null)
             throw new InvalidOperationException("No token refresh handler configured");
 
+        var currentToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
+
         await _refreshLock.WaitAsync(ct);
         try
         {
-            var newToken = await OnTokenExpired.Invoke(ct);
-            TokenRefreshed?.Invoke(newToken);
+            var storedToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
+            if (storedToken == currentToken)
+            {
+                await OnTokenExpired.Invoke(ct);
+            }
             return await SendReqHelper(method, url, body, ct);
         }
         finally

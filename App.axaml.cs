@@ -7,11 +7,13 @@ using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Synclo.Components;
 using Synclo.Factory;
 using Synclo.SecretsManager;
 using Synclo.Services;
 using Synclo.Services.ClipboardService;
+using Synclo.Services.ClipboardService.ClipboardMonitoringService;
 using Synclo.Services.Startup;
 using Synclo.Themes;
 using Synclo.ViewModels;
@@ -29,6 +31,7 @@ public class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         var collection = new ServiceCollection();
+        collection.AddLogging();
         
         // View models
         collection.AddSingleton<IViewModelFactory, ViewModelFactory>();
@@ -47,16 +50,46 @@ public class App : Application
         collection.AddSingleton<IRefreshTokenService, RefreshTokenService>();
         collection.AddSingleton<AccountService>();
         collection.AddSingleton<WebSocketService>();
-        collection.AddSingleton<ClipboardApiService>();
+        collection.AddSingleton(new ApiConfig
+        {
+            ApiTimeoutSeconds = 30
+        });
+        collection.AddSingleton<IClipboardApiService, ClipboardApiService>();
         
         // Clipboard subsystem
         collection.AddSingleton<IClipboardRepository, ClipboardRepository>();
-        collection.AddSingleton<IClipboardMonitor>(_ => {
+        collection.AddSingleton<IClipboardProvider, AvaloniaClipboardProvider>();
+        collection.AddSingleton<IClipboardMonitor>(sp => 
+        {
+            var clipboardProvider = sp.GetRequiredService<IClipboardProvider>();
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return new ClipboardMonitorWindows();
+                return new ClipboardMonitorWindows(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorWindows>());
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return new ClipboardMonitorMacOS();
-            return new ClipboardMonitorLinux();
+                return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>());
+            return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>());
+        });
+        collection.AddSingleton<ClipboardSyncService>();
+        collection.AddSingleton(new RepositoryConfig
+        {
+            MaxCacheSize = 500,
+            DefaultHistoryLimit = 100
+        });
+        collection.AddSingleton(new ClipboardSyncConfig
+        {
+            DebounceDelayMs = 500,
+            RateLimitMaxSyncs = 5,
+            RateLimitWindowMs = 10000,
+            InactivityThresholdDays = 14,
+            DefaultHistoryLimit = 100,
+            DefaultSyncPageSize = 50,
+            ShutdownTimeoutSeconds = 5,
+            EchoSuppressionWindowMs = 2000,
+            MaxTrackedHashes = 5,
+            MinRefreshIntervalMs = 300,
+            MaxRetryAttempts = 3,
+            BaseRetryDelayMs = 1000,
+            RetryProcessorTimeoutMs = 5000
         });
         collection.AddSingleton<IStartupManager>(_ => {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -65,7 +98,6 @@ public class App : Application
                 return new StartupManagerMacOS();
             return new StartupManagerLinux();
         });
-        collection.AddSingleton<ClipboardSyncService>();
         
         // Other related services
         collection.AddSingleton<CryptographyService>();
@@ -74,6 +106,8 @@ public class App : Application
         collection.AddSingleton<DialogService.IDialogService, DialogService>();
         collection.AddSingleton<IThemeService, ThemeService>();
         collection.AddSingleton<Utils>();
+        
+        // Startup subsystem
         collection.AddSingleton<ISecureStorage>(_ => {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return new SecureStorageWindows();

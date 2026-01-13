@@ -49,7 +49,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="models:ClipboardDbModel">
                         <StackPanel>
-                            <Grid ColumnDefinitions="*,Auto">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
 
                                 <Button Grid.Column="0"
                                         Classes="textButton"
@@ -68,9 +68,22 @@
                                                HorizontalAlignment="Stretch"
                                                Margin="0,0,20,0"/>
                                 </Button>
+                                
+                                <Button Grid.Column="1"
+                                        Classes="icon-button"
+                                        Margin="0 0 15 0"
+                                        IsEnabled="{Binding !IsDeleting}"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                        CommandParameter="{Binding}">
+                                    <materialIcons:MaterialIcon
+                                        Kind="Close"
+                                        Width="16"
+                                        Height="16"
+                                        VerticalAlignment="Center"/>
+                                </Button>
 
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding CreatedAt, StringFormat={}{0:h:mm tt}}"
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding CreatedAtLocal, StringFormat={}{0:h:mm tt}}"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource Accent}"
                                            FontSize="16"

@@ -1,55 +1,59 @@
 using System;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Synclo.Models;
 
 /// <summary>
-/// SQLite database model for clipboard entries.
-/// Represents the local storage structure with additional fields for echo suppression and soft deletion.
+/// Immutable model for clipboard entries stored in SQLite.
+/// All properties use init-only setters to prevent thread safety issues.
+/// Use CopyWith() method to create modified copies.
 /// </summary>
-public class ClipboardDbModel
+public partial class ClipboardDbModel : ObservableObject
 {
-    /// <summary>
-    /// Server-assigned unique identifier
-    /// </summary>
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
+    public string Content { get; init; } = string.Empty;
+    public string ContentHash { get; init; } = string.Empty;
+    public string Ciphertext { get; init; } = string.Empty;
+    public string Nonce { get; init; } = string.Empty;
+    public int BlobVersion { get; init; }
+    public bool IsRemoteDeleted { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? SyncedAt { get; init; }
+    
+    public DateTime CreatedAtLocal => CreatedAt.ToLocalTime();
     
     /// <summary>
-    /// Decrypted plaintext content
+    /// UI-only state for delete operation (not persisted to DB).
+    /// This is the only mutable property as it's UI-specific.
     /// </summary>
-    public string Content { get; set; } = string.Empty;
+    [ObservableProperty]
+    private bool _isDeleting;
     
     /// <summary>
-    /// SHA256 hash of content for echo suppression
+    /// Creates a copy of this instance with specified properties modified.
     /// </summary>
-    public string ContentHash { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Base64 encoded encrypted content
-    /// </summary>
-    public string Ciphertext { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Base64 encoded encryption nonce
-    /// </summary>
-    public string Nonce { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Encryption blob version
-    /// </summary>
-    public int BlobVersion { get; set; }
-    
-    /// <summary>
-    /// Runtime soft delete flag (entry deleted on server but kept locally until shutdown)
-    /// </summary>
-    public bool IsRemoteDeleted { get; set; }
-    
-    /// <summary>
-    /// Timestamp when entry was created
-    /// </summary>
-    public DateTime CreatedAt { get; set; }
-    
-    /// <summary>
-    /// Timestamp of last successful sync (null if never synced)
-    /// </summary>
-    public DateTime? SyncedAt { get; set; }
+    public ClipboardDbModel CopyWith(
+        string? id = null,
+        string? content = null,
+        string? contentHash = null,
+        string? ciphertext = null,
+        string? nonce = null,
+        int? blobVersion = null,
+        bool? isRemoteDeleted = null,
+        DateTime? createdAt = null,
+        DateTime? syncedAt = null)
+    {
+        return new ClipboardDbModel
+        {
+            Id = id ?? this.Id,
+            Content = content ?? this.Content,
+            ContentHash = contentHash ?? this.ContentHash,
+            Ciphertext = ciphertext ?? this.Ciphertext,
+            Nonce = nonce ?? this.Nonce,
+            BlobVersion = blobVersion ?? this.BlobVersion,
+            IsRemoteDeleted = isRemoteDeleted ?? this.IsRemoteDeleted,
+            CreatedAt = createdAt ?? this.CreatedAt,
+            SyncedAt = syncedAt ?? this.SyncedAt
+        };
+    }
 }

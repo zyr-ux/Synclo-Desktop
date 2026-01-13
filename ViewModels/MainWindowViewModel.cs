@@ -154,8 +154,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void SwitchTo<T>() where T : ViewModelBase
     {
-        if (CurrentViewModel is IDisposable d)
-            d.Dispose();
 
         CurrentViewModel = _factory.Create<T>();
     }

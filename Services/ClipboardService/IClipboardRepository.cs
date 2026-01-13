@@ -5,10 +5,6 @@ using Synclo.Models;
 
 namespace Synclo.Services.ClipboardService;
 
-/// <summary>
-/// Repository interface for clipboard database operations.
-/// Provides abstraction over SQLite storage for clipboard entries.
-/// </summary>
 public interface IClipboardRepository
 {
     /// <summary>
@@ -39,9 +35,14 @@ public interface IClipboardRepository
     Task<ClipboardDbModel?> GetByHashAsync(string hash);
     
     /// <summary>
-    /// Insert or update clipboard entry
+    /// Insert or update a single clipboard entry
     /// </summary>
     Task UpsertAsync(ClipboardDbModel entry);
+    
+    /// <summary>
+    /// Insert or update multiple clipboard entries with optimized batching
+    /// </summary>
+    Task UpsertAsync(IEnumerable<ClipboardDbModel> entries);
     
     /// <summary>
     /// Mark entry as remotely deleted (soft delete for runtime)
