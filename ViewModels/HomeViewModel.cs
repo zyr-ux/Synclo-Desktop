@@ -19,6 +19,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly NotificationService _notificationService;
     private readonly ClipboardSyncService _clipboardSyncService;
+    private CancellationTokenSource? _updateCts;
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private ObservableCollection<ClipboardDbModel> _historyEntries = new();
@@ -41,20 +42,61 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     private void OnHistoryUpdated()
     {
+        // Cancel any pending update
+        _updateCts?.Cancel();
+        _updateCts = new CancellationTokenSource();
+        var token = _updateCts.Token;
+
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            var entries = await _clipboardSyncService.GetHistoryForUI();
-            ApplyCollectionDiff(entries);
+            try
+            {
+                // Small debounce delay to batch rapid updates
+                await Task.Delay(50, token);
+                
+                if (token.IsCancellationRequested)
+                    return;
+
+                var entries = await _clipboardSyncService.GetHistoryForUI();
+                
+                if (token.IsCancellationRequested)
+                    return;
+
+                ApplyCollectionDiff(entries);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when a newer update arrives
+            }
         });
     }
 
     private void ApplyCollectionDiff(IReadOnlyList<ClipboardDbModel> newEntries)
     {
         // Run on UI thread only - minimal edits to avoid UI flicker
-        // Greedy algorithm: align existing collection with new list by moving, inserting, replacing, and trimming.
         var existing = HistoryEntries;
 
-        // Iterate desired list and ensure each position matches
+        // If the first item in newEntries is not in the existing collection at all,
+        // it's a brand new clipboard entry that should go to the top.
+        // In this case, just rebuild the collection to avoid the "insert then move" flicker.
+        if (newEntries.Count > 0 && existing.Count > 0)
+        {
+            var firstNewId = newEntries[0].Id;
+            var existsInCollection = existing.Any(e => e.Id == firstNewId);
+            
+            if (!existsInCollection)
+            {
+                // New item at top - rebuild collection to avoid flicker
+                existing.Clear();
+                foreach (var entry in newEntries)
+                {
+                    existing.Add(entry);
+                }
+                return;
+            }
+        }
+
+        // Standard diff algorithm for updates/moves
         for (int i = 0; i < newEntries.Count; i++)
         {
             var desired = newEntries[i];
@@ -237,6 +279,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _updateCts?.Cancel();
+        _updateCts?.Dispose();
         _clipboardSyncService.OnHistoryUpdated -= OnHistoryUpdated;
     }
 }
