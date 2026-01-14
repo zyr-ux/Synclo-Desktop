@@ -10,7 +10,7 @@ namespace Synclo.Services;
 
 public sealed class WebSocketService : IDisposable
 {
-    private readonly APIService _apiService;
+    private readonly ApiService _apiService;
     private readonly ISecureStorage _secureStorage;
     private readonly IRefreshTokenService _refreshTokenService;
     private const int BufferSize = 8192;
@@ -21,8 +21,9 @@ public sealed class WebSocketService : IDisposable
     private int _retryCount;
 
     private ClientWebSocket? _socket;
+    private Task? _pingTask;
 
-    public WebSocketService(APIService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
+    public WebSocketService(ApiService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
     {
         _apiService = api;
         _secureStorage = secureStorage;
@@ -30,7 +31,7 @@ public sealed class WebSocketService : IDisposable
         _apiService.TokenRefreshed += OnTokenRefreshed;
     }
 
-    private bool IsConnected => _socket is { State: WebSocketState.Open };
+    public bool IsConnected => _socket is { State: WebSocketState.Open };
     public event Action<string>? OnMessageReceived;
 
     private void OnTokenRefreshed(string token)
@@ -80,13 +81,14 @@ public sealed class WebSocketService : IDisposable
         _socket = new ClientWebSocket();
         _cts = new CancellationTokenSource();
 
-        var url = $"wss://synclo.zyrux.dev/api/ws/clipboard?token={token}";
+        var url = $"wss://synclo.zyrux.dev/ws/clipboard?token={token}";
 
         try
         {
             await _socket.ConnectAsync(new Uri(url), _cts.Token);
             _retryCount = 0;
             _ = ReceiveLoop();
+            _pingTask = StartPingLoop(_cts.Token);
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket || ex.Message.Contains("403"))
         {
@@ -112,10 +114,11 @@ public sealed class WebSocketService : IDisposable
             _socket = new ClientWebSocket();
             _cts = new CancellationTokenSource();
 
-            var url = $"wss://synclo.zyrux.dev/api/ws/clipboard?token={newToken}";
+            var url = $"wss://synclo.zyrux.dev/ws/clipboard?token={newToken}";
             await _socket.ConnectAsync(new Uri(url), _cts.Token);
             _retryCount = 0;
             _ = ReceiveLoop();
+            _pingTask = StartPingLoop(_cts.Token);
         }
         catch
         {
@@ -179,6 +182,37 @@ public sealed class WebSocketService : IDisposable
         {
             _ = ScheduleReconnectBackground();
             return;
+        }
+
+        if (status.HasValue)
+        {
+            var code = (int)status.Value;
+            if (code == 4001)
+            {
+                try
+                {
+                    await _refreshTokenService.RefreshAsync(_cts?.Token ?? CancellationToken.None);
+                }
+                catch
+                {
+                    // If refresh fails, schedule normal reconnect (which may lead to logout)
+                }
+
+                _ = ScheduleReconnectBackground();
+                return;
+            }
+
+            if (code == 4002)
+            {
+                _ = ScheduleReconnectBackground();
+                return;
+            }
+
+            if (code == 1008)
+            {
+                await Handle403AndRetry();
+                return;
+            }
         }
     }
 
@@ -253,6 +287,12 @@ public sealed class WebSocketService : IDisposable
 
                 _socket.Dispose();
             }
+
+            if (_pingTask != null)
+            {
+                try { await _pingTask; } catch { }
+                _pingTask = null;
+            }
         }
         catch
         {
@@ -279,4 +319,29 @@ public sealed class WebSocketService : IDisposable
     }
 
     #endregion
+
+    private Task StartPingLoop(CancellationToken token)
+    {
+        return Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), token);
+                    if (token.IsCancellationRequested) break;
+                    if (IsConnected)
+                    {
+                        try
+                        {
+                            await SendAsync("{\"type\":\"ping\"}");
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch { }
+        }, token);
+    }
 }

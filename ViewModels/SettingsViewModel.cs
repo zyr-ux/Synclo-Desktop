@@ -15,7 +15,7 @@ namespace Synclo.ViewModels;
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settings;
-    private readonly APIService _apiService;
+    private readonly ApiService _apiService;
     private readonly IThemeService _themeService;
     private readonly ClipboardSyncService _clipboardSyncService;
     private readonly IStartupManager _startupManager;
@@ -32,7 +32,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel(
         ISettingsService settings, 
-        APIService apiService, 
+        ApiService apiService, 
         IThemeService themeService,
         ClipboardSyncService clipboardSyncService,
         IStartupManager startupManager)

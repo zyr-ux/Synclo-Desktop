@@ -25,3 +25,5 @@ public sealed class InvalidKdfVersionException(string message) : Exception(messa
 
 public sealed class InvalidBlobVersionException(string message) : Exception(message);
 
+// NEW - Rate limit exception
+public sealed class RateLimitException(string message) : Exception(message);

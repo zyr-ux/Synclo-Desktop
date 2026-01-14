@@ -10,7 +10,7 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class DeviceService(APIService api, ISettingsService settings, ISecureStorage secureStorage)
+public sealed class DeviceService(ApiService api, ISettingsService settings, ISecureStorage secureStorage)
 {
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

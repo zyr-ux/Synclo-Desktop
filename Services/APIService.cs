@@ -8,10 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.SecretsManager;
+using Polly;
 
 namespace Synclo.Services;
 
-public sealed class APIService : IDisposable
+public sealed class ApiService : IDisposable
 {
     private const string BaseUrl = "https://synclo.zyrux.dev";
     private readonly HttpClient _http;
@@ -23,7 +24,7 @@ public sealed class APIService : IDisposable
     public event Func<CancellationToken, Task<string>>? OnTokenExpired;
     public event Action<string>? TokenRefreshed;
 
-    public APIService(HttpClient http, ISecureStorage secureStorage)
+    public ApiService(HttpClient http, ISecureStorage secureStorage)
     {
         _http = http;
         _secureStorage = secureStorage;
@@ -99,22 +100,38 @@ public sealed class APIService : IDisposable
     private async Task<HttpResponseMessage> SendReqHelper(HttpMethod method, string url, object? body,
         CancellationToken ct)
     {
-        using var req = new HttpRequestMessage(method, url);
-
-        var token = await _secureStorage.LoadAsync(AccountService.AccessToken);
-        if (!string.IsNullOrWhiteSpace(token))
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        if (body != null)
-            req.Content = Serialize(body);
-
         try
         {
-            var res = await _http.SendAsync(req, ct);
+            var policy = Policy.HandleResult<HttpResponseMessage>(r => (int)r.StatusCode == 429)
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromMilliseconds(Math.Min(1000 * Math.Pow(2, retryAttempt - 1), 30000)),
+                    onRetry: (_, _, _, _) => { });
+
+            var res = await policy.ExecuteAsync(async (ct2) =>
+            {
+                using var attemptReq = new HttpRequestMessage(method, url);
+                var token2 = await _secureStorage.LoadAsync(AccountService.AccessToken);
+                if (!string.IsNullOrWhiteSpace(token2))
+                    attemptReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token2);
+
+                if (body != null)
+                    attemptReq.Content = Serialize(body);
+
+                return await _http.SendAsync(attemptReq, ct2).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
+
+            if ((int)res.StatusCode == 429)
+            {
+                var retryAfter = ParseRetryAfter(res);
+                var text = await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                res.Dispose();
+                throw new RateLimitException($"Rate limited. Retry after: {retryAfter.TotalSeconds}s. Response: {text}");
+            }
 
             if ((int)res.StatusCode >= 500)
             {
-                var text = await res.Content.ReadAsStringAsync(ct);
+                var text = await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 res.Dispose();
                 throw new ServerFailureException(text);
             }
@@ -125,6 +142,23 @@ public sealed class APIService : IDisposable
         {
             throw new NetworkFailureException();
         }
+    }
+
+    private static TimeSpan ParseRetryAfter(HttpResponseMessage res)
+    {
+        if (res.Headers.RetryAfter != null)
+        {
+            if (res.Headers.RetryAfter.Delta.HasValue)
+                return res.Headers.RetryAfter.Delta.Value;
+            if (res.Headers.RetryAfter.Date.HasValue)
+            {
+                var date = res.Headers.RetryAfter.Date.Value;
+                var delta = date - DateTimeOffset.UtcNow;
+                return delta > TimeSpan.Zero ? delta : TimeSpan.Zero;
+            }
+        }
+        // Default backoff
+        return TimeSpan.FromSeconds(30);
     }
 
     public StringContent Serialize(object obj)
@@ -144,6 +178,11 @@ public sealed class APIService : IDisposable
         _disposed = true;
         _http.Dispose();
         _refreshLock.Dispose();
+    }
+
+    public void NotifyTokenRefreshed(string token)
+    {
+        TokenRefreshed?.Invoke(token);
     }
 
     #endregion

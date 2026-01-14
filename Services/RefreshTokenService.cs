@@ -14,7 +14,7 @@ public interface IRefreshTokenService
     Task<string> RefreshAsync(CancellationToken ct = default);
 }
 
-public sealed class RefreshTokenService(APIService api, HttpClient http, ISecureStorage secureStorage) : IRefreshTokenService
+public sealed class RefreshTokenService(ApiService api, HttpClient http, ISecureStorage secureStorage) : IRefreshTokenService
 {
     private const int SupportedKdfVersion = 1;
 
@@ -78,6 +78,8 @@ public sealed class RefreshTokenService(APIService api, HttpClient http, ISecure
                 await secureStorage.SaveAsync(
                     CryptographyService.KdfVersion,
                     data.kdf_version.Value.ToString());
+
+            api.NotifyTokenRefreshed(data.access_token);
 
             return data.access_token;
         }

@@ -10,7 +10,7 @@ using Synclo.SecretsManager;
 namespace Synclo.Services;
 
 public sealed class AccountService(
-    APIService api,
+    ApiService api,
     HttpClient http,
     ISettingsService settings,
     DeviceService deviceService,

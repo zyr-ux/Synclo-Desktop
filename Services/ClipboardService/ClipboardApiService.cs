@@ -9,7 +9,7 @@ namespace Synclo.Services.ClipboardService;
 
 public interface IClipboardApiService
 {
-    Task<string> SyncClipboardAsync(string content);
+    Task<string> SyncClipboardAsync(string content, int blobVersion = 1);
     Task<string> GetLatestClipboardAsync();
     Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
@@ -18,14 +18,14 @@ public interface IClipboardApiService
 
 public class ClipboardApiService : IClipboardApiService
 {
-    private readonly APIService _api;
+    private readonly ApiService _api;
     private readonly CryptographyService _cryptographyService;
     private readonly ISecureStorage _secureStorage;
     private readonly ILogger<ClipboardApiService> _logger;
     private readonly ApiConfig _config;
 
     public ClipboardApiService(
-        APIService api, 
+        ApiService api, 
         CryptographyService cryptographyService, 
         ISecureStorage secureStorage,
         ILogger<ClipboardApiService> logger,
@@ -38,7 +38,7 @@ public class ClipboardApiService : IClipboardApiService
         _config = config ?? throw new ArgumentNullException(nameof(config));
     }
 
-    public async Task<string> SyncClipboardAsync(string content)
+    public async Task<string> SyncClipboardAsync(string content, int blobVersion = 1)
     {
         try
         {
@@ -57,7 +57,7 @@ public class ClipboardApiService : IClipboardApiService
             {
                 ciphertext = CryptographyService.ToBase64Static(ciphertext),
                 nonce = CryptographyService.ToBase64Static(nonce),
-                blob_version = 1
+                blob_version = blobVersion
             };
             
             var response = await _api.PostAsync("api/clipboard", request, cts.Token);
@@ -123,7 +123,7 @@ public class ClipboardApiService : IClipboardApiService
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
             
             var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
-            var response = await _api.GetAsync($"/api/clipboard/all?page={page}&page_size={pageSize}", cts.Token);
+            var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}", cts.Token);
             response.EnsureSuccessStatusCode();
             
             var json = await response.Content.ReadAsStringAsync();

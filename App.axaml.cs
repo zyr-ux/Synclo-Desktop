@@ -46,7 +46,7 @@ public class App : Application
         
         // API related services
         collection.AddSingleton<HttpClient>();
-        collection.AddSingleton<APIService>();
+        collection.AddSingleton<ApiService>();
         collection.AddSingleton<DeviceService>();
         collection.AddSingleton<IRefreshTokenService, RefreshTokenService>();
         collection.AddSingleton<AccountService>();
@@ -111,7 +111,7 @@ public class App : Application
         
         var services = collection.BuildServiceProvider();
 
-        var apiService = services.GetRequiredService<APIService>();
+        var apiService = services.GetRequiredService<ApiService>();
         var refreshTokenService = services.GetRequiredService<IRefreshTokenService>();
         var accountService = services.GetRequiredService<AccountService>();
         var webSocketService = services.GetRequiredService<WebSocketService>();

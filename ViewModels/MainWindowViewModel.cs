@@ -18,7 +18,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IViewModelFactory _factory;
     private readonly NotificationService _notificationService;
     private readonly AccountService _accountService;
-    private readonly APIService _apiService;
+    private readonly ApiService _apiService;
     private readonly WebSocketService _webSocketService;
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private string _statusText = string.Empty;
@@ -31,7 +31,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         IViewModelFactory factory,
         NotificationService notificationService,
         AccountService accountService,
-        APIService apiService,
+        ApiService apiService,
         WebSocketService webSocketService)
     {
         _factory = factory;
