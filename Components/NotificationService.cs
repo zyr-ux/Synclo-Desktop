@@ -1,10 +1,8 @@
+using System;
 using Avalonia.Controls.Notifications;
 
 namespace Synclo.Services;
 
-/// <summary>
-/// Centralized notification service using Avalonia's WindowNotificationManager.
-/// </summary>
 public sealed class NotificationService
 {
     private INotificationManager? _manager;
@@ -14,28 +12,33 @@ public sealed class NotificationService
         _manager = manager;
     }
 
-    public void ShowInfo(string message, string? title = null)
+    private void Show(string message,string? title,NotificationType type)
     {
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            _manager?.Show(new Notification(title ?? "Info", message, NotificationType.Information)));
+        if (_manager is null)
+            return;
+
+        var timeout = type switch
+        {
+            NotificationType.Success => TimeSpan.FromSeconds(2),
+            NotificationType.Information => TimeSpan.FromSeconds(3),
+            NotificationType.Warning => TimeSpan.FromSeconds(5),
+            NotificationType.Error => TimeSpan.FromSeconds(0),
+            _ => TimeSpan.FromSeconds(3)
+        };
+
+        _manager.Show(new Notification(title ?? type.ToString(),message,type,timeout));
     }
 
-    public void ShowSuccess(string message, string? title = null)
-    {
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            _manager?.Show(new Notification(title ?? "Success", message, NotificationType.Success)));
-    }
+    // Backward-compatible convenience wrappers
+    public void ShowError(string message, string? title = null) =>
+        Show(message, title, NotificationType.Error);
 
-    public void ShowWarning(string message, string? title = null)
-    {
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            _manager?.Show(new Notification(title ?? "Warning", message, NotificationType.Warning)));
-    }
+    public void ShowWarning(string message, string? title = null) =>
+        Show(message, title, NotificationType.Warning);
 
-    public void ShowError(string message, string? title = null)
-    {
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            _manager?.Show(new Notification(title ?? "Error", message, NotificationType.Error)));
-    }
+    public void ShowSuccess(string message, string? title = null) =>
+        Show(message, title, NotificationType.Success);
+
+    public void ShowInfo(string message, string? title = null) =>
+        Show(message, title, NotificationType.Information);
 }
-
