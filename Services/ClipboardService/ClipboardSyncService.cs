@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
@@ -17,23 +15,19 @@ namespace Synclo.Services.ClipboardService;
 public class ClipboardSyncConfig
 {
     public int DebounceDelayMs { get; set; } = 500;
-    public int RateLimitMaxSyncs { get; set; } = 5;
-    public int RateLimitWindowMs { get; set; } = 10000;
     public int InactivityThresholdDays { get; set; } = 14;
     public int DefaultHistoryLimit { get; set; } = 100;
     public int DefaultSyncPageSize { get; set; } = 50;
     public int ShutdownTimeoutSeconds { get; set; } = 5;
-    public int EchoSuppressionWindowMs { get; set; } = 2000;
-    public int MaxTrackedHashes { get; set; } = 5;
     public int MinRefreshIntervalMs { get; set; } = 300;
     public int MaxRetryAttempts { get; set; } = 3;
     public int BaseRetryDelayMs { get; set; } = 1000;
-    public int RetryProcessorTimeoutMs { get; set; } = 5000; // 5 seconds default timeout
+    public int RetryProcessorTimeoutMs { get; set; } = 5000;
 }
 
 /// <summary>
 /// Main background service orchestrating clipboard synchronization.
-/// Handles monitoring, debouncing, rate limiting, echo suppression, and bidirectional sync.
+/// Handles monitoring, debouncing, and bidirectional sync.
 /// Updated to utilize high-performance batching and caching from ClipboardRepository.
 /// </summary>
 public class ClipboardSyncService(
@@ -60,16 +54,8 @@ public class ClipboardSyncService(
     private readonly ILogger<ClipboardSyncService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ClipboardSyncConfig _config = config ?? throw new ArgumentNullException(nameof(config));
     
-    // Echo suppression - track multiple recent received hashes to prevent rapid echo loops
-    private readonly Queue<(string Hash, DateTime Time)> _recentReceivedHashes = new();
-    private readonly object _echoLock = new();
-    
     // Debouncing
     private CancellationTokenSource? _debounceCts;
-    
-    // Rate limiting (sliding window: max 5 syncs per 10 seconds)
-    private readonly Queue<DateTime> _syncTimestamps = new();
-    private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
     
     // Failed sync queue with retry logic - optimized with semaphore signaling
     private readonly Queue<(ClipboardDbModel Entry, int AttemptCount, DateTime NextRetryTime)> _failedSyncQueue = new();
@@ -352,7 +338,7 @@ public class ClipboardSyncService(
                 if (entry == null || string.IsNullOrEmpty(entry.id) || string.IsNullOrEmpty(entry.plaintext))
                     continue;
                 
-                var contentHash = ComputeHash(entry.plaintext);
+                var contentHash = Utils.ComputeHash(entry.plaintext);
                 var existingEntry = await _repository.GetByHashAsync(contentHash);
                 
                 if (existingEntry != null && existingEntry.SyncedAt.HasValue && existingEntry.Id == entry.id)
@@ -475,33 +461,16 @@ public class ClipboardSyncService(
             if (string.IsNullOrWhiteSpace(content))
                 return;
             
-            // Check if auto-sync is enabled
             if (!_settingsService.Settings.auto_sync_enabled)
                 return;
             
-            // Compute content hash
-            var contentHash = ComputeHash(content);
+            var contentHash = Utils.ComputeHash(content);
             
-            // Echo suppression: ignore if this matches recently received content
-            if (IsEchoSuppressed(contentHash))
-                return;
-            
-            // Rate limiting
-            if (!await CheckRateLimitAsync())
-            {
-                _notificationService.ShowWarning("Clipboard sync rate limit exceeded. Please slow down.");
-                return;
-            }
-            
-            // Duplicate check: skip if identical content was recently synced
-            // Duplicate check: skip ONLY if it matches the very last entry (consecutive debounce)
-            // This mimics standard OS behavior: A -> B -> A is allowed, but A -> A is debounced.
             var lastEntries = await _repository.GetAllAsync(1);
             var lastEntry = lastEntries.FirstOrDefault();
 
             if (lastEntry != null && lastEntry.ContentHash == contentHash)
             {
-                // Consecutive duplicate detected, debounce it
                 return;
             }
             
@@ -526,10 +495,6 @@ public class ClipboardSyncService(
             
             await _repository.UpsertAsync(dbEntry);
             
-            // Track the hash to prevent echo detection when we receive it back from server
-            TrackReceivedHash(contentHash);
-            
-            // Sync to server in background with proper error handling
             RunBackgroundTask(async ct =>
             {
                 try
@@ -652,12 +617,8 @@ public class ClipboardSyncService(
             var nonce = CryptographyService.FromBase64Static(entry.nonce ?? string.Empty);
             
             var plaintext = _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
-            var contentHash = ComputeHash(plaintext);
+            var contentHash = Utils.ComputeHash(plaintext);
             
-            // Update echo suppression tracking
-            TrackReceivedHash(contentHash);
-            
-            // FIX: Deduplication - check if we already have this content
             var existingEntry = await _repository.GetByHashAsync(contentHash);
             if (existingEntry != null)
             {
@@ -699,92 +660,6 @@ public class ClipboardSyncService(
         }
     }
 
-    // IMPROVEMENT: Time-based echo cleanup
-    private void TrackReceivedHash(string contentHash)
-    {
-        lock (_echoLock)
-        {
-            var now = DateTime.UtcNow;
-            
-            // Remove old entries outside the suppression window (time-based cleanup)
-            while (_recentReceivedHashes.Count > 0)
-            {
-                var (hash, time) = _recentReceivedHashes.Peek();
-                if ((now - time).TotalMilliseconds > _config.EchoSuppressionWindowMs)
-                {
-                    _recentReceivedHashes.Dequeue();
-                }
-                else
-                {
-                    break; // Queue is ordered by time, so we can stop
-                }
-            }
-            
-            // Add new hash
-            _recentReceivedHashes.Enqueue((contentHash, now));
-            
-            // Also limit by count as a safety measure
-            while (_recentReceivedHashes.Count > _config.MaxTrackedHashes)
-            {
-                _recentReceivedHashes.Dequeue();
-            }
-        }
-    }
-
-    private bool IsEchoSuppressed(string contentHash)
-    {
-        lock (_echoLock)
-        {
-            var now = DateTime.UtcNow;
-            
-            // Check if this hash matches any recently received content within the suppression window
-            foreach (var (hash, time) in _recentReceivedHashes)
-            {
-                if (hash == contentHash && (now - time).TotalMilliseconds < _config.EchoSuppressionWindowMs)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
-    private async Task<bool> CheckRateLimitAsync()
-    {
-        await _rateLimitLock.WaitAsync();
-        try
-        {
-            var now = DateTime.UtcNow;
-            var windowStart = now.AddMilliseconds(-_config.RateLimitWindowMs);
-            
-            // Remove timestamps outside the window
-            while (_syncTimestamps.Count > 0 && _syncTimestamps.Peek() < windowStart)
-            {
-                _syncTimestamps.Dequeue();
-            }
-            
-            // Check if limit exceeded
-            if (_syncTimestamps.Count >= _config.RateLimitMaxSyncs)
-            {
-                return false;
-            }
-            
-            // Add current timestamp
-            _syncTimestamps.Enqueue(now);
-            return true;
-        }
-        finally
-        {
-            _rateLimitLock.Release();
-        }
-    }
-
-    private static string ComputeHash(string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToBase64String(hash);
-    }
 
     /// <summary>
     /// Runs a task in the background with proper exception handling and tracking.
@@ -864,8 +739,6 @@ public class ClipboardSyncService(
             // Signal retry processor to wake up and exit
             _retryProcessorSemaphore.Release();
             
-            // Cleanup deleted entries on graceful shutdown
-            await _repository.DeleteAllMarkedAsync().ConfigureAwait(false);
             await _monitor.StopAsync().ConfigureAwait(false);
             
             _logger.LogInformation("ClipboardSyncService shutdown completed");
@@ -890,7 +763,6 @@ public class ClipboardSyncService(
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
             
-            _rateLimitLock.Dispose();
             _refreshLock.Dispose();
             _retryLock.Dispose();
             _retryProcessorSemaphore.Dispose();

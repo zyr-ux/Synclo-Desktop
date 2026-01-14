@@ -62,11 +62,7 @@ public sealed class ClipboardRepository : IClipboardRepository, IDisposable
     private static readonly TaskFactory _db =
         new(CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskContinuationOptions.None, _dbScheduler);
     
-    // INTERFACE EVENT IMPLEMENTATION
     public event Action? OnDataChanged;
-    
-    // Additional "Smart" Event (Optional, for advanced usage)
-    public event Action<RepoChangeEvent>? OnDetailedChange;
 
     public ClipboardRepository(ILogger<ClipboardRepository> logger, RepositoryConfig config)
     {
@@ -402,36 +398,6 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
         }).Unwrap();
     }
 
-    // INTERFACE IMPLEMENTATION: MarkAsDeletedAsync
-    public Task MarkAsDeletedAsync(string id)
-    {
-        return _db.StartNew(async () =>
-        {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                using var connection = new SqliteConnection($"Data Source={_dbPath}");
-                await connection.OpenAsync().ConfigureAwait(false);
-                
-                var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-UPDATE clipboard_entries
-SET is_remote_deleted = 1
-WHERE id = $id
-";
-                cmd.Parameters.AddWithValue("$id", id);
-                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to mark entry as deleted: {id}");
-                throw;
-            }
-            finally { _dbLock.Release(); }
-            
-            NotifyObservers(RepoChangeEvent.Delete(id));
-        }).Unwrap();
-    }
 
     public Task DeleteByIdAsync(string id)
     {
@@ -456,29 +422,6 @@ WHERE id = $id
             finally { _dbLock.Release(); }
             
             NotifyObservers(RepoChangeEvent.Delete(id));
-        }).Unwrap();
-    }
-
-    public Task DeleteAllMarkedAsync()
-    {
-        return _db.StartNew(async () =>
-        {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                using var connection = new SqliteConnection($"Data Source={_dbPath}");
-                await connection.OpenAsync().ConfigureAwait(false);
-                
-                var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_remote_deleted = 1";
-                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to delete all marked entries");
-                throw;
-            }
-            finally { _dbLock.Release(); }
         }).Unwrap();
     }
 
@@ -514,11 +457,7 @@ WHERE id = $id
     {
         try
         {
-            // 1. Fire the interface requirement (Simple)
             OnDataChanged?.Invoke();
-            
-            // 2. Fire the detailed event (For smarter subscribers)
-            OnDetailedChange?.Invoke(change);
         }
         catch (Exception ex)
         {

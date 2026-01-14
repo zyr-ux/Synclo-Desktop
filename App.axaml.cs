@@ -78,14 +78,10 @@ public class App : Application
         collection.AddSingleton(new ClipboardSyncConfig
         {
             DebounceDelayMs = 500,
-            RateLimitMaxSyncs = 5,
-            RateLimitWindowMs = 10000,
             InactivityThresholdDays = 14,
             DefaultHistoryLimit = 100,
             DefaultSyncPageSize = 50,
             ShutdownTimeoutSeconds = 5,
-            EchoSuppressionWindowMs = 2000,
-            MaxTrackedHashes = 5,
             MinRefreshIntervalMs = 300,
             MaxRetryAttempts = 3,
             BaseRetryDelayMs = 1000,

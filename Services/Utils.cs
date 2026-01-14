@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Synclo.Services;
 
@@ -30,5 +32,12 @@ public sealed class Utils(ISettingsService settingsService)
         settingsService.Save();
 
         return newId;
+    }
+
+    public static string ComputeHash(string content)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToBase64String(hash);
     }
 }

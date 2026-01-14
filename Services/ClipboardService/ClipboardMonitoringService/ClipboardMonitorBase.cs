@@ -1,6 +1,4 @@
 using System;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -97,7 +95,7 @@ public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
             var clipboardText = await _clipboardProvider.GetTextAsync();
             if (!string.IsNullOrEmpty(clipboardText))
             {
-                _lastClipboardHash = ComputeHash(clipboardText);
+                _lastClipboardHash = Utils.ComputeHash(clipboardText);
                 _logger.LogInformation("Clipboard hash initialized successfully");
             }
         }
@@ -147,8 +145,7 @@ public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
                 if (string.IsNullOrEmpty(clipboardText))
                     continue;
                 
-                // Hash content to detect changes
-                var currentHash = ComputeHash(clipboardText);
+                var currentHash = Utils.ComputeHash(clipboardText);
                 if (_lastClipboardHash != currentHash)
                 {
                     _lastClipboardHash = currentHash;
@@ -169,21 +166,13 @@ public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
         }
     }
 
-    protected static string ComputeHash(string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToBase64String(hash);
-    }
-
     public virtual async Task SetClipboardTextAsync(string text)
     {
         try
         {
-            // Update hash BEFORE setting clipboard to prevent echo detection
             if (!string.IsNullOrEmpty(text))
             {
-                _lastClipboardHash = ComputeHash(text);
+                _lastClipboardHash = Utils.ComputeHash(text);
             }
             
             await _clipboardProvider.SetTextAsync(text);

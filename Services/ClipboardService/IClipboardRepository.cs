@@ -45,19 +45,9 @@ public interface IClipboardRepository
     Task UpsertAsync(IEnumerable<ClipboardDbModel> entries);
     
     /// <summary>
-    /// Mark entry as remotely deleted (soft delete for runtime)
-    /// </summary>
-    Task MarkAsDeletedAsync(string id);
-    
-    /// <summary>
     /// Permanently delete a specific entry by ID
     /// </summary>
     Task DeleteByIdAsync(string id);
-    
-    /// <summary>
-    /// Permanently delete all entries marked as remotely deleted (cleanup on shutdown)
-    /// </summary>
-    Task DeleteAllMarkedAsync();
     
     /// <summary>
     /// Fetches entries that were created locally but never synced (SyncedAt == null)
