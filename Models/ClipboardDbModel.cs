@@ -16,7 +16,6 @@ public partial class ClipboardDbModel : ObservableObject
     public string Ciphertext { get; init; } = string.Empty;
     public string Nonce { get; init; } = string.Empty;
     public int BlobVersion { get; init; }
-    public bool IsRemoteDeleted { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? SyncedAt { get; init; }
     
@@ -39,7 +38,6 @@ public partial class ClipboardDbModel : ObservableObject
         string? ciphertext = null,
         string? nonce = null,
         int? blobVersion = null,
-        bool? isRemoteDeleted = null,
         DateTime? createdAt = null,
         DateTime? syncedAt = null)
     {
@@ -51,7 +49,6 @@ public partial class ClipboardDbModel : ObservableObject
             Ciphertext = ciphertext ?? this.Ciphertext,
             Nonce = nonce ?? this.Nonce,
             BlobVersion = blobVersion ?? this.BlobVersion,
-            IsRemoteDeleted = isRemoteDeleted ?? this.IsRemoteDeleted,
             CreatedAt = createdAt ?? this.CreatedAt,
             SyncedAt = syncedAt ?? this.SyncedAt
         };

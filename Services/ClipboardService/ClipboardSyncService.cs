@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.SecretsManager;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 
 namespace Synclo.Services.ClipboardService;
 
@@ -20,9 +22,6 @@ public class ClipboardSyncConfig
     public int DefaultSyncPageSize { get; set; } = 50;
     public int ShutdownTimeoutSeconds { get; set; } = 5;
     public int MinRefreshIntervalMs { get; set; } = 300;
-    public int MaxRetryAttempts { get; set; } = 3;
-    public int BaseRetryDelayMs { get; set; } = 1000;
-    public int RetryProcessorTimeoutMs { get; set; } = 5000;
 }
 
 /// <summary>
@@ -54,17 +53,17 @@ public class ClipboardSyncService(
     private readonly ILogger<ClipboardSyncService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ClipboardSyncConfig _config = config ?? throw new ArgumentNullException(nameof(config));
     
-    // Debouncing
     private CancellationTokenSource? _debounceCts;
     
-    // Failed sync queue with retry logic - optimized with semaphore signaling
-    private readonly Queue<(ClipboardDbModel Entry, int AttemptCount, DateTime NextRetryTime)> _failedSyncQueue = new();
-    private readonly SemaphoreSlim _retryProcessorSemaphore = new(0, 1); // Semaphore for waking up retry processor
-    private readonly SemaphoreSlim _retryLock = new(1, 1);
-    
-    // Fixed background task tracking with proper cleanup
-    private readonly HashSet<Task> _backgroundTasks = new();
-    private readonly object _taskLock = new();
+    private readonly AsyncRetryPolicy _retryPolicy = Policy
+        .Handle<Exception>()
+        .WaitAndRetryAsync(
+            retryCount: 3,
+            sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(1000 * Math.Pow(2, attempt - 1)),
+            onRetry: (exception, timeSpan, retryCount, context) =>
+            {
+                logger.LogWarning(exception, $"Retry attempt {retryCount} after {timeSpan.TotalSeconds}s");
+            });
     
     private readonly CancellationTokenSource _shutdownCts = new();
     private bool _disposed;
@@ -112,8 +111,6 @@ public class ClipboardSyncService(
                 await _monitor.StartAsync();
             }
 
-            // Start retry processor - now uses semaphore-based wake-up
-            StartRetryProcessor();
 
             _isInitialized = true;
             _logger.LogInformation("ClipboardSyncService initialized successfully");
@@ -125,120 +122,6 @@ public class ClipboardSyncService(
         }
     }
 
-    private void StartRetryProcessor()
-    {
-        RunBackgroundTask(async ct =>
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    // Wait for either:
-                    // 1. A new failure is added to the queue (signaled via semaphore)
-                    // 2. Timeout after 5 seconds (default interval)
-                    var timeoutTask = Task.Delay(_config.RetryProcessorTimeoutMs, ct);
-                    var semaphoreTask = _retryProcessorSemaphore.WaitAsync(ct);
-                    
-                    var completedTask = await Task.WhenAny(timeoutTask, semaphoreTask).ConfigureAwait(false);
-                    
-                    // If timeout occurred, continue to process
-                    // If semaphore was signaled, process immediately
-                    // Either way, we proceed to process the queue
-                    
-                    await ProcessRetryQueueAsync(ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error in retry processor");
-                    // Back off on error to prevent tight loops
-                    await Task.Delay(10000, ct).ConfigureAwait(false);
-                }
-            }
-        }, "Retry Processor");
-    }
-
-    private async Task ProcessRetryQueueAsync(CancellationToken ct)
-    {
-        await _retryLock.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            var now = DateTime.UtcNow;
-            var itemsToRetry = new List<(ClipboardDbModel Entry, int AttemptCount, DateTime NextRetryTime)>();
-            
-            // Process all items that are ready for retry
-            while (_failedSyncQueue.Count > 0 && _failedSyncQueue.Peek().NextRetryTime <= now)
-            {
-                itemsToRetry.Add(_failedSyncQueue.Dequeue());
-            }
-
-            foreach (var (entry, attemptCount, _) in itemsToRetry)
-            {
-                try
-                {
-                    var serverId = await _clipboardApiService.SyncClipboardAsync(entry.Content);
-                    
-                    // FIX: Proper handover - delete client entry before inserting server entry
-                    await _repository.DeleteByIdAsync(entry.Id);
-
-                    // Create updated entry with server ID
-                    var updatedEntry = new ClipboardDbModel
-                    {
-                        Id = serverId,
-                        Content = entry.Content,
-                        ContentHash = entry.ContentHash,
-                        Ciphertext = entry.Ciphertext,
-                        Nonce = entry.Nonce,
-                        BlobVersion = entry.BlobVersion,
-                        IsRemoteDeleted = false,
-                        CreatedAt = entry.CreatedAt,
-                        SyncedAt = DateTime.UtcNow
-                    };
-                    
-                    await _repository.UpsertAsync(updatedEntry);
-                    _settingsService.Settings.last_sync = DateTime.UtcNow;
-                    _settingsService.Save();
-                    
-                    _logger.LogInformation($"Successfully synced clipboard entry {entry.Id} after {attemptCount} attempts");
-                }
-                catch (Exception ex)
-                {
-                    var newAttemptCount = attemptCount + 1;
-                    if (newAttemptCount <= _config.MaxRetryAttempts)
-                    {
-                        // IMPROVEMENT: Use exponential backoff with config values
-                        var delay = _config.BaseRetryDelayMs * (int)Math.Pow(2, newAttemptCount - 1);
-                        var nextRetry = DateTime.UtcNow.AddMilliseconds(delay);
-                        
-                        await _retryLock.WaitAsync(ct).ConfigureAwait(false);
-                        try
-                        {
-                            _failedSyncQueue.Enqueue((entry, newAttemptCount, nextRetry));
-                            // Signal the retry processor immediately
-                            _retryProcessorSemaphore.Release();
-                        }
-                        finally
-                        {
-                            _retryLock.Release();
-                        }
-                        
-                        _logger.LogWarning(ex, $"Failed to sync clipboard entry {entry.Id} (attempt {newAttemptCount}/{_config.MaxRetryAttempts}). Next retry at {nextRetry}");
-                    }
-                    else
-                    {
-                        _logger.LogError(ex, $"Failed to sync clipboard entry {entry.Id} after {_config.MaxRetryAttempts} attempts. Giving up.");
-                    }
-                }
-            }
-        }
-        finally
-        {
-            _retryLock.Release();
-        }
-    }
 
     public event Action? OnHistoryUpdated;
 
@@ -251,7 +134,7 @@ public class ClipboardSyncService(
         try
         {
             var entries = await _repository.GetAllAsync(limit).ConfigureAwait(false);
-            return entries?.Where(e => !e.IsRemoteDeleted).ToList() ?? new List<ClipboardDbModel>();
+            return entries ?? new List<ClipboardDbModel>();
         }
         catch (Exception ex)
         {
@@ -354,7 +237,6 @@ public class ClipboardSyncService(
                     Ciphertext = entry.ciphertext ?? string.Empty,
                     Nonce = entry.nonce ?? string.Empty,
                     BlobVersion = entry.blob_version,
-                    IsRemoteDeleted = false,
                     CreatedAt = createdAt,
                     SyncedAt = DateTime.UtcNow
                 };
@@ -482,26 +364,24 @@ public class ClipboardSyncService(
             // Save to SQLite immediately (optimistic write)
             var dbEntry = new ClipboardDbModel
             {
-                Id = clientId, // Use deterministic client ID
+                Id = clientId,
                 Content = content,
                 ContentHash = contentHash,
-                Ciphertext = string.Empty, // Will be filled after encryption
+                Ciphertext = string.Empty,
                 Nonce = string.Empty,
                 BlobVersion = _settingsService.Settings.blob_version,
-                IsRemoteDeleted = false,
                 CreatedAt = DateTime.UtcNow,
-                SyncedAt = null // Mark as unsynced
+                SyncedAt = null
             };
             
             await _repository.UpsertAsync(dbEntry);
             
             RunBackgroundTask(async ct =>
             {
-                try
+                await _retryPolicy.ExecuteAsync(async () =>
                 {
                     var serverId = await _clipboardApiService.SyncClipboardAsync(content);
                     
-                    // Get the current entry (might have been updated)
                     var currentEntry = await _repository.GetByIdAsync(clientId);
                     if (currentEntry == null)
                     {
@@ -509,19 +389,16 @@ public class ClipboardSyncService(
                         return;
                     }
                     
-                    // FIX: Proper handover - delete client entry first
                     await _repository.DeleteByIdAsync(clientId);
                     
-                    // Create updated entry with server ID
                     var syncedDbEntry = new ClipboardDbModel
                     {
-                        Id = serverId, // Update to server ID
+                        Id = serverId,
                         Content = currentEntry.Content,
                         ContentHash = currentEntry.ContentHash,
                         Ciphertext = currentEntry.Ciphertext,
                         Nonce = currentEntry.Nonce,
                         BlobVersion = currentEntry.BlobVersion,
-                        IsRemoteDeleted = false,
                         CreatedAt = currentEntry.CreatedAt,
                         SyncedAt = DateTime.UtcNow
                     };
@@ -531,30 +408,7 @@ public class ClipboardSyncService(
                     _settingsService.Save();
                     
                     _logger.LogInformation($"Successfully synced clipboard entry {clientId} -> {serverId}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Failed to sync clipboard entry {clientId}");
-                    _notificationService.ShowError($"Failed to sync clipboard: {ex.Message}");
-                    
-                    // Add to retry queue with exponential backoff
-                    var entry = await _repository.GetByIdAsync(clientId);
-                    if (entry != null)
-                    {
-                        await _retryLock.WaitAsync(ct);
-                        try
-                        {
-                            var nextRetry = DateTime.UtcNow.AddMilliseconds(_config.BaseRetryDelayMs);
-                            _failedSyncQueue.Enqueue((entry, 1, nextRetry));
-                            // Signal the retry processor immediately instead of waiting for timeout
-                            _retryProcessorSemaphore.Release();
-                        }
-                        finally
-                        {
-                            _retryLock.Release();
-                        }
-                    }
-                }
+                });
             }, $"Sync to Server: {clientId}");
         }
         catch (Exception ex)
@@ -644,7 +498,6 @@ public class ClipboardSyncService(
                 Ciphertext = entry.ciphertext ?? string.Empty,
                 Nonce = entry.nonce ?? string.Empty,
                 BlobVersion = entry.blob_version,
-                IsRemoteDeleted = false,
                 CreatedAt = entry.timestamp,
                 SyncedAt = DateTime.UtcNow
             };
@@ -662,16 +515,13 @@ public class ClipboardSyncService(
 
 
     /// <summary>
-    /// Runs a task in the background with proper exception handling and tracking.
-    /// Use this instead of fire-and-forget (_ = Task) to prevent silent failures.
-    /// Fixed to properly clean up completed tasks to prevent memory leaks.
+    /// Runs a task in the background with proper exception handling.
     /// </summary>
     private void RunBackgroundTask(Func<CancellationToken, Task> taskFunc, string taskName = "Background Task")
     {
         var cts = _shutdownCts.Token;
         
-        // Create the task with proper exception handling
-        var task = Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             try
             {
@@ -679,65 +529,22 @@ public class ClipboardSyncService(
             }
             catch (OperationCanceledException)
             {
-                // Expected during shutdown, ignore
                 _logger.LogInformation($"{taskName} was cancelled");
             }
             catch (Exception ex)
             {
-                // Log unexpected errors - these would have been silent before
                 _logger.LogError(ex, $"{taskName} failed: {ex.GetType().Name}");
             }
         }, cts);
-
-        // Add the task to our tracking collection
-        lock (_taskLock)
-        {
-            _backgroundTasks.Add(task);
-        }
-        
-        // Set up continuation to remove the task when it completes
-        task.ContinueWith(t =>
-        {
-            lock (_taskLock)
-            {
-                _backgroundTasks.Remove(t);
-            }
-        }, TaskContinuationOptions.ExecuteSynchronously);
     }
 
     public async Task ShutdownAsync()
     {
         try
         {
-            // Signal all background tasks to cancel
             _shutdownCts.Cancel();
             
-            // Get a snapshot of current tasks to wait for
-            Task[] tasksToWait;
-            lock (_taskLock)
-            {
-                tasksToWait = _backgroundTasks.ToArray();
-            }
-            
-            // Wait for all background tasks to complete (with timeout)
-            if (tasksToWait.Length > 0)
-            {
-                try
-                {
-                    await Task.WhenAll(tasksToWait).WaitAsync(TimeSpan.FromSeconds(_config.ShutdownTimeoutSeconds)).ConfigureAwait(false);
-                }
-                catch (TimeoutException)
-                {
-                    _logger.LogWarning($"Shutdown timeout: {tasksToWait.Length} background tasks did not complete in time");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error during shutdown");
-                }
-            }
-            
-            // Signal retry processor to wake up and exit
-            _retryProcessorSemaphore.Release();
+            await Task.Delay(1000);
             
             await _monitor.StopAsync().ConfigureAwait(false);
             
@@ -764,8 +571,6 @@ public class ClipboardSyncService(
             _debounceCts?.Dispose();
             
             _refreshLock.Dispose();
-            _retryLock.Dispose();
-            _retryProcessorSemaphore.Dispose();
             
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();

@@ -146,7 +146,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         return a.Id == b.Id &&
                a.Content == b.Content &&
                a.ContentHash == b.ContentHash &&
-               a.IsRemoteDeleted == b.IsRemoteDeleted &&
                a.IsDeleting == b.IsDeleting; 
     }
 
@@ -167,7 +166,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                ApplyCollectionDiff(entries.Where(e => !e.IsRemoteDeleted).ToList());
+                ApplyCollectionDiff(entries);
             });
 
             if (!silent) 
@@ -188,7 +187,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ItemClicked(ClipboardDbModel entry)
     {
-        if (entry == null || entry.IsRemoteDeleted || string.IsNullOrEmpty(entry.Content)) return;
+        if (entry == null || string.IsNullOrEmpty(entry.Content)) return;
 
         try
         {
@@ -204,7 +203,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DeleteItemClicked(ClipboardDbModel entry)
     {
-        if (entry == null || entry.IsRemoteDeleted || entry.IsDeleting) return;
+        if (entry == null || entry.IsDeleting) return;
 
         try
         {

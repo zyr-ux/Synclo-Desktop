@@ -11,48 +11,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Synclo.Services.ClipboardService;
 
-// ---------------------------------------------------------
-// 1. RepoChange Definitions
-// ---------------------------------------------------------
-public enum RepoChangeType
-{
-    Upsert,
-    Delete,
-    Reset
-}
-
-public readonly struct RepoChangeEvent
-{
-    public RepoChangeType Type { get; }
-    public IReadOnlyList<ClipboardDbModel> Items { get; }
-    
-    public RepoChangeEvent(RepoChangeType type, IReadOnlyList<ClipboardDbModel>? items = null)
-    {
-        Type = type;
-        Items = items ?? Array.Empty<ClipboardDbModel>();
-    }
-    
-    public static RepoChangeEvent Upsert(List<ClipboardDbModel> items) =>
-        new(RepoChangeType.Upsert, items);
-    
-    public static RepoChangeEvent Delete(string id) =>
-        new(RepoChangeType.Delete, new[] { new ClipboardDbModel { Id = id } });
-    
-    public static RepoChangeEvent Reset() =>
-        new(RepoChangeType.Reset);
-}
-
-// ---------------------------------------------------------
-// 2. Main Class Implementation
-// ---------------------------------------------------------
 public sealed class ClipboardRepository : IClipboardRepository, IDisposable
 {
     private readonly string _dbPath;
     private readonly ILogger<ClipboardRepository> _logger;
     private readonly RepositoryConfig _config;
-    
-    // Locks
-    private readonly SemaphoreSlim _dbLock = new(1, 1);
     
     private bool _disposed;
     
@@ -79,13 +42,11 @@ public sealed class ClipboardRepository : IClipboardRepository, IDisposable
     {
         return _db.StartNew(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
                 
-                // Verify WAL mode is enabled
                 await VerifyWALModeAsync(connection).ConfigureAwait(false);
                 
                 var cmd = connection.CreateCommand();
@@ -102,7 +63,6 @@ CREATE TABLE IF NOT EXISTS clipboard_entries (
     ciphertext TEXT NOT NULL,
     nonce TEXT NOT NULL,
     blob_version INTEGER NOT NULL,
-    is_remote_deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     synced_at TEXT
 );
@@ -110,7 +70,6 @@ CREATE TABLE IF NOT EXISTS clipboard_entries (
 CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
 CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_synced_at ON clipboard_entries(synced_at);
-CREATE INDEX IF NOT EXISTS idx_is_remote_deleted ON clipboard_entries(is_remote_deleted);
 ";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 
@@ -121,7 +80,6 @@ CREATE INDEX IF NOT EXISTS idx_is_remote_deleted ON clipboard_entries(is_remote_
                 _logger.LogError(ex, "Failed to initialize database");
                 throw;
             }
-            finally { _dbLock.Release(); }
         }).Unwrap();
     }
 
@@ -166,7 +124,6 @@ CREATE INDEX IF NOT EXISTS idx_is_remote_deleted ON clipboard_entries(is_remote_
     {
         return _db.StartNew(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -175,7 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_is_remote_deleted ON clipboard_entries(is_remote_
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       is_remote_deleted, created_at, synced_at
+       created_at, synced_at
 FROM clipboard_entries
 ORDER BY created_at DESC, ROWID DESC
 LIMIT $limit OFFSET $offset
@@ -197,7 +154,6 @@ LIMIT $limit OFFSET $offset
                 _logger.LogError(ex, "Failed to get all clipboard entries");
                 throw;
             }
-            finally { _dbLock.Release(); }
         }).Unwrap();
     }
 
@@ -205,7 +161,6 @@ LIMIT $limit OFFSET $offset
     {
         return _db.StartNew(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -227,7 +182,6 @@ LIMIT $limit OFFSET $offset
                 _logger.LogError(ex, $"Failed to get entry by ID: {id}");
                 throw;
             }
-            finally { _dbLock.Release(); }
         }).Unwrap();
     }
 
@@ -235,7 +189,6 @@ LIMIT $limit OFFSET $offset
     {
         return _db.StartNew(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -257,7 +210,6 @@ LIMIT $limit OFFSET $offset
                 _logger.LogError(ex, $"Failed to get entry by hash: {hash}");
                 throw;
             }
-            finally { _dbLock.Release(); }
         }).Unwrap();
     }
 
@@ -265,7 +217,6 @@ LIMIT $limit OFFSET $offset
     {
         return _db.StartNew(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 var list = new List<ClipboardDbModel>();
@@ -273,7 +224,7 @@ LIMIT $limit OFFSET $offset
                 await connection.OpenAsync().ConfigureAwait(false);
                 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE synced_at IS NULL AND is_remote_deleted = 0 ORDER BY created_at ASC";
+                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE synced_at IS NULL ORDER BY created_at";
                 
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
                 while (await reader.ReadAsync().ConfigureAwait(false))
@@ -287,7 +238,6 @@ LIMIT $limit OFFSET $offset
                 _logger.LogError(ex, "Failed to get unsynced entries");
                 throw;
             }
-            finally { _dbLock.Release(); }
         }).Unwrap();
     }
 
@@ -337,73 +287,42 @@ LIMIT $limit OFFSET $offset
                 throw new ArgumentException($"Entry {entry.Id} has null/empty ContentHash", nameof(entries));
         }
         
-        return _db.StartNew(async () =>
+        return _db.StartNew((Func<Task>)(async () =>
         {
-            RepoChangeEvent? eventToFire = null;
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
                 
-                var changed = new List<ClipboardDbModel>();
-                
-                // Smart batching: Use transaction only for multiple items
-                if (entryList.Count == 1)
+                using var tx = connection.BeginTransaction();
+                foreach (var entry in entryList)
                 {
-                    // Single item - direct insert (no transaction overhead)
-                    var entry = entryList[0];
                     var cmd = connection.CreateCommand();
+                    cmd.Transaction = tx;
                     cmd.CommandText = @"
 INSERT OR REPLACE INTO clipboard_entries
-(id, content, content_hash, ciphertext, nonce, blob_version, is_remote_deleted, created_at, synced_at)
-VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
+(id, content, content_hash, ciphertext, nonce, blob_version, created_at, synced_at)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced)";
                     AddParams(cmd, entry);
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                    changed.Add(entry);
                 }
-                else
-                {
-                    // Multiple items - use transaction for atomicity
-                    using var tx = connection.BeginTransaction();
-                    foreach (var entry in entryList)
-                    {
-                        var cmd = connection.CreateCommand();
-                        cmd.Transaction = tx;
-                        cmd.CommandText = @"
-INSERT OR REPLACE INTO clipboard_entries
-(id, content, content_hash, ciphertext, nonce, blob_version, is_remote_deleted, created_at, synced_at)
-VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
-                        AddParams(cmd, entry);
-                        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                        changed.Add(entry);
-                    }
-                    tx.Commit();
-                }
+                tx.Commit();
                 
-                // Fire single event only if changes occurred
-                if (changed.Count > 0)
-                    eventToFire = RepoChangeEvent.Upsert(changed);
+                NotifyObservers();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to upsert clipboard entries");
                 throw;
             }
-            finally { _dbLock.Release(); }
-            
-            // Fire event outside the lock
-            if (eventToFire.HasValue)
-                NotifyObservers(eventToFire.Value);
-        }).Unwrap();
+        })).Unwrap();
     }
 
 
     public Task DeleteByIdAsync(string id)
     {
-        return _db.StartNew(async () =>
+        return _db.StartNew((Func<Task>)(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -413,23 +332,21 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
                 cmd.CommandText = "DELETE FROM clipboard_entries WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                NotifyObservers();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to delete entry by ID: {id}");
                 throw;
             }
-            finally { _dbLock.Release(); }
-            
-            NotifyObservers(RepoChangeEvent.Delete(id));
-        }).Unwrap();
+        })).Unwrap();
     }
 
     public Task ClearAllAsync()
     {
-        return _db.StartNew(async () =>
+        return _db.StartNew((Func<Task>)(async () =>
         {
-            await _dbLock.WaitAsync().ConfigureAwait(false);
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -438,22 +355,21 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "DELETE FROM clipboard_entries";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                NotifyObservers();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to clear all entries");
                 throw;
             }
-            finally { _dbLock.Release(); }
-            
-            NotifyObservers(RepoChangeEvent.Reset());
-        }).Unwrap();
+        })).Unwrap();
     }
 
     // ---------------------------------------------------------
     // HELPERS
     // ---------------------------------------------------------
-    private void NotifyObservers(RepoChangeEvent change)
+    private void NotifyObservers()
     {
         try
         {
@@ -473,7 +389,6 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
         cmd.Parameters.AddWithValue("$cipher", entry.Ciphertext);
         cmd.Parameters.AddWithValue("$nonce", entry.Nonce);
         cmd.Parameters.AddWithValue("$ver", entry.BlobVersion);
-        cmd.Parameters.AddWithValue("$del", entry.IsRemoteDeleted ? 1 : 0);
         cmd.Parameters.AddWithValue("$created", entry.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("$synced", entry.SyncedAt?.ToString("O") ?? (object)DBNull.Value);
     }
@@ -488,9 +403,8 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
             Ciphertext = reader.GetString(3),
             Nonce = reader.GetString(4),
             BlobVersion = reader.GetInt32(5),
-            IsRemoteDeleted = reader.GetInt32(6) == 1,
-            CreatedAt = DateTime.Parse(reader.GetString(7), CultureInfo.InvariantCulture),
-            SyncedAt = reader.IsDBNull(8) ? null : DateTime.Parse(reader.GetString(8), CultureInfo.InvariantCulture)
+            CreatedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture),
+            SyncedAt = reader.IsDBNull(7) ? null : DateTime.Parse(reader.GetString(7), CultureInfo.InvariantCulture)
         };
     }
 
@@ -498,15 +412,6 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
     {
         if (_disposed) return;
         _disposed = true;
-        
-        try
-        {
-            _dbLock.Dispose();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during disposal");
-        }
     }
 }
 

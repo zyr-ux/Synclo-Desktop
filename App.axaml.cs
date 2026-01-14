@@ -82,10 +82,7 @@ public class App : Application
             DefaultHistoryLimit = 100,
             DefaultSyncPageSize = 50,
             ShutdownTimeoutSeconds = 5,
-            MinRefreshIntervalMs = 300,
-            MaxRetryAttempts = 3,
-            BaseRetryDelayMs = 1000,
-            RetryProcessorTimeoutMs = 5000
+            MinRefreshIntervalMs = 300
         });
         collection.AddSingleton<IStartupManager>(_ => {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
