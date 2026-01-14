@@ -494,42 +494,37 @@ public class ClipboardSyncService(
             }
             
             // Duplicate check: skip if identical content was recently synced
-            var existingEntry = await _repository.GetByHashAsync(contentHash);
-            if (existingEntry != null && existingEntry.SyncedAt.HasValue)
+            // Duplicate check: skip ONLY if it matches the very last entry (consecutive debounce)
+            // This mimics standard OS behavior: A -> B -> A is allowed, but A -> A is debounced.
+            var lastEntries = await _repository.GetAllAsync(1);
+            var lastEntry = lastEntries.FirstOrDefault();
+
+            if (lastEntry != null && lastEntry.ContentHash == contentHash)
             {
-                // Content already exists and was synced, skip duplicate
+                // Consecutive duplicate detected, debounce it
                 return;
             }
             
             string clientId;
-            if (existingEntry != null && !existingEntry.SyncedAt.HasValue)
+            
+            // Generate deterministic client-side ID using hash + timestamp
+            clientId = GenerateClientId(contentHash);
+            
+            // Save to SQLite immediately (optimistic write)
+            var dbEntry = new ClipboardDbModel
             {
-                // Reuse existing unsynced entry to prevent duplicates
-                clientId = existingEntry.Id;
-                var updatedEntry = existingEntry.CopyWith(createdAt: DateTime.UtcNow);
-                await _repository.UpsertAsync(updatedEntry);
-            }
-            else
-            {
-                // Generate deterministic client-side ID using hash + timestamp
-                clientId = GenerateClientId(contentHash);
-                
-                // Save to SQLite immediately (optimistic write)
-                var dbEntry = new ClipboardDbModel
-                {
-                    Id = clientId, // Use deterministic client ID
-                    Content = content,
-                    ContentHash = contentHash,
-                    Ciphertext = string.Empty, // Will be filled after encryption
-                    Nonce = string.Empty,
-                    BlobVersion = _settingsService.Settings.blob_version,
-                    IsRemoteDeleted = false,
-                    CreatedAt = DateTime.UtcNow,
-                    SyncedAt = null // Mark as unsynced
-                };
-                
-                await _repository.UpsertAsync(dbEntry);
-            }
+                Id = clientId, // Use deterministic client ID
+                Content = content,
+                ContentHash = contentHash,
+                Ciphertext = string.Empty, // Will be filled after encryption
+                Nonce = string.Empty,
+                BlobVersion = _settingsService.Settings.blob_version,
+                IsRemoteDeleted = false,
+                CreatedAt = DateTime.UtcNow,
+                SyncedAt = null // Mark as unsynced
+            };
+            
+            await _repository.UpsertAsync(dbEntry);
             
             // Track the hash to prevent echo detection when we receive it back from server
             TrackReceivedHash(contentHash);
