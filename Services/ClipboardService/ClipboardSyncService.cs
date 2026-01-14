@@ -92,6 +92,14 @@ public class ClipboardSyncService(
                 }
             }
 
+            // Auto-refresh if database is empty (first launch or after cold start wipe)
+            var existingEntries = await _repository.GetAllAsync(limit: 1);
+            if (existingEntries.Count == 0)
+            {
+                _logger.LogInformation("Database is empty, triggering automatic background refresh");
+                RunBackgroundTask(async ct => await SyncInBackgroundAsync(), "Auto-Refresh on Empty DB");
+            }
+
             // Subscribe to events
             _monitor.OnClipboardChanged += OnClipboardChanged;
             _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
