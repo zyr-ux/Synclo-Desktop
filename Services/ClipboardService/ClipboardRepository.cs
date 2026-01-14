@@ -53,11 +53,6 @@ public sealed class ClipboardRepository : IClipboardRepository, IDisposable
     
     // Locks
     private readonly SemaphoreSlim _dbLock = new(1, 1);
-    private readonly object _memLock = new();
-    
-    // Cache State
-    private readonly Dictionary<string, ClipboardDbModel> _cache = new();
-    private volatile bool _cacheInitialized;
     
     private bool _disposed;
     
@@ -162,18 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_is_remote_deleted ON clipboard_entries(is_remote_
     // ---------------------------------------------------------
     // READS
     // ---------------------------------------------------------
-    public IReadOnlyList<ClipboardDbModel>? TryGetCached(int limit)
-    {
-        if (!_cacheInitialized) return null;
-        lock (_memLock)
-        {
-            return _cache.Values
-                .OrderByDescending(e => e.CreatedAt)
-                .ThenByDescending(e => e.Id)  // Stable sort: use Id as tiebreaker
-                .Take(limit)
-                .ToList();
-        }
-    }
+
 
     // INTERFACE IMPLEMENTATION: Parameterless GetAllAsync
     public Task<List<ClipboardDbModel>> GetAllAsync()
@@ -210,14 +194,6 @@ LIMIT $limit OFFSET $offset
                     list.Add(MapFromReader(reader));
                 }
                 
-                // Batch update cache
-                lock (_memLock)
-                {
-                    foreach (var entry in list) _cache[entry.Id] = entry;
-                    TrimCache();
-                    _cacheInitialized = true;
-                }
-                
                 return list;
             }
             catch (Exception ex)
@@ -231,11 +207,6 @@ LIMIT $limit OFFSET $offset
 
     public Task<ClipboardDbModel?> GetByIdAsync(string id)
     {
-        lock (_memLock)
-        {
-            if (_cache.TryGetValue(id, out var cached)) return Task.FromResult<ClipboardDbModel?>(cached);
-        }
-        
         return _db.StartNew(async () =>
         {
             await _dbLock.WaitAsync().ConfigureAwait(false);
@@ -251,9 +222,7 @@ LIMIT $limit OFFSET $offset
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
                 if (await reader.ReadAsync().ConfigureAwait(false))
                 {
-                    var entry = MapFromReader(reader);
-                    lock (_memLock) { _cache[entry.Id] = entry; TrimCache(); }
-                    return entry;
+                    return MapFromReader(reader);
                 }
                 return null;
             }
@@ -283,9 +252,7 @@ LIMIT $limit OFFSET $offset
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
                 if (await reader.ReadAsync().ConfigureAwait(false))
                 {
-                    var entry = MapFromReader(reader);
-                    lock (_memLock) { _cache[entry.Id] = entry; TrimCache(); }
-                    return entry;
+                    return MapFromReader(reader);
                 }
                 return null;
             }
@@ -390,32 +357,14 @@ LIMIT $limit OFFSET $offset
                 {
                     // Single item - direct insert (no transaction overhead)
                     var entry = entryList[0];
-                    bool skip;
-                    lock (_memLock)
-                    {
-                        skip = _cache.TryGetValue(entry.Id, out var existing) &&
-                               existing.ContentHash == entry.ContentHash &&
-                               existing.BlobVersion == entry.BlobVersion &&
-                               existing.SyncedAt == entry.SyncedAt;
-                    }
-                    
-                    if (!skip)
-                    {
-                        var cmd = connection.CreateCommand();
-                        cmd.CommandText = @"
+                    var cmd = connection.CreateCommand();
+                    cmd.CommandText = @"
 INSERT OR REPLACE INTO clipboard_entries
 (id, content, content_hash, ciphertext, nonce, blob_version, is_remote_deleted, created_at, synced_at)
 VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
-                        AddParams(cmd, entry);
-                        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                        
-                        lock (_memLock)
-                        {
-                            _cache[entry.Id] = entry;
-                            TrimCache();
-                        }
-                        changed.Add(entry);
-                    }
+                    AddParams(cmd, entry);
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    changed.Add(entry);
                 }
                 else
                 {
@@ -423,17 +372,6 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
                     using var tx = connection.BeginTransaction();
                     foreach (var entry in entryList)
                     {
-                        bool skip;
-                        lock (_memLock)
-                        {
-                            skip = _cache.TryGetValue(entry.Id, out var existing) &&
-                                   existing.ContentHash == entry.ContentHash &&
-                                   existing.BlobVersion == entry.BlobVersion &&
-                                   existing.SyncedAt == entry.SyncedAt;
-                        }
-                        
-                        if (skip) continue;
-                        
                         var cmd = connection.CreateCommand();
                         cmd.Transaction = tx;
                         cmd.CommandText = @"
@@ -442,13 +380,9 @@ INSERT OR REPLACE INTO clipboard_entries
 VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $del, $created, $synced)";
                         AddParams(cmd, entry);
                         await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                        
-                        lock (_memLock) { _cache[entry.Id] = entry; }
                         changed.Add(entry);
                     }
                     tx.Commit();
-                    
-                    lock (_memLock) { TrimCache(); }
                 }
                 
                 // Fire single event only if changes occurred
@@ -487,12 +421,6 @@ WHERE id = $id
 ";
                 cmd.Parameters.AddWithValue("$id", id);
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
-                lock (_memLock)
-                {
-                    // Just remove from cache - model is immutable
-                    _cache.Remove(id);
-                }
             }
             catch (Exception ex)
             {
@@ -519,8 +447,6 @@ WHERE id = $id
                 cmd.CommandText = "DELETE FROM clipboard_entries WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
-                lock (_memLock) { _cache.Remove(id); }
             }
             catch (Exception ex)
             {
@@ -546,12 +472,6 @@ WHERE id = $id
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_remote_deleted = 1";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
-                lock (_memLock)
-                {
-                    var toRemove = _cache.Values.Where(x => x.IsRemoteDeleted).Select(x => x.Id).ToList();
-                    foreach (var id in toRemove) _cache.Remove(id);
-                }
             }
             catch (Exception ex)
             {
@@ -575,8 +495,6 @@ WHERE id = $id
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "DELETE FROM clipboard_entries";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
-                lock (_memLock) { _cache.Clear(); }
             }
             catch (Exception ex)
             {
@@ -605,22 +523,6 @@ WHERE id = $id
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error notifying observers");
-        }
-    }
-
-    private void TrimCache()
-    {
-        if (_cache.Count <= _config.MaxCacheSize) return;
-        
-        var itemsToRemove = _cache.Values
-            .OrderBy(x => x.CreatedAt)
-            .Take(_cache.Count - _config.MaxCacheSize)
-            .Select(x => x.Id)
-            .ToList();
-        
-        foreach (var id in itemsToRemove)
-        {
-            _cache.Remove(id);
         }
     }
 
@@ -674,6 +576,5 @@ WHERE id = $id
 /// </summary>
 public class RepositoryConfig
 {
-    public int MaxCacheSize { get; set; } = 500;
     public int DefaultHistoryLimit { get; set; } = 100;
 }

@@ -289,11 +289,6 @@ public class ClipboardSyncService(
             try
             {
                 // Return the result from the concurrent refresh
-                if (_repository is ClipboardRepository repo)
-                {
-                    return await TryGetCachedEntriesAsync(repo, limit);
-                }
-                // Fallback to DB
                 return await _repository.GetAllAsync(limit).ConfigureAwait(false) ?? new List<ClipboardDbModel>();
             }
             finally
@@ -304,8 +299,7 @@ public class ClipboardSyncService(
 
         try
         {
-            // Always fetch from database to ensure fresh data
-            // The repository has its own caching layer that will be updated
+            // Fetch from database
             var localEntries = await _repository.GetAllAsync(limit).ConfigureAwait(false);
             
             // Trigger background sync to catch up with server
@@ -326,27 +320,6 @@ public class ClipboardSyncService(
         }
     }
 
-    /// <summary>
-    /// Helper method to safely get cached entries or fall back to database
-    /// </summary>
-    private async Task<List<ClipboardDbModel>> TryGetCachedEntriesAsync(ClipboardRepository repo, int limit)
-    {
-        try
-        {
-            var cached = repo.TryGetCached(limit);
-            if (cached != null && cached.Count > 0)
-            {
-                return cached.ToList();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to get cached entries, falling back to database");
-        }
-        
-        // Fallback to database if cache fails
-        return await _repository.GetAllAsync(limit).ConfigureAwait(false) ?? new List<ClipboardDbModel>();
-    }
 
     /// <summary>
     /// Downloads latest history from server and batch-inserts it into the DB.

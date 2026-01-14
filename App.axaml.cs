@@ -72,7 +72,6 @@ public class App : Application
         collection.AddSingleton<ClipboardSyncService>();
         collection.AddSingleton(new RepositoryConfig
         {
-            MaxCacheSize = 500,
             DefaultHistoryLimit = 100
         });
         collection.AddSingleton(new ClipboardSyncConfig
