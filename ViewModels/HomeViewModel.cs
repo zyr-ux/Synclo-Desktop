@@ -41,15 +41,98 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     private void OnHistoryUpdated()
     {
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            var entries = _clipboardSyncService.GetCachedHistoryForUI();
-            HistoryEntries.Clear();
-            foreach (var entry in entries)
-            {
-                HistoryEntries.Add(entry);
-            }
+            var entries = await _clipboardSyncService.GetHistoryForUI();
+            ApplyCollectionDiff(entries);
         });
+    }
+
+    private void ApplyCollectionDiff(IReadOnlyList<ClipboardDbModel> newEntries)
+    {
+        // Run on UI thread only - minimal edits to avoid UI flicker
+        // Greedy algorithm: align existing collection with new list by moving, inserting, replacing, and trimming.
+        var existing = HistoryEntries;
+
+        // Iterate desired list and ensure each position matches
+        for (int i = 0; i < newEntries.Count; i++)
+        {
+            var desired = newEntries[i];
+
+            if (i < existing.Count)
+            {
+                var current = existing[i];
+                if (current.Id == desired.Id)
+                {
+                    // Same item at this position: update if contents changed (replace object to respect immutability)
+                    if (!AreEntriesEqual(current, desired))
+                    {
+                        var isDeleting = current.IsDeleting;
+                        var replacement = desired.CopyWith();
+                        replacement.IsDeleting = isDeleting;
+                        existing[i] = replacement;
+                    }
+                }
+                else
+                {
+                    // Try to find desired further down the list and move it up
+                    var foundIndex = -1;
+                    for (int j = i + 1; j < existing.Count; j++)
+                    {
+                        if (existing[j].Id == desired.Id)
+                        {
+                            foundIndex = j;
+                            break;
+                        }
+                    }
+
+                    if (foundIndex != -1)
+                    {
+                        existing.Move(foundIndex, i);
+
+                        // After move, check if content changed (replace if necessary)
+                        var movedItem = existing[i];
+                        if (!AreEntriesEqual(movedItem, desired))
+                        {
+                            var isDeleting = movedItem.IsDeleting;
+                            var replacement = desired.CopyWith();
+                            replacement.IsDeleting = isDeleting;
+                            existing[i] = replacement;
+                        }
+                    }
+                    else
+                    {
+                        // Not found - insert new item at this position
+                        existing.Insert(i, desired);
+                    }
+                }
+            }
+            else
+            {
+                // Append any remaining new entries
+                existing.Add(newEntries[i]);
+            }
+        }
+
+        // Remove any excess items not present in the new list
+        while (existing.Count > newEntries.Count)
+        {
+            existing.RemoveAt(existing.Count - 1);
+        }
+    }
+
+    private static bool AreEntriesEqual(ClipboardDbModel a, ClipboardDbModel b)
+    {
+        if (a == null || b == null) return false;
+        return a.Id == b.Id &&
+               a.Content == b.Content &&
+               a.ContentHash == b.ContentHash &&
+               a.Ciphertext == b.Ciphertext &&
+               a.Nonce == b.Nonce &&
+               a.BlobVersion == b.BlobVersion &&
+               a.IsRemoteDeleted == b.IsRemoteDeleted &&
+               a.SyncedAt == b.SyncedAt &&
+               a.CreatedAt == b.CreatedAt;
     }
 
     private async void LoadInitialData()
@@ -63,11 +146,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                HistoryEntries.Clear();
-                foreach (var entry in entries.Where(e => !e.IsRemoteDeleted))
-                {
-                    HistoryEntries.Add(entry);
-                }
+                ApplyCollectionDiff(entries.Where(e => !e.IsRemoteDeleted).ToList());
             });
         }
         catch (Exception ex)
@@ -93,11 +172,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                HistoryEntries.Clear();
-                foreach (var entry in entries.Where(e => !e.IsRemoteDeleted))
-                {
-                    HistoryEntries.Add(entry);
-                }
+                ApplyCollectionDiff(entries.Where(e => !e.IsRemoteDeleted).ToList());
             });
             
             _notificationService.ShowSuccess("Clipboard history refreshed.");

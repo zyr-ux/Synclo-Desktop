@@ -85,11 +85,6 @@ public class ClipboardSyncService(
     private bool _isInitialized;
     private DateTime _lastRefreshTime = DateTime.MinValue;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
-    
-    private readonly SemaphoreSlim _uiLoadLock = new(1, 1);
-    private volatile bool _uiUpdatePending;
-    private List<ClipboardDbModel> _cachedHistory = new();
-    private readonly object _cachedHistoryLock = new();
 
     public async Task InitializeAsync()
     {
@@ -115,7 +110,7 @@ public class ClipboardSyncService(
             // Subscribe to events
             _monitor.OnClipboardChanged += OnClipboardChanged;
             _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
-            _repository.OnDataChanged += OnRepositoryDataChanged;
+            _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
 
             // Retry syncing entries that failed before app closed (SyncedAt == null)
             var unsyncedEntries = await _repository.GetUnsyncedAsync();
@@ -261,55 +256,21 @@ public class ClipboardSyncService(
 
     public event Action? OnHistoryUpdated;
 
-    private void OnRepositoryDataChanged()
+    /// <summary>
+    /// Gets clipboard history for UI display.
+    /// Uses the repository's cache for fast access.
+    /// </summary>
+    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100)
     {
-        if (_disposed) return;
-        
-        _uiUpdatePending = true;
-        _ = LoadHistoryForUIAsync();
-    }
-
-    private async Task LoadHistoryForUIAsync()
-    {
-        if (_disposed) return;
-        
-        await _uiLoadLock.WaitAsync().ConfigureAwait(false);
-        
         try
         {
-            _uiUpdatePending = false;
-
-            var entries = await _repository.GetAllAsync(100).ConfigureAwait(false);
-
-            lock (_cachedHistoryLock)
-            {
-                _cachedHistory = entries?.Where(e => !e.IsRemoteDeleted).ToList() ?? new List<ClipboardDbModel>();
-            }
-
-            OnHistoryUpdated?.Invoke();
-
-            if (_uiUpdatePending)
-            {
-                _uiLoadLock.Release();
-                _ = LoadHistoryForUIAsync();
-                return;
-            }
+            var entries = await _repository.GetAllAsync(limit).ConfigureAwait(false);
+            return entries?.Where(e => !e.IsRemoteDeleted).ToList() ?? new List<ClipboardDbModel>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load history for UI");
-        }
-        finally
-        {
-            _uiLoadLock.Release();
-        }
-    }
-
-    public List<ClipboardDbModel> GetCachedHistoryForUI()
-    {
-        lock (_cachedHistoryLock)
-        {
-            return new List<ClipboardDbModel>(_cachedHistory);
+            return new List<ClipboardDbModel>();
         }
     }
 
@@ -957,7 +918,6 @@ public class ClipboardSyncService(
         {
             _monitor.OnClipboardChanged -= OnClipboardChanged;
             _webSocketService.OnMessageReceived -= OnWebSocketMessageReceived;
-            _repository.OnDataChanged -= OnRepositoryDataChanged;
             
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
@@ -966,7 +926,6 @@ public class ClipboardSyncService(
             _refreshLock.Dispose();
             _retryLock.Dispose();
             _retryProcessorSemaphore.Dispose();
-            _uiLoadLock.Dispose();
             
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();
