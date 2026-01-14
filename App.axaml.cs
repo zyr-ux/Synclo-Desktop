@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Notifications;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -116,6 +117,7 @@ public class App : Application
         });
         
         var services = collection.BuildServiceProvider();
+
         var apiService = services.GetRequiredService<APIService>();
         var refreshTokenService = services.GetRequiredService<IRefreshTokenService>();
         var accountService = services.GetRequiredService<AccountService>();
@@ -138,23 +140,41 @@ public class App : Application
         accountService.OnLogout += webSocketService.DisconnectAsync;
         
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            DisableAvaloniaDataAnnotationValidation();
-            var mainVM = services.GetRequiredService<MainWindowViewModel>();
-            var notificationService = services.GetRequiredService<NotificationService>();
-            desktop.MainWindow = new MainWindow(notificationService)
-            {
-                DataContext = mainVM
-            };
-            Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
-            desktop.Exit += async (_, _) =>
-            {
-                await clipboardSyncService.ShutdownAsync();
-                webSocketService.Dispose();
-                apiService.Dispose();
-                mainVM.Dispose();
-            };
-        }
+{
+    DisableAvaloniaDataAnnotationValidation();
+
+    var mainVM = services.GetRequiredService<MainWindowViewModel>();
+
+    var mainWindow = new MainWindow
+    {
+        DataContext = mainVM
+    };
+
+    // ✅ Initialize notification manager BEFORE VM startup
+    var notificationService = services.GetRequiredService<NotificationService>();
+
+    var notificationManager = new WindowNotificationManager(mainWindow)
+    {
+        Position = NotificationPosition.TopRight,
+        MaxItems = 3
+    };
+
+    notificationService.SetManager(notificationManager);
+
+    desktop.MainWindow = mainWindow;
+
+    // ✅ Now it's safe to initialize the VM
+    Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
+
+    desktop.Exit += async (_, _) =>
+    {
+        await clipboardSyncService.ShutdownAsync();
+        webSocketService.Dispose();
+        apiService.Dispose();
+        mainVM.Dispose();
+    };
+}
+
 
         base.OnFrameworkInitializationCompleted();
     }
