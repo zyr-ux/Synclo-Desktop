@@ -171,7 +171,39 @@ public sealed class ApiService : IDisposable
         return JsonSerializer.Deserialize<T>(json, _jsonOptions)!;
     }
 
+    /// <summary>
+    /// Triggers a token refresh for WebSocket authentication failures.
+    /// This method is thread-safe and ensures only one refresh happens at a time across all services.
+    /// </summary>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>The new access token</returns>
+    public async Task<string> WebSocketTokenRefreshAsync(CancellationToken ct = default)
+    {
+        if (OnTokenExpired == null)
+            throw new InvalidOperationException("No token refresh handler configured");
+
+        var currentToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
+
+        await _refreshLock.WaitAsync(ct);
+        try
+        {
+            var storedToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
+            // Only refresh if token hasn't been refreshed by another caller
+            if (storedToken == currentToken)
+            {
+                return await OnTokenExpired.Invoke(ct);
+            }
+            // Token was already refreshed by another caller, return the new one
+            return storedToken ?? throw new SessionExpiredException();
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
+    }
+
     public void Dispose()
+
     {
         if (_disposed) return;
 
