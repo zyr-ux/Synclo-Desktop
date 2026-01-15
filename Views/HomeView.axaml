@@ -58,6 +58,7 @@
                                             Classes="textButton"
                                             Padding="0"
                                             HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Center"
                                             Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
                                             CommandParameter="{Binding}">
                                         <TextBlock Text="{Binding Content}"
@@ -72,6 +73,7 @@
                                     <Button Grid.Column="1"
                                             Classes="icon-button"
                                             Margin="0 0 15 0"
+                                            VerticalAlignment="Center"
                                             IsEnabled="{Binding !IsDeleting}"
                                             Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
                                             CommandParameter="{Binding}">
@@ -81,6 +83,7 @@
                                     </Button>
 
                                     <TextBlock Grid.Column="2"
+                                               VerticalAlignment="Center"
                                                Text="{Binding CreatedAtLocal, StringFormat={}{0:h:mm tt}}"
                                                Foreground="{DynamicResource Accent}"
                                                FontSize="16"
