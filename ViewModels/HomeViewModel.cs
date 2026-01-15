@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -187,7 +186,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ItemClicked(ClipboardDbModel entry)
     {
-        if (entry == null || string.IsNullOrEmpty(entry.Content)) return;
+        if (string.IsNullOrEmpty(entry.Content)) return;
 
         try
         {
@@ -203,7 +202,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DeleteItemClicked(ClipboardDbModel entry)
     {
-        if (entry == null || entry.IsDeleting) return;
+        if (entry.IsDeleting) return;
 
         try
         {
@@ -211,10 +210,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             
             await _clipboardSyncService.DeleteClipboardEntryAsync(entry.Id);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             entry.IsDeleting = false;
-            _notificationService.ShowError($"Failed to delete: {ex.Message}");
         }
     }
 
