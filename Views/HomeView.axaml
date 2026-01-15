@@ -56,7 +56,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="models:ClipboardDbModel">
                             <StackPanel>
-                                <Grid ColumnDefinitions="*,Auto,80">
+                                <Grid ColumnDefinitions="*,Auto,120">
 
                                     <Button Grid.Column="0"
                                             Classes="textButton"
@@ -89,7 +89,7 @@
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Right"
                                                Margin="0 0 4 0"
-                                               Text="{Binding CreatedAtLocal, StringFormat={}{0:h:mm tt}}"
+                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, h:mm tt}'}"
                                                Foreground="{DynamicResource Accent}"
                                                FontSize="16"
                                                FontFamily="{DynamicResource Inconsolata-Medium}"/>
