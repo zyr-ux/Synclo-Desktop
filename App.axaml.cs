@@ -129,7 +129,8 @@ public class App : Application
         });
         
         // Event handlers
-        apiService.OnTokenExpired += refreshTokenService.RefreshAsync;
+        // apiService.OnTokenExpired is removed as ApiService now uses IRefreshTokenService internally
+
         accountService.OnLogout += webSocketService.DisconnectAsync;
         
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

@@ -17,17 +17,15 @@ public sealed class ApiService : IDisposable
     private const string BaseUrl = "https://synclo.zyrux.dev";
     private readonly HttpClient _http;
     private readonly ISecureStorage _secureStorage;
+    private readonly IRefreshTokenService _refreshTokenService;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private bool _disposed;
 
-    public event Func<CancellationToken, Task<string>>? OnTokenExpired;
-    public event Action<string>? TokenRefreshed;
-
-    public ApiService(HttpClient http, ISecureStorage secureStorage)
+    public ApiService(HttpClient http, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
     {
         _http = http;
         _secureStorage = secureStorage;
+        _refreshTokenService = refreshTokenService;
         
         if (_http.BaseAddress == null)
         {
@@ -41,7 +39,6 @@ public sealed class ApiService : IDisposable
             PropertyNameCaseInsensitive = true
         };
     }
-
 
     public Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default)
     {
@@ -76,25 +73,11 @@ public sealed class ApiService : IDisposable
 
         response.Dispose();
 
-        if (OnTokenExpired == null)
-            throw new InvalidOperationException("No token refresh handler configured");
-
-        var currentToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
-
-        await _refreshLock.WaitAsync(ct);
-        try
-        {
-            var storedToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
-            if (storedToken == currentToken)
-            {
-                await OnTokenExpired.Invoke(ct);
-            }
-            return await SendReqHelper(method, url, body, ct);
-        }
-        finally
-        {
-            _refreshLock.Release();
-        }
+        // Use centralized refresh service
+        await _refreshTokenService.RefreshAsync(ct);
+        
+        // Retry request with new token
+        return await SendReqHelper(method, url, body, ct);
     }
 
     private async Task<HttpResponseMessage> SendReqHelper(HttpMethod method, string url, object? body,
@@ -171,50 +154,12 @@ public sealed class ApiService : IDisposable
         return JsonSerializer.Deserialize<T>(json, _jsonOptions)!;
     }
 
-    /// <summary>
-    /// Triggers a token refresh for WebSocket authentication failures.
-    /// This method is thread-safe and ensures only one refresh happens at a time across all services.
-    /// </summary>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>The new access token</returns>
-    public async Task<string> WebSocketTokenRefreshAsync(CancellationToken ct = default)
-    {
-        if (OnTokenExpired == null)
-            throw new InvalidOperationException("No token refresh handler configured");
-
-        var currentToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
-
-        await _refreshLock.WaitAsync(ct);
-        try
-        {
-            var storedToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
-            // Only refresh if token hasn't been refreshed by another caller
-            if (storedToken == currentToken)
-            {
-                return await OnTokenExpired.Invoke(ct);
-            }
-            // Token was already refreshed by another caller, return the new one
-            return storedToken ?? throw new SessionExpiredException();
-        }
-        finally
-        {
-            _refreshLock.Release();
-        }
-    }
-
     public void Dispose()
-
     {
         if (_disposed) return;
 
         _disposed = true;
         _http.Dispose();
-        _refreshLock.Dispose();
-    }
-
-    public void NotifyTokenRefreshed(string token)
-    {
-        TokenRefreshed?.Invoke(token);
     }
 
     #endregion

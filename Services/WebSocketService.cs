@@ -12,6 +12,7 @@ public sealed class WebSocketService : IDisposable
 {
     private readonly ApiService _apiService;
     private readonly ISecureStorage _secureStorage;
+    private readonly IRefreshTokenService _refreshTokenService;
     private const int BufferSize = 8192;
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private CancellationTokenSource? _cts;
@@ -22,11 +23,12 @@ public sealed class WebSocketService : IDisposable
     private ClientWebSocket? _socket;
     private Task? _pingTask;
 
-    public WebSocketService(ApiService api, ISecureStorage secureStorage)
+    public WebSocketService(ApiService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
     {
         _apiService = api;
         _secureStorage = secureStorage;
-        _apiService.TokenRefreshed += OnTokenRefreshed;
+        _refreshTokenService = refreshTokenService;
+        _refreshTokenService.TokenRefreshed += OnTokenRefreshed;
     }
 
     public bool IsConnected => _socket is { State: WebSocketState.Open };
@@ -140,7 +142,7 @@ public sealed class WebSocketService : IDisposable
         try
         {
             // Use centralized token refresh to prevent concurrent refresh attempts
-            await _apiService.WebSocketTokenRefreshAsync(_cts?.Token ?? CancellationToken.None);
+            await _refreshTokenService.RefreshAsync(_cts?.Token ?? CancellationToken.None);
 
             var newToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
             if (string.IsNullOrWhiteSpace(newToken)) return;
@@ -283,7 +285,7 @@ public sealed class WebSocketService : IDisposable
                 try
                 {
                     // Use centralized token refresh to prevent concurrent refresh attempts
-                    await _apiService.WebSocketTokenRefreshAsync(_cts?.Token ?? CancellationToken.None);
+                    await _refreshTokenService.RefreshAsync(_cts?.Token ?? CancellationToken.None);
                 }
                 catch
                 {
@@ -409,7 +411,7 @@ public sealed class WebSocketService : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _apiService.TokenRefreshed -= OnTokenRefreshed;
+        _refreshTokenService.TokenRefreshed -= OnTokenRefreshed;
 
         _cts?.Cancel();
         _ = DisconnectInternal();
