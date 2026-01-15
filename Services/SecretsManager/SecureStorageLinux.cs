@@ -8,7 +8,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Tmds.DBus;
 
-namespace Synclo.SecretsManager;
+namespace Synclo.Services.SecretsManager;
 
 public sealed class SecureStorageLinux : ISecureStorage, IDisposable
 {

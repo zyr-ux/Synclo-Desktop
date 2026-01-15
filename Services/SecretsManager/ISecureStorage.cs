@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Synclo.SecretsManager;
+namespace Synclo.Services.SecretsManager;
 
 public interface ISecureStorage
 {

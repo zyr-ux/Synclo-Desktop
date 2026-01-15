@@ -4,10 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
-using Synclo.SecretsManager;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
+using Synclo.Services.SecretsManager;
 
 namespace Synclo.Services.ClipboardService;
 

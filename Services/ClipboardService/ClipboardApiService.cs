@@ -2,8 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
-using Synclo.SecretsManager;
 using Microsoft.Extensions.Logging;
+using Synclo.Services.SecretsManager;
 
 namespace Synclo.Services.ClipboardService;
 

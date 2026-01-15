@@ -5,7 +5,7 @@ using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
-using Synclo.SecretsManager;
+using Synclo.Services.SecretsManager;
 
 namespace Synclo.Services;
 

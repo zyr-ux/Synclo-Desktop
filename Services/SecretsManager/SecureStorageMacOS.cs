@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
-namespace Synclo.SecretsManager;
+namespace Synclo.Services.SecretsManager;
 
 public sealed class SecureStorageMacOS : ISecureStorage
 {
