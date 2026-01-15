@@ -25,15 +25,15 @@ public interface IAccountService
 }
 
 public sealed class AccountService(
-    ApiService api,
+    IApiService api,
     HttpClient http,
     ISettingsService settings,
-    DeviceService deviceService,
-    CryptographyService cryptographyService,
+    IDeviceService deviceService,
+    ICryptographyService cryptographyService,
     ISecureStorage secureStorage,
-    Utils utils,
+    IUtils utils,
     IRefreshTokenService refreshTokenService,
-    WebSocketService webSocketService) : IAccountService
+    IWebSocketService webSocketService) : IAccountService
 {
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";

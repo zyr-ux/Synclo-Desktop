@@ -19,7 +19,7 @@ public interface IDeviceService
     Task ClearAsync();
 }
 
-public sealed class DeviceService(ApiService api, ISettingsService settings, ISecureStorage secureStorage) : IDeviceService
+public sealed class DeviceService(IApiService api, ISettingsService settings, ISecureStorage secureStorage) : IDeviceService
 {
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

@@ -10,8 +10,8 @@ namespace Synclo.ViewModels;
 
 public partial class LoginViewModel : ViewModelBase
 {
-    private readonly AccountService _accountService;
-    private readonly NotificationService _notificationService;
+    private readonly IAccountService _accountService;
+    private readonly INotificationService _notificationService;
 
     [ObservableProperty] private string _email = string.Empty;
     [ObservableProperty] private string _password = string.Empty;
@@ -20,7 +20,7 @@ public partial class LoginViewModel : ViewModelBase
 
     public event Action? LoginSucceeded;
 
-    public LoginViewModel(AccountService accountService, NotificationService notificationService)
+    public LoginViewModel(IAccountService accountService, INotificationService notificationService)
     {
         _accountService = accountService;
         _notificationService = notificationService;
@@ -168,4 +168,3 @@ public partial class LoginViewModel : ViewModelBase
         return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
     }
 }
-

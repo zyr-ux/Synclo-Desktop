@@ -8,7 +8,7 @@ using Synclo.ViewModels;
 
 namespace Synclo.Components;
 
-public partial class ResetPasswordDialogViewModel(AccountService accountService, Action<bool?> close) : ViewModelBase
+public partial class ResetPasswordDialogViewModel(IAccountService accountService, Action<bool?> close) : ViewModelBase
 {
     [ObservableProperty] private string _currentPassword = string.Empty;
     [ObservableProperty] private string _newPassword = string.Empty;

@@ -15,10 +15,10 @@ namespace Synclo.ViewModels;
 
 public partial class AccountDetailsViewModel : ViewModelBase
 {
-    private readonly AccountService _accountService;
-    private readonly DeviceService _deviceService;
+    private readonly IAccountService _accountService;
+    private readonly IDeviceService _deviceService;
     private readonly IViewModelFactory _factory;
-    private readonly NotificationService _notificationService;
+    private readonly INotificationService _notificationService;
     private readonly DialogService.IDialogService _dialogService;
 
     [ObservableProperty] private string _username = string.Empty;
@@ -29,10 +29,10 @@ public partial class AccountDetailsViewModel : ViewModelBase
     public event Action? LoggedOut;
 
     public AccountDetailsViewModel(
+        IAccountService accountService,
+        IDeviceService deviceService,
         IViewModelFactory factory,
-        AccountService accountService,
-        DeviceService deviceService,
-        NotificationService notificationService,
+        INotificationService notificationService,
         DialogService.IDialogService dialogService)
     {
         _factory = factory;

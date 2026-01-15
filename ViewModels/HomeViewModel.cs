@@ -15,8 +15,8 @@ namespace Synclo.ViewModels;
 public partial class HomeViewModel : ViewModelBase, IDisposable
 {
     private readonly IClipboardMonitor _clipboardMonitor;
-    private readonly NotificationService _notificationService;
-    private readonly ClipboardSyncService _clipboardSyncService;
+    private readonly INotificationService _notificationService;
+    private readonly IClipboardSyncService _clipboardSyncService;
     private CancellationTokenSource? _updateCts;
 
     [ObservableProperty] private string? _errorMessage;
@@ -25,8 +25,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     public HomeViewModel(
         IClipboardMonitor clipboardMonitor,
-        NotificationService notificationService,
-        ClipboardSyncService clipboardSyncService)
+        INotificationService notificationService,
+        IClipboardSyncService clipboardSyncService)
     {
         _clipboardMonitor = clipboardMonitor;
         _notificationService = notificationService;

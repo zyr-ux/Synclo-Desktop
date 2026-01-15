@@ -16,10 +16,10 @@ namespace Synclo.ViewModels;
 public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IViewModelFactory _factory;
-    private readonly NotificationService _notificationService;
-    private readonly AccountService _accountService;
-    private readonly ApiService _apiService;
-    private readonly WebSocketService _webSocketService;
+    private readonly INotificationService _notificationService;
+    private readonly IAccountService _accountService;
+    private readonly IApiService _apiService;
+    private readonly IWebSocketService _webSocketService;
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private IBrush _statusColor = Brushes.Gray;
@@ -29,10 +29,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public MainWindowViewModel(
         IViewModelFactory factory,
-        NotificationService notificationService,
-        AccountService accountService,
-        ApiService apiService,
-        WebSocketService webSocketService)
+        INotificationService notificationService,
+        IAccountService accountService,
+        IApiService apiService,
+        IWebSocketService webSocketService)
     {
         _factory = factory;
         _notificationService = notificationService;

@@ -44,23 +44,23 @@ public class ClipboardSyncService(
     IClipboardMonitor monitor,
     IClipboardApiService clipboardApiService,
     IClipboardRepository repository,
-    WebSocketService webSocketService,
+    IWebSocketService webSocketService,
     ISettingsService settingsService,
-    NotificationService notificationService,
-    CryptographyService cryptographyService,
+    INotificationService notificationService,
+    ICryptographyService cryptographyService,
     ISecureStorage secureStorage,
+    IUtils utils,
     ILogger<ClipboardSyncService> logger,
-    ClipboardSyncConfig config,
-    IUtils utils
+    ClipboardSyncConfig config
     ) : IDisposable, IClipboardSyncService
 {
     private readonly IClipboardMonitor _monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
     private readonly IClipboardApiService _clipboardApiService = clipboardApiService ?? throw new ArgumentNullException(nameof(clipboardApiService));
     private readonly IClipboardRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-    private readonly WebSocketService _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
+    private readonly IWebSocketService _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
     private readonly ISettingsService _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-    private readonly NotificationService _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
-    private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
+    private readonly INotificationService _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+    private readonly ICryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
     private readonly ISecureStorage _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
     private readonly ILogger<ClipboardSyncService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ClipboardSyncConfig _config = config ?? throw new ArgumentNullException(nameof(config));

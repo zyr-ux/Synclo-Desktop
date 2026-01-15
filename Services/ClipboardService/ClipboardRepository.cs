@@ -11,6 +11,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Synclo.Services.ClipboardService;
 
+public interface IClipboardRepository
+{
+    Task InitializeAsync();
+    Task<List<ClipboardDbModel>> GetAllAsync();
+    Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0);
+    Task<ClipboardDbModel?> GetByIdAsync(string id);
+    Task<ClipboardDbModel?> GetByHashAsync(string hash);
+    Task UpsertAsync(ClipboardDbModel entry);
+    Task UpsertAsync(IEnumerable<ClipboardDbModel> entries);
+    Task DeleteByIdAsync(string id);
+    Task ClearAllAsync();
+    event Action? OnDataChanged;
+}
+
 public sealed class ClipboardRepository : IClipboardRepository, IDisposable
 {
     private readonly string _dbPath;

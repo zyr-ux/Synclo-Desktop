@@ -46,18 +46,26 @@ public class App : Application
         
         // API related services
         collection.AddSingleton<HttpClient>();
-        collection.AddSingleton<ApiService>();
-        collection.AddSingleton<DeviceService>();
+        collection.AddSingleton<IApiService, ApiService>();
+        collection.AddSingleton<IDeviceService, DeviceService>();
         collection.AddSingleton<IRefreshTokenService, RefreshTokenService>();
-        collection.AddSingleton<AccountService>();
-        collection.AddSingleton<WebSocketService>();
+        collection.AddSingleton<IAccountService, AccountService>();
+        collection.AddSingleton<IWebSocketService, WebSocketService>();
         collection.AddSingleton(new ApiConfig
         {
             ApiTimeoutSeconds = 30
         });
         collection.AddSingleton<IClipboardApiService, ClipboardApiService>();
         
-        // Clipboard subsystem
+        // Other related services
+        collection.AddSingleton<ICryptographyService, CryptographyService>();
+        collection.AddSingleton<ISettingsService, SettingsService>();
+        collection.AddSingleton<INotificationService, NotificationService>();
+        collection.AddSingleton<DialogService.IDialogService, DialogService>();
+        collection.AddSingleton<IThemeService, ThemeService>();
+        collection.AddSingleton<IUtils, Utils>();
+        
+        // Clipboard subsystem (dependant services)
         collection.AddSingleton<IClipboardRepository, ClipboardRepository>();
         collection.AddSingleton<IClipboardProvider, AvaloniaClipboardProvider>();
         collection.AddSingleton<IClipboardMonitor>(sp => 
@@ -71,7 +79,7 @@ public class App : Application
                 return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>(),utils);
             return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>(),utils);
         });
-        collection.AddSingleton<ClipboardSyncService>();
+        collection.AddSingleton<IClipboardSyncService, ClipboardSyncService>();
         collection.AddSingleton(new RepositoryConfig
         {
             DefaultHistoryLimit = 100
@@ -93,14 +101,6 @@ public class App : Application
             return new StartupManagerLinux();
         });
         
-        // Other related services
-        collection.AddSingleton<CryptographyService>();
-        collection.AddSingleton<ISettingsService, SettingsService>();
-        collection.AddSingleton<NotificationService>();
-        collection.AddSingleton<DialogService.IDialogService, DialogService>();
-        collection.AddSingleton<IThemeService, ThemeService>();
-        collection.AddSingleton<Utils>();
-        
         // Startup subsystem
         collection.AddSingleton<ISecureStorage>(_ => {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -112,17 +112,16 @@ public class App : Application
         
         var services = collection.BuildServiceProvider();
 
-        var apiService = services.GetRequiredService<ApiService>();
-        var refreshTokenService = services.GetRequiredService<IRefreshTokenService>();
-        var accountService = services.GetRequiredService<AccountService>();
-        var webSocketService = services.GetRequiredService<WebSocketService>();
+        var apiService = services.GetRequiredService<IApiService>();
+        var accountService = services.GetRequiredService<IAccountService>();
+        var webSocketService = services.GetRequiredService<IWebSocketService>();
         var settingsService = services.GetRequiredService<ISettingsService>();
         var themeService = services.GetRequiredService<IThemeService>();
         themeService.ApplyTheme(settingsService.Settings.Theme);
         
         // Initialize clipboard subsystem with proper sequencing
         var clipboardRepository = services.GetRequiredService<IClipboardRepository>();
-        var clipboardSyncService = services.GetRequiredService<ClipboardSyncService>();
+        var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
         Dispatcher.UIThread.InvokeAsync(async () =>
         {
             await clipboardRepository.InitializeAsync();
@@ -146,7 +145,7 @@ public class App : Application
     };
 
     // ✅ Initialize notification manager BEFORE VM startup
-    var notificationService = services.GetRequiredService<NotificationService>();
+    var notificationService = services.GetRequiredService<INotificationService>();
 
     var notificationManager = new WindowNotificationManager(mainWindow)
     {

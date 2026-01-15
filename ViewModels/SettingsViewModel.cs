@@ -15,9 +15,9 @@ namespace Synclo.ViewModels;
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settings;
-    private readonly ApiService _apiService;
+    private readonly IApiService _apiService;
     private readonly IThemeService _themeService;
-    private readonly ClipboardSyncService _clipboardSyncService;
+    private readonly IClipboardSyncService _clipboardSyncService;
     private readonly IStartupManager _startupManager;
     
     [ObservableProperty] private string _selectedTheme = "System";
@@ -32,9 +32,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel(
         ISettingsService settings, 
-        ApiService apiService, 
+        IApiService apiService, 
         IThemeService themeService,
-        ClipboardSyncService clipboardSyncService,
+        IClipboardSyncService clipboardSyncService,
         IStartupManager startupManager)
     {
         _settings = settings;

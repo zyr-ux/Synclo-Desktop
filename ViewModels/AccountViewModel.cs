@@ -8,13 +8,13 @@ namespace Synclo.ViewModels;
 public partial class AccountViewModel : ViewModelBase
 {
     private readonly IViewModelFactory _factory;
-    private readonly AccountService _accountService;
+    private readonly IAccountService _accountService;
 
     [ObservableProperty] private ViewModelBase? _currentViewModel;
 
     public AccountViewModel(
         IViewModelFactory factory,
-        AccountService accountService)
+        IAccountService accountService)
     {
         _factory = factory;
         _accountService = accountService;

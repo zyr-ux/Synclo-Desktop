@@ -24,7 +24,7 @@ public interface IWebSocketService : IDisposable
 
 public sealed class WebSocketService : IWebSocketService
 {
-    private readonly ApiService _apiService;
+    private readonly IApiService _apiService;
     private readonly ISecureStorage _secureStorage;
     private readonly IRefreshTokenService _refreshTokenService;
     private const int BufferSize = 8192;
@@ -37,7 +37,7 @@ public sealed class WebSocketService : IWebSocketService
     private ClientWebSocket? _socket;
     private Task? _pingTask;
 
-    public WebSocketService(ApiService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
+    public WebSocketService(IApiService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
     {
         _apiService = api;
         _secureStorage = secureStorage;
