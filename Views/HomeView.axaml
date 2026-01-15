@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="clr-namespace:Synclo.ViewModels"
              xmlns:models="clr-namespace:Synclo.Models"
              mc:Ignorable="d"
@@ -12,7 +13,7 @@
              x:DataType="vm:HomeViewModel">
 
      <!-- Root grid has NO margin -->
-    <Grid RowDefinitions="Auto,*,Auto"
+    <Grid RowDefinitions="Auto,*"
           Background="{DynamicResource PrimaryBackground}">
 
         <!-- Header keeps padding -->
@@ -39,9 +40,12 @@
         <ScrollViewer Grid.Row="1"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
+            <Interaction.Behaviors>
+                <ia:VerticalScrollViewerAnimatedBehavior/>
+            </Interaction.Behaviors>
 
             <!-- Content padding goes HERE -->
-            <Border Padding="30,30,30,0">
+            <Border Padding="30,30,30,10">
                 <ItemsControl ItemsSource="{Binding HistoryEntries}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
