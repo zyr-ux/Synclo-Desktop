@@ -61,12 +61,11 @@
                                             VerticalAlignment="Center"
                                             Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
                                             CommandParameter="{Binding}">
-                                        <TextBlock Text="{Binding Content}"
+                                        <TextBlock Text="{Binding PreviewText}"
                                                    Foreground="{DynamicResource Accent}"
                                                    FontSize="18"
                                                    FontFamily="{DynamicResource Inconsolata-Medium}"
                                                    TextTrimming="CharacterEllipsis"
-                                                   MaxLines="1"
                                                    Margin="0,0,20,0"/>
                                     </Button>
 

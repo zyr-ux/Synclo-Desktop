@@ -1,13 +1,9 @@
 using System;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Synclo.Models;
 
-/// <summary>
-/// Immutable model for clipboard entries stored in SQLite.
-/// All properties use init-only setters to prevent thread safety issues.
-/// Use CopyWith() method to create modified copies.
-/// </summary>
 public partial class ClipboardDbModel : ObservableObject
 {
     public string Id { get; init; } = string.Empty;
@@ -21,16 +17,9 @@ public partial class ClipboardDbModel : ObservableObject
     
     public DateTime CreatedAtLocal => CreatedAt.ToLocalTime();
     
-    /// <summary>
-    /// UI-only state for delete operation (not persisted to DB).
-    /// This is the only mutable property as it's UI-specific.
-    /// </summary>
     [ObservableProperty]
     private bool _isDeleting;
     
-    /// <summary>
-    /// Creates a copy of this instance with specified properties modified.
-    /// </summary>
     public ClipboardDbModel CopyWith(
         string? id = null,
         string? content = null,
@@ -52,5 +41,41 @@ public partial class ClipboardDbModel : ObservableObject
             CreatedAt = createdAt ?? this.CreatedAt,
             SyncedAt = syncedAt ?? this.SyncedAt
         };
+    }
+    
+    public string PreviewText
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Content))
+                return string.Empty;
+
+            Span<char> buffer = stackalloc char[Content.Length];
+            int len = 0;
+            bool lastWasSpace = false;
+
+            foreach (var ch in Content)
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    if (lastWasSpace)
+                        continue;
+
+                    buffer[len++] = ' ';
+                    lastWasSpace = true;
+                }
+                else
+                {
+                    buffer[len++] = ch;
+                    lastWasSpace = false;
+                }
+            }
+
+            // Trim trailing space
+            if (len > 0 && buffer[len - 1] == ' ')
+                len--;
+
+            return new string(buffer[..len]);
+        }
     }
 }

@@ -148,7 +148,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                a.ContentHash == b.ContentHash &&
                a.IsDeleting == b.IsDeleting; 
     }
-
+    
     [RelayCommand]
     private async Task RefreshClipboardHistory()
     {
