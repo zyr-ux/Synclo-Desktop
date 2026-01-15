@@ -105,14 +105,13 @@ public class ClipboardSyncService(
             // Subscribe to events
             _monitor.OnClipboardChanged += OnClipboardChanged;
             _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
-            _webSocketService.OnConnected += OnWebSocketConnected;
             _webSocketService.OnDisconnected += OnWebSocketDisconnected;
             _webSocketService.OnError += OnWebSocketError;
             _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
             
             _logger.LogInformation("Event subscriptions completed");
 
-            // Connect WebSocket if user is authenticated (will retry unsynced entries on connect)
+            // Connect WebSocket if user is authenticated
             var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(masterKeyBase64))
             {
@@ -120,11 +119,6 @@ public class ClipboardSyncService(
                 if (!_webSocketService.IsConnected)
                 {
                     _ = _webSocketService.ConnectAsync();
-                }
-                else
-                {
-                    // Already connected, retry unsynced entries immediately
-                    _ = RetryUnsyncedEntriesAsync();
                 }
             }
 
@@ -253,10 +247,15 @@ public class ClipboardSyncService(
                 var contentHash = Utils.ComputeHash(entry.plaintext);
                 var existingEntry = await _repository.GetByHashAsync(contentHash);
                 
-                if (existingEntry != null && existingEntry.SyncedAt.HasValue && existingEntry.Id == entry.id)
+                if (existingEntry != null && existingEntry.Id == entry.id)
                     continue;
                 
-                var createdAt = existingEntry?.CreatedAt ?? entry.timestamp;
+                // Normalize server timestamp to UTC and truncate to milliseconds
+                var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Utc 
+                    ? entry.timestamp 
+                    : entry.timestamp.ToUniversalTime();
+                serverTimestamp = Utils.TruncateToMilliseconds(serverTimestamp);
+                var createdAt = existingEntry?.CreatedAt ?? serverTimestamp;
                 
                 var dbEntry = new ClipboardDbModel
                 {
@@ -266,8 +265,7 @@ public class ClipboardSyncService(
                     Ciphertext = entry.ciphertext ?? string.Empty,
                     Nonce = entry.nonce ?? string.Empty,
                     BlobVersion = entry.blob_version,
-                    CreatedAt = createdAt,
-                    SyncedAt = DateTime.UtcNow
+                    CreatedAt = createdAt
                 };
                 
                 incomingBatch.Add(dbEntry);
@@ -400,8 +398,9 @@ public class ClipboardSyncService(
             }
             
             // Generate deterministic UUID and Timestamp (Client Authority)
+            // Truncate to milliseconds for consistent precision
             var clientId = Guid.NewGuid().ToString();
-            var timestamp = DateTime.UtcNow;
+            var timestamp = Utils.TruncateToMilliseconds(DateTime.UtcNow);
             
             // Save to SQLite immediately (optimistic write)
             var dbEntry = new ClipboardDbModel
@@ -412,8 +411,7 @@ public class ClipboardSyncService(
                 Ciphertext = string.Empty,
                 Nonce = string.Empty,
                 BlobVersion = _settingsService.Settings.blob_version,
-                CreatedAt = timestamp,
-                SyncedAt = null
+                CreatedAt = timestamp
             };
             
             await _repository.UpsertAsync(dbEntry);
@@ -584,23 +582,20 @@ public class ClipboardSyncService(
                 if (existingEntry.Id == entry.id)
                 {
                     _logger.LogDebug($"Skipping duplicate clipboard entry: {entry.id}");
-                    // But ensure we mark it as synced as this is confirmation from server
-                    if (!existingEntry.SyncedAt.HasValue) 
-                    {
-                         var syncedEntry = existingEntry.CopyWith(syncedAt: DateTime.UtcNow);
-                         await _repository.UpsertAsync(syncedEntry);
-                    }
                     return;
                 }
                 
-                // If we have a local entry (Unsynced) with different ID but same content, 
-                // we should probably replace it with this one to avoid duplicates in UI.
-                // However, checks for "client_" prefix are removed. 
-                // We assume if content matches, this is the authoritative version.
-                
+                // If we have a local entry with different ID but same content, 
+                // replace it with the authoritative version from server
                 _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
                 await _repository.DeleteByIdAsync(existingEntry.Id);
             }
+            
+            // Normalize server timestamp to UTC and truncate to milliseconds
+            var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Utc 
+                ? entry.timestamp 
+                : entry.timestamp.ToUniversalTime();
+            serverTimestamp = Utils.TruncateToMilliseconds(serverTimestamp);
             
             // Save to SQLite
             var dbEntry = new ClipboardDbModel
@@ -611,8 +606,7 @@ public class ClipboardSyncService(
                 Ciphertext = entry.ciphertext ?? string.Empty,
                 Nonce = entry.nonce ?? string.Empty,
                 BlobVersion = entry.blob_version,
-                CreatedAt = entry.timestamp,
-                SyncedAt = DateTime.UtcNow
+                CreatedAt = serverTimestamp
             };
             
             await _repository.UpsertAsync(dbEntry);
@@ -624,16 +618,6 @@ public class ClipboardSyncService(
         {
             _logger.LogError(ex, $"Failed to process WebSocket message");
         }
-    }
-
-    /// <summary>
-    /// Called when WebSocket connection is established.
-    /// Retries any unsynced clipboard entries.
-    /// </summary>
-    private void OnWebSocketConnected()
-    {
-        _logger.LogInformation("WebSocket connected - checking for unsynced entries");
-        RunBackgroundTask(async ct => await RetryUnsyncedEntriesAsync(), "Retry Unsynced on Connect");
     }
 
     /// <summary>
@@ -650,29 +634,6 @@ public class ClipboardSyncService(
     private void OnWebSocketError(string errorMessage)
     {
         _logger.LogWarning($"WebSocket error: {errorMessage}");
-    }
-
-    /// <summary>
-    /// Retries syncing entries that failed before (SyncedAt == null).
-    /// Uses SendExistingEntryAsync to preserve original IDs and timestamps.
-    /// </summary>
-    private async Task RetryUnsyncedEntriesAsync()
-    {
-        try
-        {
-            var unsyncedEntries = await _repository.GetUnsyncedAsync();
-            _logger.LogInformation($"Found {unsyncedEntries.Count} unsynced entries to retry");
-            
-            foreach (var entry in unsyncedEntries)
-            {
-                // ✅ Send existing entry with original ID and timestamp
-                await SendExistingEntryAsync(entry);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to retry unsynced entries");
-        }
     }
 
 
@@ -728,7 +689,6 @@ public class ClipboardSyncService(
         {
             _monitor.OnClipboardChanged -= OnClipboardChanged;
             _webSocketService.OnMessageReceived -= OnWebSocketMessageReceived;
-            _webSocketService.OnConnected -= OnWebSocketConnected;
             _webSocketService.OnDisconnected -= OnWebSocketDisconnected;
             _webSocketService.OnError -= OnWebSocketError;
             

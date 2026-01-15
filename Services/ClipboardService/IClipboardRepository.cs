@@ -49,10 +49,7 @@ public interface IClipboardRepository
     /// </summary>
     Task DeleteByIdAsync(string id);
     
-    /// <summary>
-    /// Fetches entries that were created locally but never synced (SyncedAt == null)
-    /// </summary>
-    Task<List<ClipboardDbModel>> GetUnsyncedAsync();
+
     
     /// <summary>
     /// Wipe entire database (used on logout or cold start)

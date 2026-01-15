@@ -13,7 +13,6 @@ public partial class ClipboardDbModel : ObservableObject
     public string Nonce { get; init; } = string.Empty;
     public int BlobVersion { get; init; }
     public DateTime CreatedAt { get; init; }
-    public DateTime? SyncedAt { get; init; }
     
     public DateTime CreatedAtLocal => CreatedAt.ToLocalTime();
     
@@ -27,8 +26,7 @@ public partial class ClipboardDbModel : ObservableObject
         string? ciphertext = null,
         string? nonce = null,
         int? blobVersion = null,
-        DateTime? createdAt = null,
-        DateTime? syncedAt = null)
+        DateTime? createdAt = null)
     {
         return new ClipboardDbModel
         {
@@ -38,8 +36,7 @@ public partial class ClipboardDbModel : ObservableObject
             Ciphertext = ciphertext ?? this.Ciphertext,
             Nonce = nonce ?? this.Nonce,
             BlobVersion = blobVersion ?? this.BlobVersion,
-            CreatedAt = createdAt ?? this.CreatedAt,
-            SyncedAt = syncedAt ?? this.SyncedAt
+            CreatedAt = createdAt ?? this.CreatedAt
         };
     }
     

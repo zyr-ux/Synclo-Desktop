@@ -63,13 +63,11 @@ CREATE TABLE IF NOT EXISTS clipboard_entries (
     ciphertext TEXT NOT NULL,
     nonce TEXT NOT NULL,
     blob_version INTEGER NOT NULL,
-    created_at TEXT NOT NULL,
-    synced_at TEXT
+    created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
 CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_synced_at ON clipboard_entries(synced_at);
 ";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 
@@ -132,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_synced_at ON clipboard_entries(synced_at);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       created_at, synced_at
+       created_at
 FROM clipboard_entries
 ORDER BY created_at DESC, ROWID DESC
 LIMIT $limit OFFSET $offset
@@ -213,33 +211,7 @@ LIMIT $limit OFFSET $offset
         }).Unwrap();
     }
 
-    public Task<List<ClipboardDbModel>> GetUnsyncedAsync()
-    {
-        return _db.StartNew(async () =>
-        {
-            try
-            {
-                var list = new List<ClipboardDbModel>();
-                using var connection = new SqliteConnection($"Data Source={_dbPath}");
-                await connection.OpenAsync().ConfigureAwait(false);
-                
-                var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE synced_at IS NULL ORDER BY created_at";
-                
-                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    list.Add(MapFromReader(reader));
-                }
-                return list;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to get unsynced entries");
-                throw;
-            }
-        }).Unwrap();
-    }
+
 
     // ---------------------------------------------------------
     // WRITES
@@ -301,8 +273,8 @@ LIMIT $limit OFFSET $offset
                     cmd.Transaction = tx;
                     cmd.CommandText = @"
 INSERT OR REPLACE INTO clipboard_entries
-(id, content, content_hash, ciphertext, nonce, blob_version, created_at, synced_at)
-VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced)";
+(id, content, content_hash, ciphertext, nonce, blob_version, created_at)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
                     AddParams(cmd, entry);
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
@@ -390,7 +362,6 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced)";
         cmd.Parameters.AddWithValue("$nonce", entry.Nonce);
         cmd.Parameters.AddWithValue("$ver", entry.BlobVersion);
         cmd.Parameters.AddWithValue("$created", entry.CreatedAt.ToString("O"));
-        cmd.Parameters.AddWithValue("$synced", entry.SyncedAt?.ToString("O") ?? (object)DBNull.Value);
     }
 
     private static ClipboardDbModel MapFromReader(SqliteDataReader reader)
@@ -403,8 +374,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced)";
             Ciphertext = reader.GetString(3),
             Nonce = reader.GetString(4),
             BlobVersion = reader.GetInt32(5),
-            CreatedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture),
-            SyncedAt = reader.IsDBNull(7) ? null : DateTime.Parse(reader.GetString(7), CultureInfo.InvariantCulture)
+            CreatedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture)
         };
     }
 

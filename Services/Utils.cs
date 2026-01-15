@@ -40,4 +40,18 @@ public sealed class Utils(ISettingsService settingsService)
         var hash = SHA256.HashData(bytes);
         return Convert.ToBase64String(hash);
     }
+
+    public static DateTime TruncateToMilliseconds(DateTime dateTime)
+    {
+        return new DateTime(
+            dateTime.Year,
+            dateTime.Month,
+            dateTime.Day,
+            dateTime.Hour,
+            dateTime.Minute,
+            dateTime.Second,
+            dateTime.Millisecond,
+            dateTime.Kind
+        );
+    }
 }
