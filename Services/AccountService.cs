@@ -9,6 +9,21 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
+public interface IAccountService
+{
+    Task<bool> IsAuthenticatedAsync();
+    Task<string?> GetStoredEmailAsync();
+    Task EnforceLocalKdfVersionAsync();
+    Task LoginAsync(string email, string password, CancellationToken ct = default);
+    Task RegisterAsync(string email, string password, CancellationToken ct = default);
+    Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default);
+    Task<string> RefreshTokenAsync(CancellationToken ct = default);
+    Task LogoutAsync();
+    Task DeleteAccountAsync(CancellationToken ct = default);
+    event Func<Task>? OnLogin;
+    event Func<Task>? OnLogout;
+}
+
 public sealed class AccountService(
     ApiService api,
     HttpClient http,
@@ -18,7 +33,7 @@ public sealed class AccountService(
     ISecureStorage secureStorage,
     Utils utils,
     IRefreshTokenService refreshTokenService,
-    WebSocketService webSocketService)
+    WebSocketService webSocketService) : IAccountService
 {
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";

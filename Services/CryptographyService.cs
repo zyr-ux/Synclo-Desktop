@@ -6,7 +6,26 @@ using Konscious.Security.Cryptography;
 
 namespace Synclo.Services;
 
-public sealed class CryptographyService
+public interface ICryptographyService
+{
+    string MasterKey { get; }
+    string Salt { get; }
+    string KdfVersion { get; }
+    byte[] DeriveAuthKey(string password, byte[] salt);
+    byte[] DeriveAuthKey(ReadOnlySpan<char> password, byte[] salt);
+    (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(string password, byte[] salt);
+    (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(ReadOnlySpan<char> password, byte[] salt);
+    byte[] GenerateMasterKey();
+    byte[] WrapMasterKey(byte[] masterKey, byte[] wrappingKey);
+    byte[] UnwrapMasterKey(byte[] wrappedMK, byte[] wrappingKey);
+    (byte[] ciphertext, byte[] nonce) EncryptClipboard(string plaintext, byte[] masterKey);
+    string DecryptClipboard(byte[] ciphertext, byte[] nonce, byte[] masterKey);
+    byte[] GenerateNonce(int length = 12);
+    string ToBase64(byte[] data);
+    byte[] FromBase64(string base64);
+}
+
+public sealed class CryptographyService : ICryptographyService
 {
     // -------------------- CONSTANTS --------------------
 

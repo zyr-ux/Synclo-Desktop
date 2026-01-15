@@ -64,11 +64,12 @@ public class App : Application
         {
             var clipboardProvider = sp.GetRequiredService<IClipboardProvider>();
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            var utils=sp.GetRequiredService<IUtils>();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return new ClipboardMonitorWindows(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorWindows>());
+                return new ClipboardMonitorWindows(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorWindows>(),utils);
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>());
-            return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>());
+                return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>(),utils);
+            return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>(),utils);
         });
         collection.AddSingleton<ClipboardSyncService>();
         collection.AddSingleton(new RepositoryConfig

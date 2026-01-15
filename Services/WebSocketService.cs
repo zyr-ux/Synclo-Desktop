@@ -8,7 +8,21 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class WebSocketService : IDisposable
+public interface IWebSocketService : IDisposable
+{
+    bool IsConnected { get; }
+    Task ConnectAsync();
+    Task DisconnectAsync();
+    Task<bool> EnsureConnectedAsync(TimeSpan timeout);
+    Task SendMessageAsync<T>(T message);
+    Task SendAsync(string text);
+    event Action<string>? OnMessageReceived;
+    event Action? OnConnected;
+    event Action? OnDisconnected;
+    event Action<string>? OnError;
+}
+
+public sealed class WebSocketService : IWebSocketService
 {
     private readonly ApiService _apiService;
     private readonly ISecureStorage _secureStorage;

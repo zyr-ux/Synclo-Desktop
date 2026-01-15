@@ -51,30 +51,25 @@ public class AvaloniaClipboardProvider : IClipboardProvider
 /// <summary>
 /// Base class for clipboard monitors with shared polling logic
 /// </summary>
-public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
+public abstract class ClipboardMonitorBase(
+    IClipboardProvider clipboardProvider,
+    ILogger<ClipboardMonitorBase> logger,
+    IUtils utils,
+    int pollingIntervalMs = ClipboardMonitorBase.DefaultPollingIntervalMs)
+    : IClipboardMonitor, IDisposable
 {
     private const int DefaultPollingIntervalMs = 500;
-    private readonly IClipboardProvider _clipboardProvider;
-    protected readonly ILogger<ClipboardMonitorBase> _logger;
+    private readonly IClipboardProvider _clipboardProvider = clipboardProvider ?? throw new ArgumentNullException(nameof(clipboardProvider));
+    private readonly ILogger<ClipboardMonitorBase> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IUtils _utils = utils ?? throw new ArgumentNullException(nameof(utils));
     private CancellationTokenSource? _cts;
     private Task? _monitoringTask;
     private string? _lastClipboardHash;
     private bool _disposed;
-    protected readonly int PollingIntervalMs;
 
     // Implementation of IClipboardMonitor interface members
     public event Action<string>? OnClipboardChanged;
     public bool IsRunning => _cts != null && !_cts.Token.IsCancellationRequested;
-
-    protected ClipboardMonitorBase(
-        IClipboardProvider clipboardProvider, 
-        ILogger<ClipboardMonitorBase> logger,
-        int pollingIntervalMs = DefaultPollingIntervalMs)
-    {
-        _clipboardProvider = clipboardProvider ?? throw new ArgumentNullException(nameof(clipboardProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        PollingIntervalMs = pollingIntervalMs;
-    }
 
     public virtual async Task StartAsync()
     {
@@ -95,7 +90,7 @@ public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
             var clipboardText = await _clipboardProvider.GetTextAsync();
             if (!string.IsNullOrEmpty(clipboardText))
             {
-                _lastClipboardHash = Utils.ComputeHash(clipboardText);
+                _lastClipboardHash = _utils.ComputeHash(clipboardText);
                 _logger.LogInformation("Clipboard hash initialized successfully");
             }
         }
@@ -138,14 +133,14 @@ public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
         {
             try
             {
-                await Task.Delay(PollingIntervalMs, cancellationToken);
+                await Task.Delay(pollingIntervalMs, cancellationToken);
                 
                 // Read clipboard
                 var clipboardText = await _clipboardProvider.GetTextAsync();
                 if (string.IsNullOrEmpty(clipboardText))
                     continue;
                 
-                var currentHash = Utils.ComputeHash(clipboardText);
+                var currentHash = _utils.ComputeHash(clipboardText);
                 if (_lastClipboardHash != currentHash)
                 {
                     _lastClipboardHash = currentHash;
@@ -172,7 +167,7 @@ public abstract class ClipboardMonitorBase : IClipboardMonitor, IDisposable
         {
             if (!string.IsNullOrEmpty(text))
             {
-                _lastClipboardHash = Utils.ComputeHash(text);
+                _lastClipboardHash = _utils.ComputeHash(text);
             }
             
             await _clipboardProvider.SetTextAsync(text);

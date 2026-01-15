@@ -24,6 +24,17 @@ public class ClipboardSyncConfig
     public int MinRefreshIntervalMs { get; set; } = 300;
 }
 
+public interface IClipboardSyncService : IDisposable
+{
+    Task InitializeAsync();
+    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100);
+    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100);
+    Task SetEnabledAsync(bool enabled);
+    Task DeleteClipboardEntryAsync(string clipboardId);
+    Task ShutdownAsync();
+    event Action? OnHistoryUpdated;
+}
+
 /// <summary>
 /// Main background service orchestrating clipboard synchronization.
 /// Handles monitoring, debouncing, and bidirectional sync.
@@ -39,8 +50,9 @@ public class ClipboardSyncService(
     CryptographyService cryptographyService,
     ISecureStorage secureStorage,
     ILogger<ClipboardSyncService> logger,
-    ClipboardSyncConfig config
-    ) : IDisposable
+    ClipboardSyncConfig config,
+    IUtils utils
+    ) : IDisposable, IClipboardSyncService
 {
     private readonly IClipboardMonitor _monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
     private readonly IClipboardApiService _clipboardApiService = clipboardApiService ?? throw new ArgumentNullException(nameof(clipboardApiService));
@@ -52,6 +64,7 @@ public class ClipboardSyncService(
     private readonly ISecureStorage _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
     private readonly ILogger<ClipboardSyncService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ClipboardSyncConfig _config = config ?? throw new ArgumentNullException(nameof(config));
+    private readonly IUtils _utils = utils ?? throw new ArgumentNullException(nameof(utils));
     
     private CancellationTokenSource? _debounceCts;
     private readonly HashSet<string> _inflightEntries = new(); // Track entries being sent to prevent duplicates
@@ -244,7 +257,7 @@ public class ClipboardSyncService(
                 if (entry == null || string.IsNullOrEmpty(entry.id) || string.IsNullOrEmpty(entry.plaintext))
                     continue;
                 
-                var contentHash = Utils.ComputeHash(entry.plaintext);
+                var contentHash = _utils.ComputeHash(entry.plaintext);
                 var existingEntry = await _repository.GetByHashAsync(contentHash);
                 
                 if (existingEntry != null && existingEntry.Id == entry.id)
@@ -254,7 +267,7 @@ public class ClipboardSyncService(
                 var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Utc 
                     ? entry.timestamp 
                     : entry.timestamp.ToUniversalTime();
-                serverTimestamp = Utils.TruncateToMilliseconds(serverTimestamp);
+                serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
                 var createdAt = existingEntry?.CreatedAt ?? serverTimestamp;
                 
                 var dbEntry = new ClipboardDbModel
@@ -385,7 +398,7 @@ public class ClipboardSyncService(
                 return;
             }
             
-            var contentHash = Utils.ComputeHash(content);
+            var contentHash = _utils.ComputeHash(content);
             _logger.LogInformation($"Content hash: {contentHash.Substring(0, 16)}...");
             
             var lastEntries = await _repository.GetAllAsync(1);
@@ -400,7 +413,7 @@ public class ClipboardSyncService(
             // Generate deterministic UUID and Timestamp (Client Authority)
             // Truncate to milliseconds for consistent precision
             var clientId = Guid.NewGuid().ToString();
-            var timestamp = Utils.TruncateToMilliseconds(DateTime.UtcNow);
+            var timestamp = _utils.TruncateToMilliseconds(DateTime.UtcNow);
             
             // Encrypt the content BEFORE saving to database
             var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
@@ -584,7 +597,7 @@ public class ClipboardSyncService(
             var nonce = _cryptographyService.FromBase64(entry.nonce ?? string.Empty);
             
             var plaintext = _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
-            var contentHash = Utils.ComputeHash(plaintext);
+            var contentHash = _utils.ComputeHash(plaintext);
             
             var existingEntry = await _repository.GetByHashAsync(contentHash);
             if (existingEntry != null)
@@ -608,7 +621,7 @@ public class ClipboardSyncService(
             var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Utc 
                 ? entry.timestamp 
                 : entry.timestamp.ToUniversalTime();
-            serverTimestamp = Utils.TruncateToMilliseconds(serverTimestamp);
+            serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
             
             // Save to SQLite
             var dbEntry = new ClipboardDbModel

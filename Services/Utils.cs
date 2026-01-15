@@ -5,7 +5,15 @@ using System.Text;
 
 namespace Synclo.Services;
 
-public sealed class Utils(ISettingsService settingsService)
+public interface IUtils
+{
+    string GetDeviceName();
+    string GetOrCreateDeviceId();
+    string ComputeHash(string content);
+    DateTime TruncateToMilliseconds(DateTime dateTime);
+}
+
+public sealed class Utils(ISettingsService settingsService) : IUtils
 {
     public string GetDeviceName()
     {
@@ -34,14 +42,14 @@ public sealed class Utils(ISettingsService settingsService)
         return newId;
     }
 
-    public static string ComputeHash(string content)
+    public string ComputeHash(string content)
     {
         var bytes = Encoding.UTF8.GetBytes(content);
         var hash = SHA256.HashData(bytes);
         return Convert.ToBase64String(hash);
     }
 
-    public static DateTime TruncateToMilliseconds(DateTime dateTime)
+    public DateTime TruncateToMilliseconds(DateTime dateTime)
     {
         return new DateTime(
             dateTime.Year,

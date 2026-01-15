@@ -12,7 +12,17 @@ using Polly;
 
 namespace Synclo.Services;
 
-public sealed class ApiService : IDisposable
+public interface IApiService : IDisposable
+{
+    Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default);
+    Task<HttpResponseMessage> PostAsync(string url, object body, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteAsync(string url, CancellationToken ct = default);
+    Task Health();
+    StringContent Serialize(object obj);
+    T Deserialize<T>(string json);
+}
+
+public sealed class ApiService : IApiService
 {
     private const string BaseUrl = "https://synclo.zyrux.dev";
     private readonly HttpClient _http;

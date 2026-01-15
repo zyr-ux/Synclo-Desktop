@@ -10,7 +10,16 @@ using Synclo.SecretsManager;
 
 namespace Synclo.Services;
 
-public sealed class DeviceService(ApiService api, ISettingsService settings, ISecureStorage secureStorage)
+public interface IDeviceService
+{
+    Task<List<DeviceModel>> GetDevicesAsync(CancellationToken ct = default);
+    Task DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
+    Task<List<DeviceModel>> LoadAsync();
+    Task SaveAsync(List<DeviceModel> devices);
+    Task ClearAsync();
+}
+
+public sealed class DeviceService(ApiService api, ISettingsService settings, ISecureStorage secureStorage) : IDeviceService
 {
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
