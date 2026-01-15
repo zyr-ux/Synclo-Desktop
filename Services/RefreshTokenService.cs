@@ -17,20 +17,24 @@ public interface IRefreshTokenService
     event Action<string>? TokenRefreshed;
 }
 
-public sealed class RefreshTokenService(HttpClient http, 
+public sealed class RefreshTokenService(
+    HttpClient http,
     ISecureStorage secureStorage,
-    CryptographyService cryptographyService) : IRefreshTokenService
+    ICryptographyService cryptographyService) : IRefreshTokenService
 {
     private const int SupportedKdfVersion = 1;
-    private readonly SemaphoreSlim _refreshLock = new(1, 1);
-    private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
-    
+
+    private readonly ICryptographyService _cryptographyService =
+        cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
+
     // Maintain local JSON options to avoid dependency on ApiService
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true
     };
+
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     public event Action<string>? TokenRefreshed;
 
@@ -44,16 +48,14 @@ public sealed class RefreshTokenService(HttpClient http,
         {
             // 2. Check if the token has already been refreshed by another thread.
             var currentToken = await secureStorage.LoadAsync(AccountService.AccessToken);
-            
+
             // If the token in storage is different from what we had before waiting, 
             // someone else refreshed it. Return the new token.
             if (currentToken != initialToken && !string.IsNullOrWhiteSpace(currentToken))
-            {
                 // Optionally notify here too if we want to be very chatty, but strictly not required
                 // as the 'refresher' would have already notified.
                 return currentToken;
-            }
-            
+
             // 3. Needs refresh. Proceed with logic.
             var refreshToken = await secureStorage.LoadAsync(AccountService.RefreshToken);
             if (string.IsNullOrWhiteSpace(refreshToken))
@@ -66,11 +68,11 @@ public sealed class RefreshTokenService(HttpClient http,
                 using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/refresh")
                 {
                     Content = new StringContent(
-                        JsonSerializer.Serialize(body, _jsonOptions), 
-                        Encoding.UTF8, 
+                        JsonSerializer.Serialize(body, _jsonOptions),
+                        Encoding.UTF8,
                         "application/json")
                 };
-                
+
                 using var res = await http.SendAsync(httpReq, ct);
 
                 if (!res.IsSuccessStatusCode)

@@ -33,7 +33,7 @@ public class App : Application
     {
         var collection = new ServiceCollection();
         collection.AddLogging();
-        
+
         // View models
         collection.AddSingleton<IViewModelFactory, ViewModelFactory>();
         collection.AddSingleton<MainWindowViewModel>();
@@ -43,7 +43,7 @@ public class App : Application
         collection.AddTransient<LoginViewModel>();
         collection.AddTransient<AccountDetailsViewModel>();
         collection.AddTransient<ResetPasswordDialogViewModel>();
-        
+
         // API related services
         collection.AddSingleton<HttpClient>();
         collection.AddSingleton<IApiService, ApiService>();
@@ -51,12 +51,8 @@ public class App : Application
         collection.AddSingleton<IRefreshTokenService, RefreshTokenService>();
         collection.AddSingleton<IAccountService, AccountService>();
         collection.AddSingleton<IWebSocketService, WebSocketService>();
-        collection.AddSingleton(new ApiConfig
-        {
-            ApiTimeoutSeconds = 30
-        });
         collection.AddSingleton<IClipboardApiService, ClipboardApiService>();
-        
+
         // Other related services
         collection.AddSingleton<ICryptographyService, CryptographyService>();
         collection.AddSingleton<ISettingsService, SettingsService>();
@@ -64,52 +60,44 @@ public class App : Application
         collection.AddSingleton<DialogService.IDialogService, DialogService>();
         collection.AddSingleton<IThemeService, ThemeService>();
         collection.AddSingleton<IUtils, Utils>();
-        
+
         // Clipboard subsystem (dependant services)
         collection.AddSingleton<IClipboardRepository, ClipboardRepository>();
         collection.AddSingleton<IClipboardProvider, AvaloniaClipboardProvider>();
-        collection.AddSingleton<IClipboardMonitor>(sp => 
+        collection.AddSingleton<IClipboardMonitor>(sp =>
         {
             var clipboardProvider = sp.GetRequiredService<IClipboardProvider>();
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var utils=sp.GetRequiredService<IUtils>();
+            var utils = sp.GetRequiredService<IUtils>();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return new ClipboardMonitorWindows(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorWindows>(),utils);
+                return new ClipboardMonitorWindows(clipboardProvider,
+                    loggerFactory.CreateLogger<ClipboardMonitorWindows>(), utils);
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>(),utils);
-            return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>(),utils);
+                return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>(),
+                    utils);
+            return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>(),
+                utils);
         });
         collection.AddSingleton<IClipboardSyncService, ClipboardSyncService>();
-        collection.AddSingleton(new RepositoryConfig
+        collection.AddSingleton<IStartupManager>(_ =>
         {
-            DefaultHistoryLimit = 100
-        });
-        collection.AddSingleton(new ClipboardSyncConfig
-        {
-            DebounceDelayMs = 500,
-            InactivityThresholdDays = 14,
-            DefaultHistoryLimit = 100,
-            DefaultSyncPageSize = 50,
-            ShutdownTimeoutSeconds = 5,
-            MinRefreshIntervalMs = 300
-        });
-        collection.AddSingleton<IStartupManager>(_ => {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return new StartupManagerWindows();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 return new StartupManagerMacOS();
             return new StartupManagerLinux();
         });
-        
+
         // Startup subsystem
-        collection.AddSingleton<ISecureStorage>(_ => {
+        collection.AddSingleton<ISecureStorage>(_ =>
+        {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return new SecureStorageWindows();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 return new SecureStorageMacOS();
             return new SecureStorageLinux();
         });
-        
+
         var services = collection.BuildServiceProvider();
 
         var apiService = services.GetRequiredService<IApiService>();
@@ -118,7 +106,7 @@ public class App : Application
         var settingsService = services.GetRequiredService<ISettingsService>();
         var themeService = services.GetRequiredService<IThemeService>();
         themeService.ApplyTheme(settingsService.Settings.Theme);
-        
+
         // Initialize clipboard subsystem with proper sequencing
         var clipboardRepository = services.GetRequiredService<IClipboardRepository>();
         var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
@@ -127,47 +115,44 @@ public class App : Application
             await clipboardRepository.InitializeAsync();
             await clipboardSyncService.InitializeAsync();
         });
-        
-        // Event handlers
-        // apiService.OnTokenExpired is removed as ApiService now uses IRefreshTokenService internally
 
         accountService.OnLogout += webSocketService.DisconnectAsync;
-        
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-{
-    DisableAvaloniaDataAnnotationValidation();
+        {
+            DisableAvaloniaDataAnnotationValidation();
 
-    var mainVM = services.GetRequiredService<MainWindowViewModel>();
+            var mainVm = services.GetRequiredService<MainWindowViewModel>();
 
-    var mainWindow = new MainWindow
-    {
-        DataContext = mainVM
-    };
+            var mainWindow = new MainWindow
+            {
+                DataContext = mainVm
+            };
 
-    // ✅ Initialize notification manager BEFORE VM startup
-    var notificationService = services.GetRequiredService<INotificationService>();
+            // ✅ Initialize notification manager BEFORE VM startup
+            var notificationService = services.GetRequiredService<INotificationService>();
 
-    var notificationManager = new WindowNotificationManager(mainWindow)
-    {
-        Position = NotificationPosition.TopRight,
-        MaxItems = 3
-    };
+            var notificationManager = new WindowNotificationManager(mainWindow)
+            {
+                Position = NotificationPosition.TopRight,
+                MaxItems = 3
+            };
 
-    notificationService.SetManager(notificationManager);
+            notificationService.SetManager(notificationManager);
 
-    desktop.MainWindow = mainWindow;
+            desktop.MainWindow = mainWindow;
 
-    // ✅ Now it's safe to initialize the VM
-    Dispatcher.UIThread.InvokeAsync(mainVM.InitializeApplicationAsync);
+            // ✅ Now it's safe to initialize the VM
+            Dispatcher.UIThread.InvokeAsync(mainVm.InitializeApplicationAsync);
 
-    desktop.Exit += async (_, _) =>
-    {
-        await clipboardSyncService.ShutdownAsync();
-        webSocketService.Dispose();
-        apiService.Dispose();
-        mainVM.Dispose();
-    };
-}
+            desktop.Exit += async (_, _) =>
+            {
+                await clipboardSyncService.ShutdownAsync();
+                webSocketService.Dispose();
+                apiService.Dispose();
+                mainVm.Dispose();
+            };
+        }
 
 
         base.OnFrameworkInitializationCompleted();

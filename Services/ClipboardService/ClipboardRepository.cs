@@ -6,8 +6,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
-using Synclo.Models;
 using Microsoft.Extensions.Logging;
+using Synclo.Models;
 
 namespace Synclo.Services.ClipboardService;
 
@@ -27,30 +27,31 @@ public interface IClipboardRepository
 
 public sealed class ClipboardRepository : IClipboardRepository, IDisposable
 {
-    private readonly string _dbPath;
-    private readonly ILogger<ClipboardRepository> _logger;
-    private readonly RepositoryConfig _config;
-    
-    private bool _disposed;
-    
+    private const int DefaultHistoryLimit = 100;
+
     // Task Scheduling
     private static readonly TaskScheduler _dbScheduler =
         new ConcurrentExclusiveSchedulerPair(TaskScheduler.Default, 1).ExclusiveScheduler;
+
     private static readonly TaskFactory _db =
         new(CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskContinuationOptions.None, _dbScheduler);
-    
-    public event Action? OnDataChanged;
 
-    public ClipboardRepository(ILogger<ClipboardRepository> logger, RepositoryConfig config)
+    private readonly string _dbPath;
+    private readonly ILogger<ClipboardRepository> _logger;
+
+    private bool _disposed;
+
+    public ClipboardRepository(ILogger<ClipboardRepository> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-        
+
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var dir = Path.Combine(appDataPath, "Synclo");
         Directory.CreateDirectory(dir);
         _dbPath = Path.Combine(dir, "clipboard.db");
     }
+
+    public event Action? OnDataChanged;
 
     public Task InitializeAsync()
     {
@@ -60,9 +61,9 @@ public sealed class ClipboardRepository : IClipboardRepository, IDisposable
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 await VerifyWALModeAsync(connection).ConfigureAwait(false);
-                
+
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 PRAGMA journal_mode=WAL;
@@ -84,7 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
 CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
 ";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
+
                 _logger.LogInformation("Database initialized successfully. WAL mode verified.");
             }
             catch (Exception ex)
@@ -93,31 +94,6 @@ CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
                 throw;
             }
         }).Unwrap();
-    }
-
-    private async Task VerifyWALModeAsync(SqliteConnection connection)
-    {
-        try
-        {
-            var cmd = connection.CreateCommand();
-            cmd.CommandText = "PRAGMA journal_mode";
-            var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
-        
-            // Fixed: Handle null result and proper string comparison
-            if (result == null || !string.Equals(result.ToString(), "wal", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogWarning($"WAL mode not enabled. Current mode: {result?.ToString() ?? "null"}. This may impact concurrency performance.");
-            }
-            else
-            {
-                _logger.LogInformation("WAL mode enabled successfully");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to verify WAL mode");
-            throw;
-        }
     }
 
     // ---------------------------------------------------------
@@ -129,7 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
     public Task<List<ClipboardDbModel>> GetAllAsync()
     {
         // Default to a reasonable limit (e.g. 100) to satisfy the interface safely
-        return GetAllAsync(_config.DefaultHistoryLimit, 0);
+        return GetAllAsync(DefaultHistoryLimit);
     }
 
     public Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0)
@@ -140,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
@@ -151,14 +127,11 @@ LIMIT $limit OFFSET $offset
 ";
                 cmd.Parameters.AddWithValue("$limit", limit);
                 cmd.Parameters.AddWithValue("$offset", offset);
-                
+
                 var list = new List<ClipboardDbModel>();
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    list.Add(MapFromReader(reader));
-                }
-                
+                while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(MapFromReader(reader));
+
                 return list;
             }
             catch (Exception ex)
@@ -177,16 +150,13 @@ LIMIT $limit OFFSET $offset
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "SELECT * FROM clipboard_entries WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
-                
+
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                if (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    return MapFromReader(reader);
-                }
+                if (await reader.ReadAsync().ConfigureAwait(false)) return MapFromReader(reader);
                 return null;
             }
             catch (Exception ex)
@@ -205,16 +175,13 @@ LIMIT $limit OFFSET $offset
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "SELECT * FROM clipboard_entries WHERE content_hash = $hash LIMIT 1";
                 cmd.Parameters.AddWithValue("$hash", hash);
-                
+
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                if (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    return MapFromReader(reader);
-                }
+                if (await reader.ReadAsync().ConfigureAwait(false)) return MapFromReader(reader);
                 return null;
             }
             catch (Exception ex)
@@ -226,12 +193,11 @@ LIMIT $limit OFFSET $offset
     }
 
 
-
     // ---------------------------------------------------------
     // WRITES
     // ---------------------------------------------------------
     /// <summary>
-    /// Insert or update a single clipboard entry (convenience method)
+    ///     Insert or update a single clipboard entry (convenience method)
     /// </summary>
     public Task UpsertAsync(ClipboardDbModel entry)
     {
@@ -243,43 +209,43 @@ LIMIT $limit OFFSET $offset
             throw new ArgumentException("Entry Content cannot be null or empty", nameof(entry));
         if (string.IsNullOrEmpty(entry.ContentHash))
             throw new ArgumentException("Entry ContentHash cannot be null or empty", nameof(entry));
-        
+
         return UpsertAsync(new[] { entry });
     }
 
     /// <summary>
-    /// Insert or update multiple clipboard entries with optimized batching.
-    /// Fires a single event after all changes complete.
+    ///     Insert or update multiple clipboard entries with optimized batching.
+    ///     Fires a single event after all changes complete.
     /// </summary>
     public Task UpsertAsync(IEnumerable<ClipboardDbModel> entries)
     {
         if (entries == null)
             throw new ArgumentNullException(nameof(entries));
-        
+
         var entryList = entries.ToList();
         if (entryList.Count == 0)
             return Task.CompletedTask;
-        
+
         // Validate all entries
         foreach (var entry in entryList)
         {
             if (entry == null)
                 throw new ArgumentException("Entry collection contains null entry", nameof(entries));
             if (string.IsNullOrEmpty(entry.Id))
-                throw new ArgumentException($"Entry with null/empty ID found", nameof(entries));
+                throw new ArgumentException("Entry with null/empty ID found", nameof(entries));
             if (string.IsNullOrEmpty(entry.Content))
                 throw new ArgumentException($"Entry {entry.Id} has null/empty Content", nameof(entries));
             if (string.IsNullOrEmpty(entry.ContentHash))
                 throw new ArgumentException($"Entry {entry.Id} has null/empty ContentHash", nameof(entries));
         }
-        
+
         return _db.StartNew((Func<Task>)(async () =>
         {
             try
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 using var tx = connection.BeginTransaction();
                 foreach (var entry in entryList)
                 {
@@ -292,8 +258,9 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
                     AddParams(cmd, entry);
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
+
                 tx.Commit();
-                
+
                 NotifyObservers();
             }
             catch (Exception ex)
@@ -313,12 +280,12 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "DELETE FROM clipboard_entries WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
+
                 NotifyObservers();
             }
             catch (Exception ex)
@@ -337,11 +304,11 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
             {
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
-                
+
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = "DELETE FROM clipboard_entries";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                
+
                 NotifyObservers();
             }
             catch (Exception ex)
@@ -350,6 +317,34 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
                 throw;
             }
         })).Unwrap();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+    }
+
+    private async Task VerifyWALModeAsync(SqliteConnection connection)
+    {
+        try
+        {
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA journal_mode";
+            var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+
+            // Fixed: Handle null result and proper string comparison
+            if (result == null || !string.Equals(result.ToString(), "wal", StringComparison.OrdinalIgnoreCase))
+                _logger.LogWarning(
+                    $"WAL mode not enabled. Current mode: {result?.ToString() ?? "null"}. This may impact concurrency performance.");
+            else
+                _logger.LogInformation("WAL mode enabled successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify WAL mode");
+            throw;
+        }
     }
 
     // ---------------------------------------------------------
@@ -391,18 +386,4 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
             CreatedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture)
         };
     }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-    }
-}
-
-/// <summary>
-/// Configuration for repository settings
-/// </summary>
-public class RepositoryConfig
-{
-    public int DefaultHistoryLimit { get; set; } = 100;
 }

@@ -1,15 +1,14 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Synclo.Models;
 using Microsoft.Extensions.Logging;
+using Synclo.Models;
 using Synclo.Services.SecretsManager;
 
 namespace Synclo.Services.ClipboardService;
 
 public interface IClipboardApiService
 {
-
     Task<string> GetLatestClipboardAsync();
     Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
@@ -17,33 +16,37 @@ public interface IClipboardApiService
 }
 
 public class ClipboardApiService(
-    ApiService api,
-    CryptographyService cryptographyService,
+    IApiService api,
+    ICryptographyService cryptographyService,
     ISecureStorage secureStorage,
-    ILogger<ClipboardApiService> logger,
-    ApiConfig config)
+    ILogger<ClipboardApiService> logger)
     : IClipboardApiService
 {
-    private readonly ApiService _api = api ?? throw new ArgumentNullException(nameof(api));
-    private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
-    private readonly ISecureStorage _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+    private const int ApiTimeoutSeconds = 30;
+    private readonly IApiService _api = api ?? throw new ArgumentNullException(nameof(api));
+
+    private readonly ICryptographyService _cryptographyService =
+        cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
+
     private readonly ILogger<ClipboardApiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly ApiConfig _config = config ?? throw new ArgumentNullException(nameof(config));
+
+    private readonly ISecureStorage _secureStorage =
+        secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
 
 
     public async Task<string> GetLatestClipboardAsync()
     {
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.ApiTimeoutSeconds));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
             var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
-            
+
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             var response = await _api.GetAsync("/api/clipboard", cts.Token);
             response.EnsureSuccessStatusCode();
-            
+
             var json = await response.Content.ReadAsStringAsync();
             var entry = _api.Deserialize<ClipboardEntry>(json);
             return DecryptClipboardEntry(entry, masterKey);
@@ -59,23 +62,20 @@ public class ClipboardApiService(
     {
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.ApiTimeoutSeconds));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
             var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
-            
+
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}", cts.Token);
             response.EnsureSuccessStatusCode();
-            
+
             var json = await response.Content.ReadAsStringAsync();
             var historyResponse = _api.Deserialize<ClipboardHistoryResponse>(json);
-            
-            foreach (var entry in historyResponse.history)
-            {
-                entry.plaintext = DecryptClipboardEntry(entry, masterKey);
-            }
-            
+
+            foreach (var entry in historyResponse.history) entry.plaintext = DecryptClipboardEntry(entry, masterKey);
+
             return historyResponse;
         }
         catch (Exception ex)
@@ -91,17 +91,17 @@ public class ClipboardApiService(
         {
             if (string.IsNullOrEmpty(clipboardId))
                 throw new ArgumentException("Clipboard ID cannot be null or empty", nameof(clipboardId));
-            
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.ApiTimeoutSeconds));
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
             var response = await _api.DeleteAsync($"/api/clipboard/{clipboardId}", cts.Token);
             response.EnsureSuccessStatusCode();
-            
+
             var json = await response.Content.ReadAsStringAsync();
             var deleteResponse = _api.Deserialize<ClipboardDeleteResponse>(json);
-            
+
             if (deleteResponse == null)
                 throw new InvalidOperationException("Server returned null response");
-            
+
             return deleteResponse;
         }
         catch (Exception ex)
@@ -111,25 +111,20 @@ public class ClipboardApiService(
         }
     }
 
+    public T Deserialize<T>(string json)
+    {
+        return _api.Deserialize<T>(json);
+    }
+
     private string DecryptClipboardEntry(ClipboardEntry entry, byte[] masterKey)
     {
         if (entry == null)
             throw new ArgumentNullException(nameof(entry));
         if (masterKey == null)
             throw new ArgumentNullException(nameof(masterKey));
-        
+
         var ciphertext = _cryptographyService.FromBase64(entry.ciphertext ?? string.Empty);
         var nonce = _cryptographyService.FromBase64(entry.nonce ?? string.Empty);
         return _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
     }
-
-    public T Deserialize<T>(string json)
-    {
-        return _api.Deserialize<T>(json);
-    }
-}
-
-public class ApiConfig
-{
-    public int ApiTimeoutSeconds { get; set; } = 30;
 }
