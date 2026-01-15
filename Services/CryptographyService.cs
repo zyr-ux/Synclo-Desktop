@@ -21,14 +21,14 @@ public sealed class CryptographyService
     private const byte WrapFormatVersion = 1;
     private const byte KdfVersionValue = 1;
 
-    private static readonly byte[] ClipboardAad = "clipboard_v1"u8.ToArray();
-    private static readonly byte[] WrapAad = "wrap_mk_v1"u8.ToArray();
-    private static readonly byte[] HkdfSaltLabel = "hkdf_salt_v1"u8.ToArray();
+    private readonly byte[] ClipboardAad = "clipboard_v1"u8.ToArray();
+    private readonly byte[] WrapAad = "wrap_mk_v1"u8.ToArray();
+    private readonly byte[] HkdfSaltLabel = "hkdf_salt_v1"u8.ToArray();
 
     // Secure storage keys
-    public static string MasterKey => $"{AccountService.Prefix}.crypto.master_key";
-    public static string Salt => $"{AccountService.Prefix}.crypto.salt";
-    public static string KdfVersion => $"{AccountService.Prefix}.crypto.kdf_version";
+    public string MasterKey => $"{AccountService.Prefix}.crypto.master_key";
+    public string Salt => $"{AccountService.Prefix}.crypto.salt";
+    public string KdfVersion => $"{AccountService.Prefix}.crypto.kdf_version";
 
     // -------------------- PASSWORD DERIVATION --------------------
 
@@ -87,10 +87,10 @@ public sealed class CryptographyService
         }
     }
 
-    private static byte[] BuildInfo(string purpose)
+    private byte[] BuildInfo(string purpose)
         => Encoding.UTF8.GetBytes($"{purpose}|kdf_v{KdfVersionValue}");
 
-    private static byte[] DeriveHkdfSalt(byte[] argonSalt)
+    private byte[] DeriveHkdfSalt(byte[] argonSalt)
     {
         using var sha = SHA256.Create();
         sha.TransformBlock(HkdfSaltLabel, 0, HkdfSaltLabel.Length, null, 0);
@@ -98,7 +98,7 @@ public sealed class CryptographyService
         return sha.Hash!;
     }
 
-    private static byte[] DeriveBaseKey(ReadOnlySpan<char> password, byte[] salt)
+    private byte[] DeriveBaseKey(ReadOnlySpan<char> password, byte[] salt)
     {
         var maxBytes = Encoding.UTF8.GetMaxByteCount(password.Length);
         var rented = ArrayPool<byte>.Shared.Rent(maxBytes);
@@ -297,10 +297,10 @@ public sealed class CryptographyService
         return RandomNumberGenerator.GetBytes(length);
     }
 
-    public static string ToBase64Static(byte[] data)
+    public string ToBase64(byte[] data)
         => Convert.ToBase64String(data ?? throw new ArgumentNullException(nameof(data)));
 
-    public static byte[] FromBase64Static(string base64)
+    public byte[] FromBase64(string base64)
         => Convert.FromBase64String(
             string.IsNullOrWhiteSpace(base64)
                 ? throw new ArgumentException("Base64 cannot be empty", nameof(base64))

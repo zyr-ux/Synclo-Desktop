@@ -16,28 +16,19 @@ public interface IClipboardApiService
     T Deserialize<T>(string json);
 }
 
-public class ClipboardApiService : IClipboardApiService
+public class ClipboardApiService(
+    ApiService api,
+    CryptographyService cryptographyService,
+    ISecureStorage secureStorage,
+    ILogger<ClipboardApiService> logger,
+    ApiConfig config)
+    : IClipboardApiService
 {
-    private readonly ApiService _api;
-    private readonly CryptographyService _cryptographyService;
-    private readonly ISecureStorage _secureStorage;
-    private readonly ILogger<ClipboardApiService> _logger;
-    private readonly ApiConfig _config;
-
-    public ClipboardApiService(
-        ApiService api, 
-        CryptographyService cryptographyService, 
-        ISecureStorage secureStorage,
-        ILogger<ClipboardApiService> logger,
-        ApiConfig config)
-    {
-        _api = api ?? throw new ArgumentNullException(nameof(api));
-        _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
-        _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-    }
-
+    private readonly ApiService _api = api ?? throw new ArgumentNullException(nameof(api));
+    private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
+    private readonly ISecureStorage _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+    private readonly ILogger<ClipboardApiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ApiConfig _config = config ?? throw new ArgumentNullException(nameof(config));
 
 
     public async Task<string> GetLatestClipboardAsync()
@@ -45,11 +36,11 @@ public class ClipboardApiService : IClipboardApiService
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
             
-            var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
+            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             var response = await _api.GetAsync("/api/clipboard", cts.Token);
             response.EnsureSuccessStatusCode();
             
@@ -69,11 +60,11 @@ public class ClipboardApiService : IClipboardApiService
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
             
-            var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
+            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}", cts.Token);
             response.EnsureSuccessStatusCode();
             
@@ -127,8 +118,8 @@ public class ClipboardApiService : IClipboardApiService
         if (masterKey == null)
             throw new ArgumentNullException(nameof(masterKey));
         
-        var ciphertext = CryptographyService.FromBase64Static(entry.ciphertext ?? string.Empty);
-        var nonce = CryptographyService.FromBase64Static(entry.nonce ?? string.Empty);
+        var ciphertext = _cryptographyService.FromBase64(entry.ciphertext ?? string.Empty);
+        var nonce = _cryptographyService.FromBase64(entry.nonce ?? string.Empty);
         return _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
     }
 

@@ -17,10 +17,13 @@ public interface IRefreshTokenService
     event Action<string>? TokenRefreshed;
 }
 
-public sealed class RefreshTokenService(HttpClient http, ISecureStorage secureStorage) : IRefreshTokenService
+public sealed class RefreshTokenService(HttpClient http, 
+    ISecureStorage secureStorage,
+    CryptographyService cryptographyService) : IRefreshTokenService
 {
     private const int SupportedKdfVersion = 1;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private readonly CryptographyService _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
     
     // Maintain local JSON options to avoid dependency on ApiService
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -108,11 +111,11 @@ public sealed class RefreshTokenService(HttpClient http, ISecureStorage secureSt
                 await secureStorage.SaveAsync(AccountService.RefreshToken, data.refresh_token);
 
                 if (!string.IsNullOrWhiteSpace(data.salt))
-                    await secureStorage.SaveAsync(CryptographyService.Salt, data.salt);
+                    await secureStorage.SaveAsync(_cryptographyService.Salt, data.salt);
 
                 if (data.kdf_version.HasValue)
                     await secureStorage.SaveAsync(
-                        CryptographyService.KdfVersion,
+                        _cryptographyService.KdfVersion,
                         data.kdf_version.Value.ToString());
 
                 // Notify listeners (e.g., WebSocketService) that a new token is available
@@ -136,8 +139,8 @@ public sealed class RefreshTokenService(HttpClient http, ISecureStorage secureSt
         await secureStorage.DeleteAsync(AccountService.AccessToken);
         await secureStorage.DeleteAsync(AccountService.RefreshToken);
         await secureStorage.DeleteAsync(AccountService.UserEmail);
-        await secureStorage.DeleteAsync(CryptographyService.MasterKey);
-        await secureStorage.DeleteAsync(CryptographyService.Salt);
-        await secureStorage.DeleteAsync(CryptographyService.KdfVersion);
+        await secureStorage.DeleteAsync(_cryptographyService.MasterKey);
+        await secureStorage.DeleteAsync(_cryptographyService.Salt);
+        await secureStorage.DeleteAsync(_cryptographyService.KdfVersion);
     }
 }

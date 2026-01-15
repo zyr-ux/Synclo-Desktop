@@ -41,7 +41,7 @@ public sealed class AccountService(
     // -------------------- KDF ENFORCEMENT --------------------
     public async Task EnforceLocalKdfVersionAsync()
     {
-        var stored = await secureStorage.LoadAsync(CryptographyService.KdfVersion);
+        var stored = await secureStorage.LoadAsync(cryptographyService.KdfVersion);
 
         if (string.IsNullOrWhiteSpace(stored))
             return;
@@ -72,7 +72,7 @@ public sealed class AccountService(
                     $"but this app only supports version {SupportedKdfVersion}. Please update.");
             }
 
-            var salt = CryptographyService.FromBase64Static(saltResponse.salt);
+            var salt = cryptographyService.FromBase64(saltResponse.salt);
 
             var (authKey, wrappingKey) =
                 cryptographyService.DerivePasswordKeys(password, salt);
@@ -80,7 +80,7 @@ public sealed class AccountService(
             var req = new LoginRequest
             {
                 email = email,
-                auth_key = CryptographyService.ToBase64Static(authKey),
+                auth_key = cryptographyService.ToBase64(authKey),
                 device_id = utils.GetOrCreateDeviceId(),
                 device_name = utils.GetDeviceName()
             };
@@ -107,7 +107,7 @@ public sealed class AccountService(
                 throw new ServerFailureException("Missing auth data");
 
             var wrappedMk =
-                CryptographyService.FromBase64Static(data.encrypted_master_key);
+                cryptographyService.FromBase64(data.encrypted_master_key);
 
             var masterKey =
                 cryptographyService.UnwrapMasterKey(wrappedMk, wrappingKey);
@@ -116,14 +116,14 @@ public sealed class AccountService(
             await secureStorage.SaveAsync(RefreshToken, data.refresh_token);
             await secureStorage.SaveAsync(UserEmail, email);
             await secureStorage.SaveAsync(
-                CryptographyService.MasterKey,
-                CryptographyService.ToBase64Static(masterKey));
+                cryptographyService.MasterKey,
+                cryptographyService.ToBase64(masterKey));
             await secureStorage.SaveAsync(
-                CryptographyService.KdfVersion,
+                cryptographyService.KdfVersion,
                 SupportedKdfVersion.ToString());
 
             if (!string.IsNullOrWhiteSpace(data.salt))
-                await secureStorage.SaveAsync(CryptographyService.Salt, data.salt);
+                await secureStorage.SaveAsync(cryptographyService.Salt, data.salt);
 
             settings.Settings.device_id = req.device_id;
             settings.Settings.device_name = req.device_name;
@@ -164,9 +164,9 @@ public sealed class AccountService(
             var req = new RegisterRequest
             {
                 email = email,
-                auth_key = CryptographyService.ToBase64Static(authKey),
-                encrypted_master_key = CryptographyService.ToBase64Static(wrappedMk),
-                salt = CryptographyService.ToBase64Static(salt),
+                auth_key = cryptographyService.ToBase64(authKey),
+                encrypted_master_key = cryptographyService.ToBase64(wrappedMk),
+                salt = cryptographyService.ToBase64(salt),
                 kdf_version = SupportedKdfVersion,
                 device_id = utils.GetOrCreateDeviceId(),
                 device_name = utils.GetDeviceName()
@@ -198,13 +198,13 @@ public sealed class AccountService(
             await secureStorage.SaveAsync(RefreshToken, data.refresh_token);
             await secureStorage.SaveAsync(UserEmail, email);
             await secureStorage.SaveAsync(
-                CryptographyService.MasterKey,
-                CryptographyService.ToBase64Static(masterKey));
+                cryptographyService.MasterKey,
+                cryptographyService.ToBase64(masterKey));
             await secureStorage.SaveAsync(
-                CryptographyService.Salt,
-                CryptographyService.ToBase64Static(salt));
+                cryptographyService.Salt,
+                cryptographyService.ToBase64(salt));
             await secureStorage.SaveAsync(
-                CryptographyService.KdfVersion,
+                cryptographyService.KdfVersion,
                 SupportedKdfVersion.ToString());
 
             settings.Settings.device_id = req.device_id;
@@ -233,15 +233,15 @@ public sealed class AccountService(
             string.IsNullOrWhiteSpace(newPassword))
             throw new InvalidRequestException("Passwords are required");
 
-        var storedSalt = await secureStorage.LoadAsync(CryptographyService.Salt);
-        var storedMk = await secureStorage.LoadAsync(CryptographyService.MasterKey);
+        var storedSalt = await secureStorage.LoadAsync(cryptographyService.Salt);
+        var storedMk = await secureStorage.LoadAsync(cryptographyService.MasterKey);
 
         if (string.IsNullOrWhiteSpace(storedSalt) ||
             string.IsNullOrWhiteSpace(storedMk))
             throw new SessionExpiredException();
 
-        var salt = CryptographyService.FromBase64Static(storedSalt);
-        var masterKey = CryptographyService.FromBase64Static(storedMk);
+        var salt = cryptographyService.FromBase64(storedSalt);
+        var masterKey = cryptographyService.FromBase64(storedMk);
 
         var (oldAuthKey, _) =
             cryptographyService.DerivePasswordKeys(currentPassword, salt);
@@ -255,10 +255,10 @@ public sealed class AccountService(
 
         var req = new PasswordChangeRequest
         {
-            old_auth_key = CryptographyService.ToBase64Static(oldAuthKey),
-            new_auth_key = CryptographyService.ToBase64Static(newAuthKey),
-            new_encrypted_master_key = CryptographyService.ToBase64Static(newWrappedMk),
-            new_salt = CryptographyService.ToBase64Static(newSalt),
+            old_auth_key = cryptographyService.ToBase64(oldAuthKey),
+            new_auth_key = cryptographyService.ToBase64(newAuthKey),
+            new_encrypted_master_key = cryptographyService.ToBase64(newWrappedMk),
+            new_salt = cryptographyService.ToBase64(newSalt),
             new_kdf_version = SupportedKdfVersion
         };
 
@@ -281,10 +281,10 @@ public sealed class AccountService(
             throw new ServerFailureException(content);
 
         await secureStorage.SaveAsync(
-            CryptographyService.Salt,
-            CryptographyService.ToBase64Static(newSalt));
+            cryptographyService.Salt,
+            cryptographyService.ToBase64(newSalt));
         await secureStorage.SaveAsync(
-            CryptographyService.KdfVersion,
+            cryptographyService.KdfVersion,
             SupportedKdfVersion.ToString());
     }
 
@@ -317,9 +317,9 @@ public sealed class AccountService(
         await secureStorage.DeleteAsync(AccessToken);
         await secureStorage.DeleteAsync(RefreshToken);
         await secureStorage.DeleteAsync(UserEmail);
-        await secureStorage.DeleteAsync(CryptographyService.MasterKey);
-        await secureStorage.DeleteAsync(CryptographyService.Salt);
-        await secureStorage.DeleteAsync(CryptographyService.KdfVersion);
+        await secureStorage.DeleteAsync(cryptographyService.MasterKey);
+        await secureStorage.DeleteAsync(cryptographyService.Salt);
+        await secureStorage.DeleteAsync(cryptographyService.KdfVersion);
 
         await deviceService.ClearAsync();
     }

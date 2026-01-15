@@ -112,7 +112,7 @@ public class ClipboardSyncService(
             _logger.LogInformation("Event subscriptions completed");
 
             // Connect WebSocket if user is authenticated
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogInformation("User is authenticated, ensuring WebSocket connection");
@@ -220,7 +220,7 @@ public class ClipboardSyncService(
     {
         try
         {
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
             if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogInformation("Sync skipped: User not logged in");
@@ -403,14 +403,14 @@ public class ClipboardSyncService(
             var timestamp = Utils.TruncateToMilliseconds(DateTime.UtcNow);
             
             // Encrypt the content BEFORE saving to database
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
             if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogWarning("Master key not found - cannot encrypt clipboard content");
                 return;
             }
             
-            var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
+            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
             
             // Save to SQLite with encrypted data
@@ -419,8 +419,8 @@ public class ClipboardSyncService(
                 Id = clientId,
                 Content = content,
                 ContentHash = contentHash,
-                Ciphertext = CryptographyService.ToBase64Static(ciphertext),
-                Nonce = CryptographyService.ToBase64Static(nonce),
+                Ciphertext = _cryptographyService.ToBase64(ciphertext),
+                Nonce = _cryptographyService.ToBase64(nonce),
                 BlobVersion = _settingsService.Settings.blob_version,
                 CreatedAt = timestamp
             };
@@ -478,14 +478,14 @@ public class ClipboardSyncService(
                         _logger.LogInformation($"Sending clipboard entry via WebSocket: {entry.Id}");
                         
                         // Encrypt the content
-                        var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
+                        var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
                         if (string.IsNullOrEmpty(masterKeyBase64))
                         {
                             _logger.LogWarning("Master key not found - cannot encrypt clipboard content");
                             return;
                         }
                         
-                        var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
+                        var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
                         var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(entry.Content, masterKey);
                         
                         // Create the sync request with ORIGINAL ID and timestamp
@@ -493,8 +493,8 @@ public class ClipboardSyncService(
                         {
                             id = entry.Id, // ✅ Reuse original ID
                             timestamp = entry.CreatedAt, // ✅ Reuse original timestamp
-                            ciphertext = CryptographyService.ToBase64Static(ciphertext),
-                            nonce = CryptographyService.ToBase64Static(nonce),
+                            ciphertext = _cryptographyService.ToBase64(ciphertext),
+                            nonce = _cryptographyService.ToBase64(nonce),
                             blob_version = entry.BlobVersion
                         };
                         
@@ -572,16 +572,16 @@ public class ClipboardSyncService(
             }
             
             // Decrypt content
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogWarning("Master key not found - cannot decrypt clipboard content");
                 return;
             }
             
-            var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
-            var ciphertext = CryptographyService.FromBase64Static(entry.ciphertext ?? string.Empty);
-            var nonce = CryptographyService.FromBase64Static(entry.nonce ?? string.Empty);
+            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
+            var ciphertext = _cryptographyService.FromBase64(entry.ciphertext ?? string.Empty);
+            var nonce = _cryptographyService.FromBase64(entry.nonce ?? string.Empty);
             
             var plaintext = _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
             var contentHash = Utils.ComputeHash(plaintext);
