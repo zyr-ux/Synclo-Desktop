@@ -17,7 +17,8 @@ public sealed class AccountService(
     CryptographyService cryptographyService,
     ISecureStorage secureStorage,
     Utils utils,
-    IRefreshTokenService refreshTokenService)
+    IRefreshTokenService refreshTokenService,
+    WebSocketService webSocketService)
 {
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
@@ -130,6 +131,9 @@ public sealed class AccountService(
 
             // Notify subscribers (e.g., ClipboardSyncService) of successful login
             if (OnLogin != null) await OnLogin.Invoke();
+            
+            // Connect WebSocket for real-time sync
+            _ = webSocketService.ConnectAsync();
         }
         catch (InvalidRequestException) { throw; }
         catch (InvalidCredentialsException) { throw; }
@@ -209,6 +213,9 @@ public sealed class AccountService(
 
             // Notify subscribers (e.g., ClipboardSyncService) of successful registration
             if (OnLogin != null) await OnLogin.Invoke();
+            
+            // Connect WebSocket for real-time sync
+            _ = webSocketService.ConnectAsync();
         }
         catch (InvalidRequestException) { throw; }
         catch (UserAlreadyExistsException) { throw; }

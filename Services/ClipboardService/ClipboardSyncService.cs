@@ -54,6 +54,8 @@ public class ClipboardSyncService(
     private readonly ClipboardSyncConfig _config = config ?? throw new ArgumentNullException(nameof(config));
     
     private CancellationTokenSource? _debounceCts;
+    private readonly HashSet<string> _inflightEntries = new(); // Track entries being sent to prevent duplicates
+    private readonly SemaphoreSlim _inflightLock = new(1, 1);
     
     private readonly AsyncRetryPolicy _retryPolicy = Policy
         .Handle<Exception>()
@@ -103,17 +105,27 @@ public class ClipboardSyncService(
             // Subscribe to events
             _monitor.OnClipboardChanged += OnClipboardChanged;
             _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
+            _webSocketService.OnConnected += OnWebSocketConnected;
+            _webSocketService.OnDisconnected += OnWebSocketDisconnected;
+            _webSocketService.OnError += OnWebSocketError;
             _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
             
             _logger.LogInformation("Event subscriptions completed");
 
-            // Retry syncing entries that failed before app closed (SyncedAt == null)
-            var unsyncedEntries = await _repository.GetUnsyncedAsync();
-            _logger.LogInformation($"Found {unsyncedEntries.Count} unsynced entries to retry");
-            foreach (var entry in unsyncedEntries)
+            // Connect WebSocket if user is authenticated (will retry unsynced entries on connect)
+            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(masterKeyBase64))
             {
-                var content = entry.Content; // Capture for closure
-                RunBackgroundTask(async ct => await ProcessOutgoingClipboardAsync(content), $"Retry Sync: {entry.Id}");
+                _logger.LogInformation("User is authenticated, ensuring WebSocket connection");
+                if (!_webSocketService.IsConnected)
+                {
+                    _ = _webSocketService.ConnectAsync();
+                }
+                else
+                {
+                    // Already connected, retry unsynced entries immediately
+                    _ = RetryUnsyncedEntriesAsync();
+                }
             }
 
             // Start monitoring if auto-sync is enabled
@@ -387,10 +399,9 @@ public class ClipboardSyncService(
                 return;
             }
             
-            string clientId;
-            
-            // Generate deterministic client-side ID using hash + timestamp
-            clientId = GenerateClientId(contentHash);
+            // Generate deterministic UUID and Timestamp (Client Authority)
+            var clientId = Guid.NewGuid().ToString();
+            var timestamp = DateTime.UtcNow;
             
             // Save to SQLite immediately (optimistic write)
             var dbEntry = new ClipboardDbModel
@@ -401,26 +412,61 @@ public class ClipboardSyncService(
                 Ciphertext = string.Empty,
                 Nonce = string.Empty,
                 BlobVersion = _settingsService.Settings.blob_version,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = timestamp,
                 SyncedAt = null
             };
             
             await _repository.UpsertAsync(dbEntry);
             
-            // Sync to server via WebSocket (primary) or HTTP POST (fallback)
+            // Send to server
+            await SendExistingEntryAsync(dbEntry);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Clipboard processing error");
+            _notificationService.ShowError($"Clipboard processing error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Sends an existing clipboard entry to the server via WebSocket.
+    /// Reuses the original ID and timestamp to maintain consistency.
+    /// Includes in-flight tracking to prevent duplicate sends.
+    /// </summary>
+    private async Task SendExistingEntryAsync(ClipboardDbModel entry)
+    {
+        // Check if already in-flight
+        await _inflightLock.WaitAsync();
+        try
+        {
+            if (_inflightEntries.Contains(entry.Id))
+            {
+                _logger.LogDebug($"Entry {entry.Id} is already being sent, skipping duplicate");
+                return;
+            }
+            _inflightEntries.Add(entry.Id);
+        }
+        finally
+        {
+            _inflightLock.Release();
+        }
+
+        try
+        {
             RunBackgroundTask(async ct =>
             {
-                await _retryPolicy.ExecuteAsync(async () =>
+                try
                 {
-                    string serverId;
-                    
-                    // Check if WebSocket is connected
-                    _logger.LogInformation($"WebSocket connected: {_webSocketService.IsConnected}");
-                    
-                    if (_webSocketService.IsConnected)
+                    await _retryPolicy.ExecuteAsync(async () =>
                     {
-                        // Primary method: Send via WebSocket
-                        _logger.LogInformation($"Sending clipboard via WebSocket: {clientId}");
+                        // Ensure WebSocket is connected with timeout
+                        if (!await _webSocketService.EnsureConnectedAsync(TimeSpan.FromSeconds(5)))
+                        {
+                            _logger.LogWarning($"WebSocket connection timeout - entry {entry.Id} will sync when connection is restored");
+                            return;
+                        }
+                        
+                        _logger.LogInformation($"Sending clipboard entry via WebSocket: {entry.Id}");
                         
                         // Encrypt the content
                         var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
@@ -431,78 +477,57 @@ public class ClipboardSyncService(
                         }
                         
                         var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
-                        var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
+                        var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(entry.Content, masterKey);
                         
-                        _logger.LogInformation("Content encrypted successfully");
-                        
-                        // Create the sync request
+                        // Create the sync request with ORIGINAL ID and timestamp
                         var request = new ClipboardSyncRequest
                         {
+                            id = entry.Id, // ✅ Reuse original ID
+                            timestamp = entry.CreatedAt, // ✅ Reuse original timestamp
                             ciphertext = CryptographyService.ToBase64Static(ciphertext),
                             nonce = CryptographyService.ToBase64Static(nonce),
-                            blob_version = _settingsService.Settings.blob_version
+                            blob_version = entry.BlobVersion
                         };
                         
-                        // Serialize and send via WebSocket
-                        var json = System.Text.Json.JsonSerializer.Serialize(request);
-                        _logger.LogInformation($"Sending WebSocket message: {json.Substring(0, Math.Min(100, json.Length))}...");
-                        await _webSocketService.SendAsync(json);
+                        // Send via WebSocket with automatic serialization
+                        await _webSocketService.SendMessageAsync(request);
                         
-                        _logger.LogInformation($"Clipboard sent via WebSocket successfully: {clientId}");
-                        
-                        // Server will broadcast back with server ID via WebSocket
-                        // The ProcessIncomingClipboardAsync will handle replacing client ID with server ID
-                        return;
-                    }
-                    else
+                        _logger.LogInformation($"Clipboard entry sent via WebSocket successfully: {entry.Id}");
+                    });
+                }
+                finally
+                {
+                    // Remove from in-flight tracking
+                    await _inflightLock.WaitAsync();
+                    try
                     {
-                        // Fallback method: Use HTTP POST
-                        _logger.LogWarning($"WebSocket not connected, falling back to HTTP POST for: {clientId}");
-                        serverId = await _clipboardApiService.SyncClipboardAsync(content, _settingsService.Settings.blob_version);
-                        
-                        var currentEntry = await _repository.GetByIdAsync(clientId);
-                        if (currentEntry == null)
-                        {
-                            _logger.LogWarning($"Entry {clientId} not found after sync attempt");
-                            return;
-                        }
-                        
-                        await _repository.DeleteByIdAsync(clientId);
-                        
-                        var syncedDbEntry = new ClipboardDbModel
-                        {
-                            Id = serverId,
-                            Content = currentEntry.Content,
-                            ContentHash = currentEntry.ContentHash,
-                            Ciphertext = currentEntry.Ciphertext,
-                            Nonce = currentEntry.Nonce,
-                            BlobVersion = currentEntry.BlobVersion,
-                            CreatedAt = currentEntry.CreatedAt,
-                            SyncedAt = DateTime.UtcNow
-                        };
-                        
-                        await _repository.UpsertAsync(syncedDbEntry);
-                        _settingsService.Settings.last_sync = DateTime.UtcNow;
-                        _settingsService.Save();
-                        
-                        _logger.LogInformation($"Successfully synced clipboard entry via HTTP POST {clientId} -> {serverId}");
+                        _inflightEntries.Remove(entry.Id);
                     }
-                });
-            }, $"Sync to Server: {clientId}");
+                    finally
+                    {
+                        _inflightLock.Release();
+                    }
+                }
+            }, $"Send Entry: {entry.Id}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Clipboard processing error");
-            _notificationService.ShowError($"Clipboard processing error: {ex.Message}");
+            _logger.LogError(ex, $"Failed to send entry {entry.Id}");
+            // Remove from in-flight on error
+            await _inflightLock.WaitAsync();
+            try
+            {
+                _inflightEntries.Remove(entry.Id);
+            }
+            finally
+            {
+                _inflightLock.Release();
+            }
         }
     }
 
-    private string GenerateClientId(string contentHash)
-    {
-        // Generate deterministic client ID using hash + timestamp (increased to 16 chars for safety)
-        var timestamp = DateTime.UtcNow.Ticks.ToString("x");
-        return $"client_{contentHash.Substring(0, 16)}_{timestamp}";
-    }
+    // GenerateClientId method removed as it is no longer used
+
 
     private void OnWebSocketMessageReceived(string message)
     {
@@ -514,37 +539,7 @@ public class ClipboardSyncService(
     {
         try
         {
-            // First, check if this is a ping/pong or control message
-            using var doc = System.Text.Json.JsonDocument.Parse(message);
-            if (doc.RootElement.TryGetProperty("type", out var typeProperty))
-            {
-                var messageType = typeProperty.GetString();
-                
-                if (messageType == "ping")
-                {
-                    // Respond to server ping to keep connection alive
-                    await _webSocketService.SendAsync("{\"type\":\"pong\"}");
-                    _logger.LogDebug("Responded to server ping");
-                    return;
-                }
-                else if (messageType == "pong")
-                {
-                    // Ignore pong responses (we don't send pings currently)
-                    _logger.LogDebug("Received pong message");
-                    return;
-                }
-                else if (messageType == "error")
-                {
-                    // Log error messages from server
-                    if (doc.RootElement.TryGetProperty("message", out var errorMsg))
-                    {
-                        _logger.LogWarning($"Server error: {errorMsg.GetString()}");
-                    }
-                    return;
-                }
-            }
-            
-            // If no type field or unknown type, try to deserialize as clipboard entry
+            // Deserialize as clipboard entry (protocol messages already filtered by WebSocketService)
             ClipboardEntry? entry;
             try
             {
@@ -585,20 +580,26 @@ public class ClipboardSyncService(
             var existingEntry = await _repository.GetByHashAsync(contentHash);
             if (existingEntry != null)
             {
-                // If we already have the exact same server entry, skip this update
+                // If we already have the exact same ID, skip
                 if (existingEntry.Id == entry.id)
                 {
                     _logger.LogDebug($"Skipping duplicate clipboard entry: {entry.id}");
+                    // But ensure we mark it as synced as this is confirmation from server
+                    if (!existingEntry.SyncedAt.HasValue) 
+                    {
+                         var syncedEntry = existingEntry.CopyWith(syncedAt: DateTime.UtcNow);
+                         await _repository.UpsertAsync(syncedEntry);
+                    }
                     return;
                 }
                 
-                // If we have a client entry, delete it so we can replace with server entry
-                if (existingEntry.Id.StartsWith("client_"))
-                {
-                    _logger.LogInformation($"Replacing client entry {existingEntry.Id} with server entry {entry.id}");
-                    await _repository.DeleteByIdAsync(existingEntry.Id);
-                    // Continue to insert the server entry below
-                }
+                // If we have a local entry (Unsynced) with different ID but same content, 
+                // we should probably replace it with this one to avoid duplicates in UI.
+                // However, checks for "client_" prefix are removed. 
+                // We assume if content matches, this is the authoritative version.
+                
+                _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
+                await _repository.DeleteByIdAsync(existingEntry.Id);
             }
             
             // Save to SQLite
@@ -622,6 +623,55 @@ public class ClipboardSyncService(
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Failed to process WebSocket message");
+        }
+    }
+
+    /// <summary>
+    /// Called when WebSocket connection is established.
+    /// Retries any unsynced clipboard entries.
+    /// </summary>
+    private void OnWebSocketConnected()
+    {
+        _logger.LogInformation("WebSocket connected - checking for unsynced entries");
+        RunBackgroundTask(async ct => await RetryUnsyncedEntriesAsync(), "Retry Unsynced on Connect");
+    }
+
+    /// <summary>
+    /// Called when WebSocket disconnects.
+    /// </summary>
+    private void OnWebSocketDisconnected()
+    {
+        _logger.LogWarning("WebSocket disconnected - clipboard sync paused until reconnection");
+    }
+
+    /// <summary>
+    /// Called when WebSocket receives an error message.
+    /// </summary>
+    private void OnWebSocketError(string errorMessage)
+    {
+        _logger.LogWarning($"WebSocket error: {errorMessage}");
+    }
+
+    /// <summary>
+    /// Retries syncing entries that failed before (SyncedAt == null).
+    /// Uses SendExistingEntryAsync to preserve original IDs and timestamps.
+    /// </summary>
+    private async Task RetryUnsyncedEntriesAsync()
+    {
+        try
+        {
+            var unsyncedEntries = await _repository.GetUnsyncedAsync();
+            _logger.LogInformation($"Found {unsyncedEntries.Count} unsynced entries to retry");
+            
+            foreach (var entry in unsyncedEntries)
+            {
+                // ✅ Send existing entry with original ID and timestamp
+                await SendExistingEntryAsync(entry);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retry unsynced entries");
         }
     }
 
@@ -678,11 +728,15 @@ public class ClipboardSyncService(
         {
             _monitor.OnClipboardChanged -= OnClipboardChanged;
             _webSocketService.OnMessageReceived -= OnWebSocketMessageReceived;
+            _webSocketService.OnConnected -= OnWebSocketConnected;
+            _webSocketService.OnDisconnected -= OnWebSocketDisconnected;
+            _webSocketService.OnError -= OnWebSocketError;
             
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
             
             _refreshLock.Dispose();
+            _inflightLock.Dispose();
             
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();

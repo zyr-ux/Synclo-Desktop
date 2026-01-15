@@ -9,18 +9,15 @@ public partial class AccountViewModel : ViewModelBase
 {
     private readonly IViewModelFactory _factory;
     private readonly AccountService _accountService;
-    private readonly WebSocketService _webSocketService;
 
     [ObservableProperty] private ViewModelBase? _currentViewModel;
 
     public AccountViewModel(
         IViewModelFactory factory,
-        AccountService accountService,
-        WebSocketService webSocketService)
+        AccountService accountService)
     {
         _factory = factory;
         _accountService = accountService;
-        _webSocketService = webSocketService;
         _ = InitializeAsync();
     }
 
@@ -29,7 +26,6 @@ public partial class AccountViewModel : ViewModelBase
         if (await _accountService.IsAuthenticatedAsync())
         {
             ShowAccountDetails();
-            _ = _webSocketService.ConnectAsync();
         }
         else
         {
@@ -53,7 +49,6 @@ public partial class AccountViewModel : ViewModelBase
     private void OnLoginSuccess()
     {
         ShowAccountDetails();
-        _ = _webSocketService.ConnectAsync();
     }
 
     private void OnLogout()

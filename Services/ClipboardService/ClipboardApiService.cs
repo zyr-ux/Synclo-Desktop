@@ -9,7 +9,7 @@ namespace Synclo.Services.ClipboardService;
 
 public interface IClipboardApiService
 {
-    Task<string> SyncClipboardAsync(string content, int blobVersion = 1);
+
     Task<string> GetLatestClipboardAsync();
     Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
@@ -38,56 +38,7 @@ public class ClipboardApiService : IClipboardApiService
         _config = config ?? throw new ArgumentNullException(nameof(config));
     }
 
-    public async Task<string> SyncClipboardAsync(string content, int blobVersion = 1)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(content))
-                throw new ArgumentException("Content cannot be null or empty", nameof(content));
-            
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey);
-            if (string.IsNullOrEmpty(masterKeyBase64))
-                throw new InvalidOperationException("Master key not found. User must be logged in.");
-            
-            var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
-            var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
-            
-            var request = new ClipboardSyncRequest
-            {
-                ciphertext = CryptographyService.ToBase64Static(ciphertext),
-                nonce = CryptographyService.ToBase64Static(nonce),
-                blob_version = blobVersion
-            };
-            
-            var response = await _api.PostAsync("api/clipboard", request, cts.Token);
-            response.EnsureSuccessStatusCode();
-            
-            var json = await response.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(json))
-                throw new InvalidOperationException("Server returned empty response");
-            
-            ClipboardSyncResponse? syncResponse;
-            try
-            {
-                syncResponse = _api.Deserialize<ClipboardSyncResponse>(json);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to deserialize server response. JSON: {json}", ex);
-            }
-            
-            if (syncResponse == null)
-                throw new InvalidOperationException("Server returned null response");
-            
-            return syncResponse.id;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to sync clipboard");
-            throw;
-        }
-    }
+
 
     public async Task<string> GetLatestClipboardAsync()
     {

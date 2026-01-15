@@ -33,6 +33,9 @@ public sealed class WebSocketService : IDisposable
 
     public bool IsConnected => _socket is { State: WebSocketState.Open };
     public event Action<string>? OnMessageReceived;
+    public event Action? OnConnected;
+    public event Action? OnDisconnected;
+    public event Action<string>? OnError;
 
     private void OnTokenRefreshed(string token)
     {
@@ -67,6 +70,37 @@ public sealed class WebSocketService : IDisposable
         await DisconnectInternal();
     }
 
+    /// <summary>
+    /// Ensures WebSocket is connected within the specified timeout.
+    /// </summary>
+    /// <param name="timeout">Maximum time to wait for connection</param>
+    /// <returns>True if connected, false if timeout</returns>
+    public async Task<bool> EnsureConnectedAsync(TimeSpan timeout)
+    {
+        if (IsConnected) return true;
+        
+        await ConnectAsync();
+        
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        while (!IsConnected && stopwatch.Elapsed < timeout)
+        {
+            await Task.Delay(100);
+        }
+        
+        return IsConnected;
+    }
+
+    /// <summary>
+    /// Sends a message with automatic JSON serialization.
+    /// </summary>
+    /// <typeparam name="T">Type of message to send</typeparam>
+    /// <param name="message">Message object to serialize and send</param>
+    public async Task SendMessageAsync<T>(T message)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(message);
+        await SendAsync(json);
+    }
+
     #region Internal Methods
     
     private async Task ConnectInternal()
@@ -81,7 +115,9 @@ public sealed class WebSocketService : IDisposable
         _socket = new ClientWebSocket();
         _cts = new CancellationTokenSource();
 
-        var url = $"wss://synclo.zyrux.dev/ws/clipboard?token={token}";
+        // Use Authorization header instead of query parameter
+        _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+        var url = "wss://synclo.zyrux.dev/ws/clipboard";
 
         try
         {
@@ -89,6 +125,7 @@ public sealed class WebSocketService : IDisposable
             _retryCount = 0;
             _ = ReceiveLoop();
             _pingTask = StartPingLoop(_cts.Token);
+            OnConnected?.Invoke();
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket || ex.Message.Contains("403"))
         {
@@ -114,11 +151,14 @@ public sealed class WebSocketService : IDisposable
             _socket = new ClientWebSocket();
             _cts = new CancellationTokenSource();
 
-            var url = $"wss://synclo.zyrux.dev/ws/clipboard?token={newToken}";
+            // Use Authorization header instead of query parameter
+            _socket.Options.SetRequestHeader("Authorization", $"Bearer {newToken}");
+            var url = "wss://synclo.zyrux.dev/ws/clipboard";
             await _socket.ConnectAsync(new Uri(url), _cts.Token);
             _retryCount = 0;
             _ = ReceiveLoop();
             _pingTask = StartPingLoop(_cts.Token);
+            OnConnected?.Invoke();
         }
         catch
         {
@@ -151,6 +191,14 @@ public sealed class WebSocketService : IDisposable
                 } while (!result.EndOfMessage);
 
                 var message = Encoding.UTF8.GetString(ms.ToArray());
+                
+                // Handle protocol messages (ping/pong/error) before passing to subscribers
+                if (await HandleProtocolMessage(message))
+                {
+                    continue; // Protocol message handled, don't invoke OnMessageReceived
+                }
+                
+                // Only invoke for actual data messages
                 OnMessageReceived?.Invoke(message);
             }
         }
@@ -164,11 +212,55 @@ public sealed class WebSocketService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Handles WebSocket protocol messages (ping, pong, error).
+    /// </summary>
+    /// <param name="message">The received message</param>
+    /// <returns>True if message was a protocol message and was handled, false otherwise</returns>
+    private async Task<bool> HandleProtocolMessage(string message)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(message);
+            if (doc.RootElement.TryGetProperty("type", out var typeProperty))
+            {
+                var messageType = typeProperty.GetString();
+                
+                switch (messageType)
+                {
+                    case "ping":
+                        // Respond to server ping to keep connection alive
+                        await SendAsync("{\"type\":\"pong\"}");
+                        return true;
+                    
+                    case "pong":
+                        // Ignore pong responses (already tracked by ping loop)
+                        return true;
+                    
+                    case "error":
+                        // Extract and propagate error message
+                        var errorMsg = doc.RootElement.TryGetProperty("message", out var msgProp)
+                            ? msgProp.GetString() ?? "Unknown error"
+                            : "Unknown error";
+                        OnError?.Invoke(errorMsg);
+                        return true;
+                }
+            }
+        }
+        catch
+        {
+            // Not a valid JSON or doesn't have type field - treat as data message
+        }
+        
+        return false; // Not a protocol message
+    }
+
     private async Task HandleClose(WebSocketCloseStatus? status)
     {
         if (_disposed) return;
 
         await DisconnectInternal();
+        OnDisconnected?.Invoke();
 
         if (_manualDisconnect) return;
 
@@ -267,6 +359,8 @@ public sealed class WebSocketService : IDisposable
 
     private async Task DisconnectInternal()
     {
+        var wasConnected = IsConnected;
+        
         try
         {
             _cts?.Cancel();
@@ -302,6 +396,11 @@ public sealed class WebSocketService : IDisposable
             _socket = null;
             _cts?.Dispose();
             _cts = null;
+            
+            if (wasConnected && !_manualDisconnect)
+            {
+                OnDisconnected?.Invoke();
+            }
         }
     }
 
@@ -317,9 +416,7 @@ public sealed class WebSocketService : IDisposable
 
         _connectLock.Dispose();
     }
-
-    #endregion
-
+    
     private Task StartPingLoop(CancellationToken token)
     {
         return Task.Run(async () =>
@@ -344,4 +441,6 @@ public sealed class WebSocketService : IDisposable
             catch { }
         }, token);
     }
+    
+    #endregion
 }
