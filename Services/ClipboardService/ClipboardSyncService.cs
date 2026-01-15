@@ -402,14 +402,25 @@ public class ClipboardSyncService(
             var clientId = Guid.NewGuid().ToString();
             var timestamp = Utils.TruncateToMilliseconds(DateTime.UtcNow);
             
-            // Save to SQLite immediately (optimistic write)
+            // Encrypt the content BEFORE saving to database
+            var masterKeyBase64 = await _secureStorage.LoadAsync(CryptographyService.MasterKey).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(masterKeyBase64))
+            {
+                _logger.LogWarning("Master key not found - cannot encrypt clipboard content");
+                return;
+            }
+            
+            var masterKey = CryptographyService.FromBase64Static(masterKeyBase64);
+            var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
+            
+            // Save to SQLite with encrypted data
             var dbEntry = new ClipboardDbModel
             {
                 Id = clientId,
                 Content = content,
                 ContentHash = contentHash,
-                Ciphertext = string.Empty,
-                Nonce = string.Empty,
+                Ciphertext = CryptographyService.ToBase64Static(ciphertext),
+                Nonce = CryptographyService.ToBase64Static(nonce),
                 BlobVersion = _settingsService.Settings.blob_version,
                 CreatedAt = timestamp
             };
@@ -584,11 +595,13 @@ public class ClipboardSyncService(
                     _logger.LogDebug($"Skipping duplicate clipboard entry: {entry.id}");
                     return;
                 }
-                
                 // If we have a local entry with different ID but same content, 
                 // replace it with the authoritative version from server
-                _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
-                await _repository.DeleteByIdAsync(existingEntry.Id);
+                else
+                {
+                    _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
+                    await _repository.DeleteByIdAsync(existingEntry.Id);
+                }
             }
             
             // Normalize server timestamp to UTC and truncate to milliseconds
