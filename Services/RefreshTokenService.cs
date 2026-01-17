@@ -27,7 +27,6 @@ public sealed class RefreshTokenService(
     private readonly ICryptographyService _cryptographyService =
         cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
 
-    // Maintain local JSON options to avoid dependency on ApiService
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -40,24 +39,24 @@ public sealed class RefreshTokenService(
 
     public async Task<string> RefreshAsync(CancellationToken ct = default)
     {
-        // 1. Capture the current token BEFORE locking to detect if it changes while we wait.
-        var initialToken = await secureStorage.LoadAsync(AccountService.AccessToken);
+        var initialToken =
+            await secureStorage.LoadAsync(AccountService.AccessToken).ConfigureAwait(false);
 
-        await _refreshLock.WaitAsync(ct);
+        await _refreshLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            // 2. Check if the token has already been refreshed by another thread.
-            var currentToken = await secureStorage.LoadAsync(AccountService.AccessToken);
+            var currentToken =
+                await secureStorage.LoadAsync(AccountService.AccessToken).ConfigureAwait(false);
 
-            // If the token in storage is different from what we had before waiting, 
-            // someone else refreshed it. Return the new token.
             if (currentToken != initialToken && !string.IsNullOrWhiteSpace(currentToken))
-                // Optionally notify here too if we want to be very chatty, but strictly not required
-                // as the 'refresher' would have already notified.
+            {
+                SafeInvokeTokenRefreshed(currentToken);
                 return currentToken;
+            }
 
-            // 3. Needs refresh. Proceed with logic.
-            var refreshToken = await secureStorage.LoadAsync(AccountService.RefreshToken);
+            var refreshToken =
+                await secureStorage.LoadAsync(AccountService.RefreshToken).ConfigureAwait(false);
+
             if (string.IsNullOrWhiteSpace(refreshToken))
                 throw new SessionExpiredException();
 
@@ -73,55 +72,72 @@ public sealed class RefreshTokenService(
                         "application/json")
                 };
 
-                using var res = await http.SendAsync(httpReq, ct);
+                using var res =
+                    await http.SendAsync(httpReq, ct).ConfigureAwait(false);
 
                 if (!res.IsSuccessStatusCode)
                 {
                     if (res.StatusCode == HttpStatusCode.Unauthorized)
                     {
-                        var errorContent = await res.Content.ReadAsStringAsync(ct);
-                        if (errorContent.Contains("reused") || errorContent.Contains("family"))
+                        var errorContent =
+                            await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+                        if (errorContent.Contains("reused", StringComparison.OrdinalIgnoreCase) ||
+                            errorContent.Contains("family", StringComparison.OrdinalIgnoreCase))
                         {
-                            await ClearLocalSession();
-                            throw new SecurityBreachException("Refresh token reuse detected.");
+                            await ClearLocalSession().ConfigureAwait(false);
+                            throw new SecurityBreachException(
+                                "Refresh token reuse detected.");
                         }
                     }
 
-                    await ClearLocalSession();
+                    await ClearLocalSession().ConfigureAwait(false);
                     throw new SessionExpiredException();
                 }
 
-                var content = await res.Content.ReadAsStringAsync(ct);
-                var data = JsonSerializer.Deserialize<AuthResponse>(content, _jsonOptions);
+                var content =
+                    await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+                var data =
+                    JsonSerializer.Deserialize<AuthResponse>(content, _jsonOptions);
 
                 if (data == null ||
                     string.IsNullOrWhiteSpace(data.access_token) ||
                     string.IsNullOrWhiteSpace(data.refresh_token))
                 {
-                    await ClearLocalSession();
+                    await ClearLocalSession().ConfigureAwait(false);
                     throw new SessionExpiredException();
                 }
 
-                if (data.kdf_version.HasValue && data.kdf_version.Value != SupportedKdfVersion)
+                if (data.kdf_version.HasValue &&
+                    data.kdf_version.Value != SupportedKdfVersion)
                 {
-                    await ClearLocalSession();
+                    await ClearLocalSession().ConfigureAwait(false);
                     throw new SecurityException(
                         $"Account upgraded to security version {data.kdf_version}. Please update the app.");
                 }
 
-                await secureStorage.SaveAsync(AccountService.AccessToken, data.access_token);
-                await secureStorage.SaveAsync(AccountService.RefreshToken, data.refresh_token);
+                await secureStorage
+                    .SaveAsync(AccountService.RefreshToken, data.refresh_token)
+                    .ConfigureAwait(false);
+
+                await secureStorage
+                    .SaveAsync(AccountService.AccessToken, data.access_token)
+                    .ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(data.salt))
-                    await secureStorage.SaveAsync(_cryptographyService.Salt, data.salt);
+                    await secureStorage
+                        .SaveAsync(_cryptographyService.Salt, data.salt)
+                        .ConfigureAwait(false);
 
                 if (data.kdf_version.HasValue)
-                    await secureStorage.SaveAsync(
-                        _cryptographyService.KdfVersion,
-                        data.kdf_version.Value.ToString());
+                    await secureStorage
+                        .SaveAsync(
+                            _cryptographyService.KdfVersion,
+                            data.kdf_version.Value.ToString())
+                        .ConfigureAwait(false);
 
-                // Notify listeners (e.g., WebSocketService) that a new token is available
-                TokenRefreshed?.Invoke(data.access_token);
+                SafeInvokeTokenRefreshed(data.access_token);
 
                 return data.access_token;
             }
@@ -136,13 +152,26 @@ public sealed class RefreshTokenService(
         }
     }
 
+    private void SafeInvokeTokenRefreshed(string token)
+    {
+        try
+        {
+            TokenRefreshed?.Invoke(token);
+        }
+        catch
+        {
+            // Suppress errors
+        }
+    }
+
+    // Lock removed here to prevent deadlock with RefreshAsync
     private async Task ClearLocalSession()
     {
-        await secureStorage.DeleteAsync(AccountService.AccessToken);
-        await secureStorage.DeleteAsync(AccountService.RefreshToken);
-        await secureStorage.DeleteAsync(AccountService.UserEmail);
-        await secureStorage.DeleteAsync(_cryptographyService.MasterKey);
-        await secureStorage.DeleteAsync(_cryptographyService.Salt);
-        await secureStorage.DeleteAsync(_cryptographyService.KdfVersion);
+        await secureStorage.DeleteAsync(AccountService.AccessToken).ConfigureAwait(false);
+        await secureStorage.DeleteAsync(AccountService.RefreshToken).ConfigureAwait(false);
+        await secureStorage.DeleteAsync(AccountService.UserEmail).ConfigureAwait(false);
+        await secureStorage.DeleteAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
+        await secureStorage.DeleteAsync(_cryptographyService.Salt).ConfigureAwait(false);
+        await secureStorage.DeleteAsync(_cryptographyService.KdfVersion).ConfigureAwait(false);
     }
 }
