@@ -507,8 +507,9 @@ public class ClipboardSyncService(
                             if (!await _webSocketService.EnsureConnectedAsync(TimeSpan.FromSeconds(5)))
                             {
                                 _logger.LogWarning(
-                                    $"WebSocket connection timeout - entry {entry.Id} will sync when connection is restored");
-                                return;
+                                    $"WebSocket connection timeout - entry {entry.Id} will retry on next attempt");
+                                // Throw to trigger retry policy instead of returning
+                                throw new InvalidOperationException("WebSocket not connected");
                             }
 
                             _logger.LogInformation($"Sending clipboard entry via WebSocket: {entry.Id}");
@@ -525,14 +526,35 @@ public class ClipboardSyncService(
                             };
 
                             // Send via WebSocket with automatic serialization
-                            await _webSocketService.SendMessageAsync(request);
-
-                            _logger.LogInformation($"Clipboard entry sent via WebSocket successfully: {entry.Id}");
+                            try
+                            {
+                                await _webSocketService.SendMessageAsync(request);
+                                _logger.LogInformation($"Clipboard entry sent via WebSocket successfully: {entry.Id}");
+                                
+                                // Only remove from inflight on successful send
+                                await _inflightLock.WaitAsync();
+                                try
+                                {
+                                    _inflightEntries.Remove(entry.Id);
+                                }
+                                finally
+                                {
+                                    _inflightLock.Release();
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Failed to send entry {entry.Id} via WebSocket, will retry");
+                                throw; // Re-throw to trigger retry policy
+                            }
                         });
                     }
-                    finally
+                    catch (Exception ex)
                     {
-                        // Remove from in-flight tracking
+                        // Log retry exhaustion - entry remains in inflight for future retry
+                        _logger.LogError(ex, $"All retry attempts exhausted for entry {entry.Id}");
+                        
+                        // Remove from inflight after all retries exhausted
                         await _inflightLock.WaitAsync();
                         try
                         {
