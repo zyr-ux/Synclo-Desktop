@@ -377,13 +377,15 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
     {
         return new ClipboardDbModel
         {
-            Id = reader.GetString(0),
-            Content = reader.GetString(1),
-            ContentHash = reader.GetString(2),
-            Ciphertext = reader.GetString(3),
-            Nonce = reader.GetString(4),
-            BlobVersion = reader.GetInt32(5),
-            CreatedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture)
+            Id = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+            Content = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+            ContentHash = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            Ciphertext = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+            Nonce = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+            BlobVersion = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+            CreatedAt = reader.IsDBNull(6)
+                ? DateTime.UtcNow
+                : DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
         };
     }
 }
