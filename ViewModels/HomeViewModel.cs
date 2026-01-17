@@ -17,6 +17,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly INotificationService _notificationService;
     private readonly IClipboardSyncService _clipboardSyncService;
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
     private CancellationTokenSource? _updateCts;
 
     [ObservableProperty] private string? _errorMessage;
@@ -46,17 +47,25 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
         Dispatcher.UIThread.InvokeAsync(async () =>
         {
+            // Try to acquire lock without waiting - if another update is in progress, skip this one
+            if (!await _updateLock.WaitAsync(0))
+                return;
+            
             try
             {
                 await Task.Delay(50, token); // Debounce
                 if (token.IsCancellationRequested) return;
 
                 var entries = await _clipboardSyncService.GetHistoryForUI();
-                if (token.IsCancellationRequested) return;
+                if (token.IsCancellationRequested) return; // Check again after async call
 
                 ApplyCollectionDiff(entries);
             }
             catch (OperationCanceledException) { /* Ignored */ }
+            finally
+            {
+                _updateLock.Release();
+            }
         });
     }
 
@@ -220,6 +229,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     {
         _updateCts?.Cancel();
         _updateCts?.Dispose();
+        _updateLock.Dispose();
         _clipboardSyncService.OnHistoryUpdated -= OnHistoryUpdated;
     }
 }
