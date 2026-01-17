@@ -631,7 +631,18 @@ public class ClipboardSyncService(
             var ciphertext = _cryptographyService.FromBase64(entry.ciphertext ?? string.Empty);
             var nonce = _cryptographyService.FromBase64(entry.nonce ?? string.Empty);
 
-            var plaintext = _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
+            // Decrypt content with error handling
+            string plaintext;
+            try
+            {
+                plaintext = _cryptographyService.DecryptClipboard(ciphertext, nonce, masterKey);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.Security.Cryptography.CryptographicException)
+            {
+                _logger.LogError(ex, $"Failed to decrypt clipboard entry {entry.id} - data may be corrupted or tampered");
+                return; // Skip this entry but continue processing others
+            }
+            
             var contentHash = _utils.ComputeHash(plaintext);
 
             var existingEntry = await _repository.GetByHashAsync(contentHash);

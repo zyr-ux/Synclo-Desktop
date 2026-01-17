@@ -74,7 +74,18 @@ public class ClipboardApiService(
             var json = await response.Content.ReadAsStringAsync();
             var historyResponse = _api.Deserialize<ClipboardHistoryResponse>(json);
 
-            foreach (var entry in historyResponse.history) entry.plaintext = DecryptClipboardEntry(entry, masterKey);
+            foreach (var entry in historyResponse.history)
+            {
+                try
+                {
+                    entry.plaintext = DecryptClipboardEntry(entry, masterKey);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, $"Failed to decrypt entry {entry?.id ?? "unknown"}, skipping");
+                    entry.plaintext = null; // Mark as failed
+                }
+            }
 
             return historyResponse;
         }
