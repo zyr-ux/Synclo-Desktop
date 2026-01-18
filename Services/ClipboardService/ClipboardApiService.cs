@@ -10,7 +10,7 @@ namespace Synclo.Services.ClipboardService;
 public interface IClipboardApiService
 {
     Task<string> GetLatestClipboardAsync();
-    Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20);
+    Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20, bool includeDeleted = false);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
     T Deserialize<T>(string json);
 }
@@ -58,7 +58,7 @@ public class ClipboardApiService(
         }
     }
 
-    public async Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20)
+    public async Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20, bool includeDeleted = false)
     {
         try
         {
@@ -68,7 +68,7 @@ public class ClipboardApiService(
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
-            var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}", cts.Token);
+            var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}&include_deleted={includeDeleted.ToString().ToLower()}", cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();

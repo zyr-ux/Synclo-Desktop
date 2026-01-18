@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -19,6 +20,7 @@ internal abstract record ClipboardPipelineEvent
 {
     public record LocalContent(string Content, DateTime Timestamp) : ClipboardPipelineEvent;
     public record RemoteEntry(ClipboardEntry Entry, DateTime Timestamp) : ClipboardPipelineEvent;
+    public record RemoteDelete(string Id, DateTime Timestamp) : ClipboardPipelineEvent;
 }
 
 public interface IClipboardSyncService : IDisposable
@@ -381,7 +383,7 @@ public class ClipboardSyncService(
                 return; // Not logged in
             }
 
-            var historyResponse = await _clipboardApiService.GetClipboardHistoryAsync(1, DefaultSyncPageSize)
+            var historyResponse = await _clipboardApiService.GetClipboardHistoryAsync(1, DefaultSyncPageSize, includeDeleted: true)
                 .ConfigureAwait(false);
 
             // Handle null or empty response gracefully
@@ -422,6 +424,20 @@ public class ClipboardSyncService(
                     : entry.timestamp.ToUniversalTime();
                 serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
                 var createdAt = existingEntry?.CreatedAt ?? serverTimestamp;
+
+
+                // Handle tombstones (entries synced as deleted)
+                if (entry.is_deleted)
+                {
+                    _logger.LogInformation($"Sync encountered tombstone for {entry.id}, ensuring local deletion");
+                    
+                    // Delete locally if exists
+                    if (existingEntry != null || await _repository.GetByIdAsync(entry.id) != null)
+                    {
+                        await _repository.DeleteByIdAsync(entry.id);
+                    }
+                    continue; // Skip upsert for deleted items
+                }
 
                 var dbEntry = new ClipboardDbModel
                 {
@@ -525,7 +541,13 @@ public class ClipboardSyncService(
                             
                         case ClipboardPipelineEvent.RemoteEntry remote:
                             _logger.LogDebug($"Processing remote clipboard entry {remote.Entry.id} from {remote.Timestamp:HH:mm:ss.fff}");
+                            _logger.LogDebug($"Processing remote clipboard entry {remote.Entry.id} from {remote.Timestamp:HH:mm:ss.fff}");
                             await ProcessIncomingClipboardAsync(remote.Entry);
+                            break;
+
+                        case ClipboardPipelineEvent.RemoteDelete remoteDelete:
+                            _logger.LogDebug($"Processing remote delete for {remoteDelete.Id}");
+                            await _repository.DeleteByIdAsync(remoteDelete.Id);
                             break;
                     }
                 }
@@ -618,7 +640,7 @@ public class ClipboardSyncService(
                 return;
             }
 
-            var (ciphertext, nonce) = _cryptographyService.Encrypt(content, masterKey);
+            var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
 
             // Save to SQLite with encrypted data
             var dbEntry = new ClipboardDbModel
@@ -766,30 +788,61 @@ public class ClipboardSyncService(
     {
         try
         {
-            // Try to deserialize as ACK response
-            var ackResponse = JsonSerializer.Deserialize<WebSocketAckResponse>(message);
-            if (ackResponse?.type == "ack")
+            using var doc = System.Text.Json.JsonDocument.Parse(message);
+            if (doc.RootElement.TryGetProperty("type", out var typeProp))
             {
-                _logger.LogDebug($"Received ACK for entry {ackResponse.id}");
+                var type = typeProp.GetString();
                 
-                // Find and complete the pending ACK task
-                await _ackLock.WaitAsync();
-                try
+                if (type == "ack")
                 {
-                    if (_pendingAcks.TryGetValue(ackResponse.id, out var tcs))
+                    var ackResponse = JsonSerializer.Deserialize<WebSocketAckResponse>(message);
+                    if (ackResponse != null)
                     {
-                        tcs.TrySetResult(ackResponse);
-                        _pendingAcks.Remove(ackResponse.id);
+                        _logger.LogDebug($"Received ACK for entry {ackResponse.id}");
+                        await _ackLock.WaitAsync();
+                        try
+                        {
+                            if (_pendingAcks.TryGetValue(ackResponse.id, out var tcs))
+                            {
+                                tcs.TrySetResult(ackResponse);
+                                _pendingAcks.Remove(ackResponse.id);
+                            }
+                        }
+                        finally
+                        {
+                            _ackLock.Release();
+                        }
                     }
+                    return;
                 }
-                finally
+                else if (type == "delete")
                 {
-                    _ackLock.Release();
+                    var deleteResponse = JsonSerializer.Deserialize<WebSocketDeleteResponse>(message);
+                    if (deleteResponse != null)
+                    {
+                        _logger.LogInformation($"Received delete event for {deleteResponse.id}");
+                        
+                        var deleteEvt = new ClipboardPipelineEvent.RemoteDelete(deleteResponse.id, DateTime.UtcNow);
+                        if (!_clipboardChannel.Writer.TryWrite(deleteEvt))
+                        {
+                            _logger.LogWarning($"Clipboard channel is full, remote delete {deleteResponse.id} will be dropped");
+                        }
+                    }
+                    return;
                 }
-                return;
+                else if (type == "error")
+                {
+                    _logger.LogWarning($"Received server error: {message}");
+                    return;
+                }
+                else if (type == "pong")
+                {
+                    // Pong handled implicitly or ignored
+                    return;
+                }
             }
 
-            // Not an ACK - deserialize as clipboard entry
+            // Not an ACK/Delete/Error - deserialize as clipboard entry
             var entry = JsonSerializer.Deserialize<ClipboardEntry>(message);
             if (entry == null)
             {
@@ -811,22 +864,10 @@ public class ClipboardSyncService(
         }
     }
 
-    private async Task ProcessIncomingClipboardAsync(string message)
+    private async Task ProcessIncomingClipboardAsync(ClipboardEntry entry)
     {
         try
         {
-            // Deserialize as clipboard entry (protocol messages already filtered by WebSocketService)
-            ClipboardEntry? entry;
-            try
-            {
-                entry = _clipboardApiService.Deserialize<ClipboardEntry>(message);
-            }
-            catch (Exception ex)
-            {
-                // Not a valid clipboard entry
-                _logger.LogDebug($"Message not a clipboard entry: {message}. Error: {ex.Message}");
-                return;
-            }
 
             // Validate required fields - if missing, this is not a clipboard message
             if (entry == null ||

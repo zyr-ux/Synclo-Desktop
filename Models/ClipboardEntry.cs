@@ -11,5 +11,8 @@ public class ClipboardEntry
     public DateTime timestamp { get; set; }
     
     public string? plaintext { get; set; }
+    
+    public bool is_deleted { get; set; } = false;
+    public DateTime? deleted_at { get; set; }
 }
 
