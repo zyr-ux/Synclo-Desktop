@@ -43,6 +43,7 @@ public class ClipboardSyncService(
     IWebSocketService webSocketService,
     ISettingsService settingsService,
     INotificationService notificationService,
+    IAccountService accountService,
     ICryptographyService cryptographyService,
     ISecureStorage secureStorage,
     IUtils utils,
@@ -67,6 +68,9 @@ public class ClipboardSyncService(
 
     private readonly INotificationService _notificationService =
         notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+
+    private readonly IAccountService _accountService =
+        accountService ?? throw new ArgumentNullException(nameof(accountService));
 
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
@@ -175,6 +179,7 @@ public class ClipboardSyncService(
                 _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
                 _webSocketService.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketService.OnError += OnWebSocketError;
+                _accountService.OnLogout += OnAccountLoggedOut;
                 _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
 
                 _logger.LogInformation("Event subscriptions completed");
@@ -382,6 +387,7 @@ public class ClipboardSyncService(
             _webSocketService.OnMessageReceived -= OnWebSocketMessageReceived;
             _webSocketService.OnDisconnected -= OnWebSocketDisconnected;
             _webSocketService.OnError -= OnWebSocketError;
+            _accountService.OnLogout -= OnAccountLoggedOut;
 
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
@@ -755,10 +761,10 @@ public class ClipboardSyncService(
 
 
 
-    private async Task SendExistingEntryAsync(ClipboardDbModel entry)
+    private Task SendExistingEntryAsync(ClipboardDbModel entry)
     {
         // Skip if already synced
-        if (entry.IsSynced) return;
+        if (entry.IsSynced) return Task.CompletedTask;
 
         try
         {
@@ -838,6 +844,7 @@ public class ClipboardSyncService(
         {
             _logger.LogError(ex, $"Failed to initiate send for {entry.Id}");
         }
+        return Task.CompletedTask;
     }
 
     // GenerateClientId method removed as it is no longer used
@@ -928,9 +935,7 @@ public class ClipboardSyncService(
             // Handle tombstones (deleted entries) - they have null ciphertext/nonce
             if (entry.is_deleted)
             {
-                var local = await _repository.GetByIdAsync(entry.id);
-                if (local != null && local.CreatedAt > entry.timestamp) return;
-
+                // Fix: Always honor deletions regardless of timestamp check to prevent zombie entries
                 _logger.LogInformation($"Processing remote tombstone for {entry.id}");
                 await _repository.MarkDeletedAsync(entry.id);
                 return;
@@ -1131,5 +1136,11 @@ public class ClipboardSyncService(
                 _logger.LogError(ex, $"{taskName} failed: {ex.GetType().Name}");
             }
         }, cts);
+    }
+
+    private Task OnAccountLoggedOut()
+    {
+        ClearMasterKeyCache();
+        return Task.CompletedTask;
     }
 }

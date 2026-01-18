@@ -172,10 +172,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             
             var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: 100);
             
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                ApplyCollectionDiff(entries);
-            });
+            // UI update is handled by OnHistoryUpdated event triggered within RefreshFromServerAsync
 
             if (!silent) 
                 _notificationService.ShowSuccess("Clipboard history refreshed.");

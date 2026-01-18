@@ -322,12 +322,14 @@ public sealed class AccountService(
             await OnLogout.Invoke();
         }
 
-        var deviceId = settings.Settings.device_id;
-        if (!string.IsNullOrWhiteSpace(deviceId))
+        if (!string.IsNullOrWhiteSpace(settings.Settings.device_id))
         {
-            try { await deviceService.DeleteDeviceAsync(deviceId); }
+            try { await deviceService.DeleteDeviceAsync(settings.Settings.device_id); }
             catch { }
         }
+
+        // Fix: Explicitly disconnect WebSocket to fail-safe against orphaned connections
+        await webSocketService.DisconnectAsync();
 
         await secureStorage.DeleteAsync(AccessToken);
         await secureStorage.DeleteAsync(RefreshToken);
