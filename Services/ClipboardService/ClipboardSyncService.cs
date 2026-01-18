@@ -1145,8 +1145,8 @@ public class ClipboardSyncService(
     {
         ClearMasterKeyCache();
         
-        // Cleanup tombstones on logout to ensure no tracking of deleted items remains
-        await _repository.PurgeTombstonesAsync();
+        // Wipe local database completely on logout/failure to ensure fresh state on next login
+        await _repository.ClearAllAsync();
         
         // Disconnect WebSocket
         await _webSocketService.DisconnectAsync();

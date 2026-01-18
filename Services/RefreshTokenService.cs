@@ -15,6 +15,7 @@ public interface IRefreshTokenService
 {
     Task<string> RefreshAsync(CancellationToken ct = default);
     event Action<string>? TokenRefreshed;
+    event Action? SessionExpired;
 }
 
 public sealed class RefreshTokenService(
@@ -36,6 +37,7 @@ public sealed class RefreshTokenService(
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     public event Action<string>? TokenRefreshed;
+    public event Action? SessionExpired;
 
     public async Task<string> RefreshAsync(CancellationToken ct = default)
     {
@@ -173,5 +175,7 @@ public sealed class RefreshTokenService(
         await secureStorage.DeleteAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
         await secureStorage.DeleteAsync(_cryptographyService.Salt).ConfigureAwait(false);
         await secureStorage.DeleteAsync(_cryptographyService.KdfVersion).ConfigureAwait(false);
+
+        SessionExpired?.Invoke();
     }
 }

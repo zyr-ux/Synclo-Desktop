@@ -107,6 +107,10 @@ public class App : Application
         var themeService = services.GetRequiredService<IThemeService>();
         themeService.ApplyTheme(settingsService.Settings.Theme);
 
+        // Wiring events
+        var refreshTokenService = services.GetRequiredService<IRefreshTokenService>();
+        refreshTokenService.SessionExpired += () => _ = accountService.LogoutAsync();
+
         // Initialize clipboard subsystem with proper sequencing
         var clipboardRepository = services.GetRequiredService<IClipboardRepository>();
         var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
