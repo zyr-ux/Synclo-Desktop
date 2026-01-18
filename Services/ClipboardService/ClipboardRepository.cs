@@ -555,7 +555,6 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 throw;
             }
         })).Unwrap();
-        })).Unwrap();
     }
 
     public Task PurgeTombstonesAsync()
