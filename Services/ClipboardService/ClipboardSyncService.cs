@@ -510,34 +510,24 @@ public class ClipboardSyncService(
                     idsToDelete.Add(entry.id);
             }
 
-            // Database Transaction
+            // Database Transaction - REMOVED WRAPPER TO PREVENT DEADLOCK
+            // Executing sequentially instead of atomic transaction prevents reentrancy deadlock 
+            // on the exclusive TaskScheduler.
             if (idsToDelete.Count > 0 || incomingBatch.Count > 0)
             {
-                await _repository.RunInTransactionAsync(async () =>
+                foreach (var id in idsToDelete)
                 {
-                    foreach (var id in idsToDelete)
-                    {
-                        // Use MarkDeleted for tombstones, or DeleteById for replacements?
-                        // For history sync, if replacing an old version, Delete+Upsert is cleaner.
-                        // If it's a remote delete, MarkDeleted is better. 
-                        // Since we split logic above, we can just use DeleteById here for simplicity 
-                        // as Upsert will put the new one back.
-                        // However, for pure deletions, we want tombstones.
-                        
-                        var isTombstone = historyResponse.history.FirstOrDefault(x => x.id == id)?.is_deleted ?? false;
-                        if (isTombstone)
-                            await _repository.MarkDeletedAsync(id);
-                        else
-                            await _repository.DeleteByIdAsync(id); 
-                    }
+                    var isTombstone = historyResponse.history.FirstOrDefault(x => x.id == id)?.is_deleted ?? false;
+                    if (isTombstone)
+                        await _repository.MarkDeletedAsync(id).ConfigureAwait(false);
+                    else
+                        await _repository.DeleteByIdAsync(id).ConfigureAwait(false); 
+                }
 
-                    if (incomingBatch.Count > 0)
-                    {
-                        await _repository.UpsertAsync(incomingBatch).ConfigureAwait(false);
-                    }
-                });
-
-                _logger.LogInformation($"Sync stats: {incomingBatch.Count} upserts, {idsToDelete.Count} cleanups");
+                if (incomingBatch.Count > 0)
+                {
+                    await _repository.UpsertAsync(incomingBatch).ConfigureAwait(false);
+                }
             }
 
             _settingsService.Settings.last_sync = DateTime.UtcNow;
@@ -1014,14 +1004,12 @@ public class ClipboardSyncService(
             };
 
             // Issue #3 fix: Wrap delete+upsert in transaction to prevent data loss
-            await _repository.RunInTransactionAsync(async () =>
+            // DEADLOCK FIX: RunInTransactionAsync removed. Executing sequentially.
+            if (existingEntry != null && existingEntry.Id != entry.id)
             {
-                if (existingEntry != null && existingEntry.Id != entry.id)
-                {
-                    await _repository.DeleteByIdAsync(existingEntry.Id);
-                }
-                await _repository.UpsertAsync(dbEntry);
-            });
+                await _repository.DeleteByIdAsync(existingEntry.Id).ConfigureAwait(false);
+            }
+            await _repository.UpsertAsync(dbEntry).ConfigureAwait(false);
 
             // Bug #1 fix: Set suppression guard before writing to OS clipboard using semaphore
             await _remoteUpdateLock.WaitAsync();

@@ -131,6 +131,7 @@ CREATE INDEX IF NOT EXISTS idx_is_synced ON clipboard_entries(is_synced);
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
        created_at, is_synced, is_deleted
 FROM clipboard_entries
+WHERE is_deleted = 0
 ORDER BY created_at DESC, ROWID DESC
 LIMIT $limit OFFSET $offset
 ";

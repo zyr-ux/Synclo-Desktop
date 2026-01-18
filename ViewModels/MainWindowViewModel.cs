@@ -109,7 +109,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "Server Offline";
+                StatusText = "Offline";
                 StatusColor = Brushes.Red;
             });
         }
