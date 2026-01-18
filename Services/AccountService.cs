@@ -361,7 +361,7 @@ public sealed class AccountService(
     // Delete Account
     public async Task DeleteAccountAsync(CancellationToken ct = default)
     {
-        using var res = await api.DeleteAsync("/api/account/delete", ct);
+        using var res = await api.DeleteAsync("/api/delete", ct);
 
         if (!res.IsSuccessStatusCode)
         {
