@@ -936,7 +936,7 @@ public class ClipboardSyncService(
             if (entry.is_deleted)
             {
                 // Fix: Always honor deletions regardless of timestamp check to prevent zombie entries
-                _logger.LogInformation($"Processing remote tombstone for {entry.id}");
+                _logger.LogInformation($"Processing remote tombstone for {entry.id} (IS_DELETED=TRUE)");
                 await _repository.MarkDeletedAsync(entry.id);
                 return;
             }

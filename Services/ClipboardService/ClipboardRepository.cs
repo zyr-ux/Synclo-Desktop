@@ -464,6 +464,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 using var connection = new SqliteConnection($"Data Source={_dbPath}");
                 await connection.OpenAsync().ConfigureAwait(false);
 
+                // 1. Try to mark properly as deleted
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     UPDATE clipboard_entries 
@@ -475,7 +476,27 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 
                 if (rowsAffected > 0)
                 {
-                    _logger.LogInformation($"Entry {id} marked as deleted (tombstone)");
+                    _logger.LogInformation($"Entry {id} marked as deleted (found in DB)");
+                    NotifyObservers();
+                }
+                else
+                {
+                    // 2. If it doesn't exist, we MUST persist the tombstone so we don't accept it later
+                    // This handles cases where we receive a delete for an item we haven't synced yet (or was purged)
+                    _logger.LogInformation($"Entry {id} not found for deletion - inserting tombstone");
+                    
+                    var insertCmd = connection.CreateCommand();
+                    insertCmd.CommandText = @"
+                        INSERT INTO clipboard_entries 
+                        (id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted)
+                        VALUES 
+                        ($id, '', 'TOMBSTONE', '', '', 0, $created, 0, 1)
+                        ON CONFLICT(id) DO UPDATE SET is_deleted = 1, is_synced = 0";
+
+                    insertCmd.Parameters.AddWithValue("$id", id);
+                    insertCmd.Parameters.AddWithValue("$created", DateTime.UtcNow.ToString("O"));
+                    
+                    await insertCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     NotifyObservers();
                 }
             }
