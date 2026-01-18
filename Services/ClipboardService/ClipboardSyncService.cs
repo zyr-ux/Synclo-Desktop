@@ -166,6 +166,9 @@ public class ClipboardSyncService(
                     }
                 }
 
+                // Cleanup tombstones on startup (keep DB clean)
+                await _repository.PurgeTombstonesAsync();
+
                 // Auto-refresh if database is empty (first launch or after cold start wipe)
                 var existingEntries = await _repository.GetAllAsync(1);
                 if (existingEntries.Count == 0)
@@ -1138,9 +1141,14 @@ public class ClipboardSyncService(
         }, cts);
     }
 
-    private Task OnAccountLoggedOut()
+    private async Task OnAccountLoggedOut()
     {
         ClearMasterKeyCache();
-        return Task.CompletedTask;
+        
+        // Cleanup tombstones on logout to ensure no tracking of deleted items remains
+        await _repository.PurgeTombstonesAsync();
+        
+        // Disconnect WebSocket
+        await _webSocketService.DisconnectAsync();
     }
 }

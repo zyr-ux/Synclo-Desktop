@@ -27,6 +27,7 @@ public interface IClipboardRepository
     Task MarkDeletedAsync(string id);
     Task DeleteByIdAsync(string id);
     Task ClearAllAsync();
+    Task PurgeTombstonesAsync();
     Task RunInTransactionAsync(Func<Task> action);
     event Action? OnDataChanged;
 }
@@ -551,6 +552,34 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to clear all entries");
+                throw;
+            }
+        })).Unwrap();
+        })).Unwrap();
+    }
+
+    public Task PurgeTombstonesAsync()
+    {
+        return _db.StartNew((Func<Task>)(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_deleted = 1";
+                var count = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                if (count > 0)
+                {
+                    _logger.LogInformation($"Purged {count} tombstone(s) from database");
+                    NotifyObservers();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to purge tombstones");
                 throw;
             }
         })).Unwrap();
