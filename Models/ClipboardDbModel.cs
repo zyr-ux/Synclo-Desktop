@@ -14,7 +14,7 @@ public partial class ClipboardDbModel : ObservableObject
     public int BlobVersion { get; init; }
     public DateTime CreatedAt { get; init; }
     public bool IsSynced { get; init; } = false;
-    public bool IsDeletedRemotely { get; init; } = false;
+    public bool IsDeleted { get; init; } = false;
     
     public DateTime CreatedAtLocal => CreatedAt.ToLocalTime();
     
@@ -30,7 +30,7 @@ public partial class ClipboardDbModel : ObservableObject
         int? blobVersion = null,
         DateTime? createdAt = null,
         bool? isSynced = null,
-        bool? isDeletedRemotely = null)
+        bool? isDeleted = null)
     {
         return new ClipboardDbModel
         {
@@ -42,7 +42,7 @@ public partial class ClipboardDbModel : ObservableObject
             BlobVersion = blobVersion ?? this.BlobVersion,
             CreatedAt = createdAt ?? this.CreatedAt,
             IsSynced = isSynced ?? this.IsSynced,
-            IsDeletedRemotely = isDeletedRemotely ?? this.IsDeletedRemotely
+            IsDeleted = isDeleted ?? this.IsDeleted
         };
     }
     

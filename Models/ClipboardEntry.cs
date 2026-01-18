@@ -5,8 +5,8 @@ namespace Synclo.Models;
 public class ClipboardEntry
 {
     public required string id { get; set; }
-    public required string ciphertext { get; set; }
-    public required string nonce { get; set; }
+    public string? ciphertext { get; set; }  // Nullable for tombstones
+    public string? nonce { get; set; }       // Nullable for tombstones
     public int blob_version { get; set; }
     public DateTime timestamp { get; set; }
     

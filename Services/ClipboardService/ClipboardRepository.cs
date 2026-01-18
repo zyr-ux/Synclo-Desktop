@@ -19,10 +19,12 @@ public interface IClipboardRepository
     Task<ClipboardDbModel?> GetByIdAsync(string id);
     Task<ClipboardDbModel?> GetByHashAsync(string hash);
     Task<Dictionary<string, ClipboardDbModel>> GetHashMapAsync(IEnumerable<string> hashes);
+    Task<Dictionary<string, ClipboardDbModel>> GetByIdsAsync(IEnumerable<string> ids);
     Task<List<ClipboardDbModel>> GetUnsyncedAsync();
     Task UpsertAsync(ClipboardDbModel entry);
     Task UpsertAsync(IEnumerable<ClipboardDbModel> entries);
     Task MarkAsSyncedAsync(string id);
+    Task MarkDeletedAsync(string id);
     Task DeleteByIdAsync(string id);
     Task ClearAllAsync();
     Task RunInTransactionAsync(Func<Task> action);
@@ -288,6 +290,59 @@ ORDER BY created_at ASC
         })).Unwrap();
     }
 
+    public Task<Dictionary<string, ClipboardDbModel>> GetByIdsAsync(IEnumerable<string> ids)
+    {
+        return _db.StartNew((Func<Task<Dictionary<string, ClipboardDbModel>>>)(async () =>
+        {
+            var result = new Dictionary<string, ClipboardDbModel>();
+            var uniqueIds = ids.Distinct().ToList();
+            
+            if (uniqueIds.Count == 0) return result;
+
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                const int ChunkSize = 900; 
+                
+                foreach (var chunk in uniqueIds.Chunk(ChunkSize))
+                {
+                    var cmd = connection.CreateCommand();
+                    var placeholders = string.Join(",", chunk.Select((_, i) => $"$p{i}"));
+                    
+                    cmd.CommandText = $@"
+                        SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
+                               created_at, is_synced, is_deleted_remotely
+                        FROM clipboard_entries
+                        WHERE id IN ({placeholders})";
+
+                    for (int i = 0; i < chunk.Length; i++)
+                    {
+                        cmd.Parameters.AddWithValue($"$p{i}", chunk[i]);
+                    }
+
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var entry = MapFromReader(reader);
+                        if (!result.ContainsKey(entry.Id))
+                        {
+                            result[entry.Id] = entry;
+                        }
+                    }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get entries by IDs");
+                throw;
+            }
+        })).Unwrap();
+    }
+
 
     // ---------------------------------------------------------
     // WRITES
@@ -391,6 +446,41 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to mark entry {id} as synced");
+                throw;
+            }
+        })).Unwrap();
+    }
+
+    /// <summary>
+    /// Marks an entry as deleted (tombstone). Sets is_deleted_remotely=1 and is_synced=0.
+    /// </summary>
+    public Task MarkDeletedAsync(string id)
+    {
+        return _db.StartNew((Func<Task>)(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE clipboard_entries 
+                    SET is_deleted_remotely = 1, is_synced = 0 
+                    WHERE id = $id";
+                cmd.Parameters.AddWithValue("$id", id);
+                
+                var rowsAffected = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                if (rowsAffected > 0)
+                {
+                    _logger.LogInformation($"Entry {id} marked as deleted (tombstone)");
+                    NotifyObservers();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to mark entry {id} as deleted");
                 throw;
             }
         })).Unwrap();
