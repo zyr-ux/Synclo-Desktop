@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.WebSockets;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Polly;
@@ -11,6 +13,13 @@ using Synclo.Models;
 using Synclo.Services.SecretsManager;
 
 namespace Synclo.Services.ClipboardService;
+
+// Unified pipeline event - supports both local content and remote entries
+internal abstract record ClipboardPipelineEvent
+{
+    public record LocalContent(string Content, DateTime Timestamp) : ClipboardPipelineEvent;
+    public record RemoteEntry(ClipboardEntry Entry, DateTime Timestamp) : ClipboardPipelineEvent;
+}
 
 public interface IClipboardSyncService : IDisposable
 {
@@ -49,8 +58,6 @@ public class ClipboardSyncService(
     private readonly ICryptographyService _cryptographyService =
         cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
 
-    private readonly HashSet<string> _inflightEntries = new(); // Track entries being sent to prevent duplicates
-    private readonly SemaphoreSlim _inflightLock = new(1, 1);
     private readonly ILogger<ClipboardSyncService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IClipboardMonitor _monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
 
@@ -63,7 +70,10 @@ public class ClipboardSyncService(
         repository ?? throw new ArgumentNullException(nameof(repository));
 
     private readonly AsyncRetryPolicy _retryPolicy = Policy
-        .Handle<Exception>()
+        .Handle<HttpRequestException>()
+        .Or<WebSocketException>()
+        .Or<TimeoutException>()
+        .Or<InvalidOperationException>(ex => ex.Message.Contains("WebSocket not connected"))
         .WaitAndRetryAsync(
             3,
             attempt => TimeSpan.FromMilliseconds(1000 * Math.Pow(2, attempt - 1)),
@@ -84,6 +94,32 @@ public class ClipboardSyncService(
     private readonly IWebSocketService _webSocketService =
         webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
 
+    // ACK tracking for clipboard sync
+    private readonly Dictionary<string, TaskCompletionSource<WebSocketAckResponse>> _pendingAcks = new();
+    private readonly SemaphoreSlim _ackLock = new(1, 1);
+    private const int AckTimeoutSeconds = 5;
+
+    // Unified channel pipeline for both local and remote events (Issue #1 fix)
+    private readonly Channel<ClipboardPipelineEvent> _clipboardChannel = Channel.CreateBounded<ClipboardPipelineEvent>(
+        new BoundedChannelOptions(MaxQueuedClipboardEvents)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest // Drop oldest events if queue is full
+        });
+    private const int MaxQueuedClipboardEvents = 100;
+    
+    // Suppression guard to prevent feedback loop (Bug #1 fix)
+    private volatile bool _isRemoteUpdate = false;
+    
+    // Consumer task tracking for graceful shutdown (Bug #8 fix)
+    private Task? _consumerTask;
+    
+    // Initialization lock to prevent race conditions (Bug #9 fix)
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+    
+    // Master key cache to avoid repeated secure storage I/O (Issue #2 fix)
+    private byte[]? _cachedMasterKey;
+    private readonly SemaphoreSlim _masterKeyLock = new(1, 1);
+
     private CancellationTokenSource? _debounceCts;
     private bool _disposed;
     private bool _isInitialized;
@@ -91,71 +127,83 @@ public class ClipboardSyncService(
 
     public async Task InitializeAsync()
     {
-        if (_isInitialized) return;
-
+        // Bug #9 fix: Prevent race condition with initialization lock
+        await _initLock.WaitAsync();
         try
         {
-            // Cold start check: wipe DB if inactive for too long
-            if (_settingsService.Settings.last_sync.HasValue)
+            if (_isInitialized) return;
+
+            try
             {
-                var inactivityDuration = DateTime.UtcNow - _settingsService.Settings.last_sync.Value;
-                if (inactivityDuration.TotalDays > InactivityThresholdDays)
+                // Cold start check: wipe DB if inactive for too long
+                if (_settingsService.Settings.last_sync.HasValue)
                 {
-                    await _repository.ClearAllAsync();
-                    _notificationService.ShowInfo(
-                        $"For your security, clipboard history was cleared after {(int)inactivityDuration.TotalDays} days of inactivity. " +
-                        "Refreshing from server...");
-                    // Refresh history from server in background
-                    RunBackgroundTask(async ct => await RefreshFromServerAsync(DefaultSyncPageSize),
-                        "Cold Start Refresh");
+                    var inactivityDuration = DateTime.UtcNow - _settingsService.Settings.last_sync.Value;
+                    if (inactivityDuration.TotalDays > InactivityThresholdDays)
+                    {
+                        await _repository.ClearAllAsync();
+                        _notificationService.ShowInfo(
+                            $"For your security, clipboard history was cleared after {(int)inactivityDuration.TotalDays} days of inactivity. " +
+                            "Refreshing from server...");
+                        // Refresh history from server in background
+                        RunBackgroundTask(async ct => await RefreshFromServerAsync(DefaultSyncPageSize),
+                            "Cold Start Refresh");
+                    }
                 }
-            }
 
-            // Auto-refresh if database is empty (first launch or after cold start wipe)
-            var existingEntries = await _repository.GetAllAsync(1);
-            if (existingEntries.Count == 0)
+                // Auto-refresh if database is empty (first launch or after cold start wipe)
+                var existingEntries = await _repository.GetAllAsync(1);
+                if (existingEntries.Count == 0)
+                {
+                    _logger.LogInformation("Database is empty, triggering automatic background refresh");
+                    RunBackgroundTask(async ct => await SyncInBackgroundAsync(), "Auto-Refresh on Empty DB");
+                }
+
+                // Subscribe to events
+                _monitor.OnClipboardChanged += OnClipboardChanged;
+                _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
+                _webSocketService.OnDisconnected += OnWebSocketDisconnected;
+                _webSocketService.OnError += OnWebSocketError;
+                _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
+
+                _logger.LogInformation("Event subscriptions completed");
+
+                // Connect WebSocket if user is authenticated
+                var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(masterKeyBase64))
+                {
+                    _logger.LogInformation("User is authenticated, ensuring WebSocket connection");
+                    if (!_webSocketService.IsConnected) _ = _webSocketService.ConnectAsync();
+                }
+
+                // Start monitoring if auto-sync is enabled
+                if (_settingsService.Settings.auto_sync_enabled)
+                {
+                    _logger.LogInformation("Auto-sync enabled, starting clipboard monitor");
+                    await _monitor.StartAsync();
+                    _logger.LogInformation($"Clipboard monitor started. IsRunning: {_monitor.IsRunning}");
+                }
+                else
+                {
+                    _logger.LogWarning("Auto-sync is DISABLED - clipboard monitor will NOT start");
+                }
+
+                // Start consumer task for clipboard channel (Bug #7, #8 fix)
+                _consumerTask = Task.Run(() => ProcessClipboardChannelAsync(_shutdownCts.Token), _shutdownCts.Token);
+                _logger.LogInformation("Clipboard channel consumer started");
+
+                _isInitialized = true;
+                _logger.LogInformation("ClipboardSyncService initialized successfully");
+            }
+            catch (Exception ex)
             {
-                _logger.LogInformation("Database is empty, triggering automatic background refresh");
-                RunBackgroundTask(async ct => await SyncInBackgroundAsync(), "Auto-Refresh on Empty DB");
+                _logger.LogError(ex, "Failed to initialize ClipboardSyncService");
+                throw;
             }
-
-            // Subscribe to events
-            _monitor.OnClipboardChanged += OnClipboardChanged;
-            _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
-            _webSocketService.OnDisconnected += OnWebSocketDisconnected;
-            _webSocketService.OnError += OnWebSocketError;
-            _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
-
-            _logger.LogInformation("Event subscriptions completed");
-
-            // Connect WebSocket if user is authenticated
-            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(masterKeyBase64))
-            {
-                _logger.LogInformation("User is authenticated, ensuring WebSocket connection");
-                if (!_webSocketService.IsConnected) _ = _webSocketService.ConnectAsync();
-            }
-
-            // Start monitoring if auto-sync is enabled
-            if (_settingsService.Settings.auto_sync_enabled)
-            {
-                _logger.LogInformation("Auto-sync enabled, starting clipboard monitor");
-                await _monitor.StartAsync();
-                _logger.LogInformation($"Clipboard monitor started. IsRunning: {_monitor.IsRunning}");
-            }
-            else
-            {
-                _logger.LogWarning("Auto-sync is DISABLED - clipboard monitor will NOT start");
-            }
-
-
-            _isInitialized = true;
-            _logger.LogInformation("ClipboardSyncService initialized successfully");
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Failed to initialize ClipboardSyncService");
-            throw;
+            _initLock.Release();
         }
     }
 
@@ -219,6 +267,10 @@ public class ClipboardSyncService(
 
     public async Task SetEnabledAsync(bool enabled)
     {
+        // Bug #10 fix: Persist settings so preference survives restart
+        _settingsService.Settings.auto_sync_enabled = enabled;
+        _settingsService.Save();
+        
         if (enabled)
             await _monitor.StartAsync();
         else
@@ -250,10 +302,32 @@ public class ClipboardSyncService(
     {
         try
         {
+            _logger.LogInformation("Starting graceful shutdown...");
+            
+            // Stop accepting new clipboard events
+            _clipboardChannel.Writer.Complete();
+            _logger.LogInformation("Clipboard channel writer completed");
+            
+            // Cancel shutdown token to signal consumer to stop
             _shutdownCts.Cancel();
+            
+            // Bug #8 fix: Await consumer task with timeout
+            if (_consumerTask != null)
+            {
+                var shutdownTimeout = TimeSpan.FromSeconds(ShutdownTimeoutSeconds);
+                var completedTask = await Task.WhenAny(_consumerTask, Task.Delay(shutdownTimeout));
+                
+                if (completedTask == _consumerTask)
+                {
+                    _logger.LogInformation("Consumer task completed gracefully");
+                }
+                else
+                {
+                    _logger.LogWarning($"Consumer task did not complete within {ShutdownTimeoutSeconds}s timeout");
+                }
+            }
 
-            await Task.Delay(1000);
-
+            // Stop clipboard monitor
             await _monitor.StopAsync().ConfigureAwait(false);
 
             _logger.LogInformation("ClipboardSyncService shutdown completed");
@@ -281,7 +355,9 @@ public class ClipboardSyncService(
             _debounceCts?.Dispose();
 
             _refreshLock.Dispose();
-            _inflightLock.Dispose();
+            _ackLock.Dispose();
+            _initLock.Dispose();
+            _masterKeyLock.Dispose();
 
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();
@@ -317,14 +393,25 @@ public class ClipboardSyncService(
                 return;
             }
 
-            var incomingBatch = new List<ClipboardDbModel>();
+            // First pass: Collect all valid entries and their hashes
+            var hashToEntry = new Dictionary<string, ClipboardEntry>();
             foreach (var entry in historyResponse.history)
             {
-                if (entry == null || string.IsNullOrEmpty(entry.id) || string.IsNullOrEmpty(entry.plaintext))
+                if (entry == null || string.IsNullOrEmpty(entry.id) || string.IsNullOrWhiteSpace(entry.plaintext))
                     continue;
 
                 var contentHash = _utils.ComputeHash(entry.plaintext);
-                var existingEntry = await _repository.GetByHashAsync(contentHash);
+                hashToEntry[contentHash] = entry;
+            }
+
+            // Issue #4 fix: Bulk fetch existing entries by hash (avoid N+1 queries)
+            var existingEntries = await _repository.GetHashMapAsync(hashToEntry.Keys);
+
+            var incomingBatch = new List<ClipboardDbModel>();
+            // Process each entry
+            foreach (var (contentHash, entry) in hashToEntry)
+            {
+                var existingEntry = existingEntries.GetValueOrDefault(contentHash);
 
                 if (existingEntry != null && existingEntry.Id == entry.id)
                     continue;
@@ -344,7 +431,8 @@ public class ClipboardSyncService(
                     Ciphertext = entry.ciphertext ?? string.Empty,
                     Nonce = entry.nonce ?? string.Empty,
                     BlobVersion = entry.blob_version,
-                    CreatedAt = createdAt
+                    CreatedAt = createdAt,
+                    IsSynced = true // Entries from server are already synced
                 };
 
                 incomingBatch.Add(dbEntry);
@@ -381,29 +469,110 @@ public class ClipboardSyncService(
 
     private void OnClipboardChanged(string content)
     {
-        _logger.LogInformation($"OnClipboardChanged fired with content length: {content?.Length ?? 0}");
-
-        // Cancel and dispose any pending debounce
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = new CancellationTokenSource();
-        var cts = _debounceCts;
-
-        // Debounce: wait for clipboard stability
-        RunBackgroundTask(async ct =>
+        // Bug #1 fix: Check suppression guard to prevent feedback loop
+        if (_isRemoteUpdate)
         {
-            try
+            _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
+            return;
+        }
+
+        _logger.LogDebug($"OnClipboardChanged fired with content length: {content?.Length ?? 0}");
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            _logger.LogDebug("Content is null or whitespace, skipping");
+            return;
+        }
+
+        // Issue #1 fix: Write local content to unified channel
+        var evt = new ClipboardPipelineEvent.LocalContent(content, DateTime.UtcNow);
+        
+        if (!_clipboardChannel.Writer.TryWrite(evt))
+        {
+            _logger.LogWarning("Clipboard channel is full, oldest event will be dropped");
+        }
+    }
+
+    // Unified consumer loop - processes both local and remote events sequentially (Issue #1 fix)
+    private async Task ProcessClipboardChannelAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("Unified clipboard channel consumer loop started");
+        
+        try
+        {
+            await foreach (var evt in _clipboardChannel.Reader.ReadAllAsync(ct))
             {
-                _logger.LogInformation($"Starting debounce delay of {DebounceDelayMs}ms");
-                await Task.Delay(DebounceDelayMs, cts.Token).ConfigureAwait(false);
-                _logger.LogInformation("Debounce complete, processing outgoing clipboard");
-                await ProcessOutgoingClipboardAsync(content).ConfigureAwait(false);
+                try
+                {
+                    // Pattern match on event type
+                    switch (evt)
+                    {
+                        case ClipboardPipelineEvent.LocalContent local:
+                            // Issue #5 fix: Debounce in consumer loop
+                            // Wait for potential rapid-fire updates
+                            await Task.Delay(DebounceDelayMs, ct);
+                            
+                            // If more events arrived while we were waiting, this one is superseded
+                            if (_clipboardChannel.Reader.Count > 0)
+                            {
+                                _logger.LogDebug($"Skipping superseded local event from {local.Timestamp:HH:mm:ss.fff}");
+                                continue;
+                            }
+
+                            _logger.LogDebug($"Processing local clipboard event from {local.Timestamp:HH:mm:ss.fff}");
+                            await ProcessOutgoingClipboardAsync(local.Content);
+                            break;
+                            
+                        case ClipboardPipelineEvent.RemoteEntry remote:
+                            _logger.LogDebug($"Processing remote clipboard entry {remote.Entry.id} from {remote.Timestamp:HH:mm:ss.fff}");
+                            await ProcessIncomingClipboardAsync(remote.Entry);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to process clipboard event");
+                    // Continue processing other events
+                }
             }
-            catch (OperationCanceledException)
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Clipboard channel consumer loop cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Clipboard channel consumer loop failed");
+        }
+        
+        _logger.LogInformation("Clipboard channel consumer loop stopped");
+    }
+
+    // Issue #2 fix: Cache master key to avoid repeated secure storage I/O
+    private async Task<byte[]?> GetMasterKeyAsync()
+    {
+        await _masterKeyLock.WaitAsync();
+        try
+        {
+            if (_cachedMasterKey != null)
             {
-                _logger.LogDebug("Debounce cancelled");
+                return _cachedMasterKey;
             }
-        }, "Clipboard Changed");
+
+            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(masterKeyBase64))
+            {
+                return null;
+            }
+
+            _cachedMasterKey = Convert.FromBase64String(masterKeyBase64);
+            _logger.LogDebug("Master key cached in memory");
+            return _cachedMasterKey;
+        }
+        finally
+        {
+            _masterKeyLock.Release();
+        }
     }
 
     private async Task ProcessOutgoingClipboardAsync(string content)
@@ -441,16 +610,15 @@ public class ClipboardSyncService(
             var clientId = Guid.NewGuid().ToString();
             var timestamp = _utils.TruncateToMilliseconds(DateTime.UtcNow);
 
-            // Encrypt the content BEFORE saving to database
-            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(masterKeyBase64))
+            // Issue #2 fix: Use cached master key
+            var masterKey = await GetMasterKeyAsync();
+            if (masterKey == null)
             {
                 _logger.LogWarning("Master key not found - cannot encrypt clipboard content");
                 return;
             }
 
-            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
-            var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
+            var (ciphertext, nonce) = _cryptographyService.Encrypt(content, masterKey);
 
             // Save to SQLite with encrypted data
             var dbEntry = new ClipboardDbModel
@@ -461,7 +629,8 @@ public class ClipboardSyncService(
                 Ciphertext = _cryptographyService.ToBase64(ciphertext),
                 Nonce = _cryptographyService.ToBase64(nonce),
                 BlobVersion = _settingsService.Settings.blob_version,
-                CreatedAt = timestamp
+                CreatedAt = timestamp,
+                IsSynced = false // Will be set to true only after server ACK
             };
 
             await _repository.UpsertAsync(dbEntry);
@@ -478,21 +647,11 @@ public class ClipboardSyncService(
 
     private async Task SendExistingEntryAsync(ClipboardDbModel entry)
     {
-        // Check if already in-flight
-        await _inflightLock.WaitAsync();
-        try
+        // Skip if already synced
+        if (entry.IsSynced)
         {
-            if (_inflightEntries.Contains(entry.Id))
-            {
-                _logger.LogDebug($"Entry {entry.Id} is already being sent, skipping duplicate");
-                return;
-            }
-
-            _inflightEntries.Add(entry.Id);
-        }
-        finally
-        {
-            _inflightLock.Release();
+            _logger.LogDebug($"Entry {entry.Id} is already synced, skipping");
+            return;
         }
 
         try
@@ -508,78 +667,89 @@ public class ClipboardSyncService(
                             {
                                 _logger.LogWarning(
                                     $"WebSocket connection timeout - entry {entry.Id} will retry on next attempt");
-                                // Throw to trigger retry policy instead of returning
                                 throw new InvalidOperationException("WebSocket not connected");
                             }
 
                             _logger.LogInformation($"Sending clipboard entry via WebSocket: {entry.Id}");
 
-                            // Use the already-encrypted data from the database entry
-                            // No need to re-encrypt - the content was encrypted when saved to DB
-                            var request = new ClipboardSyncRequest
-                            {
-                                id = entry.Id,
-                                timestamp = entry.CreatedAt,
-                                ciphertext = entry.Ciphertext, // ✅ Use stored ciphertext
-                                nonce = entry.Nonce,            // ✅ Use stored nonce
-                                blob_version = entry.BlobVersion
-                            };
-
-                            // Send via WebSocket with automatic serialization
+                            // Create TaskCompletionSource for ACK
+                            var ackTcs = new TaskCompletionSource<WebSocketAckResponse>();
+                            
+                            await _ackLock.WaitAsync();
                             try
                             {
+                                _pendingAcks[entry.Id] = ackTcs;
+                            }
+                            finally
+                            {
+                                _ackLock.Release();
+                            }
+
+                            try
+                            {
+                                // Send the clipboard entry
+                                var request = new ClipboardSyncRequest
+                                {
+                                    id = entry.Id,
+                                    timestamp = entry.CreatedAt,
+                                    ciphertext = entry.Ciphertext,
+                                    nonce = entry.Nonce,
+                                    blob_version = entry.BlobVersion
+                                };
+
                                 await _webSocketService.SendMessageAsync(request);
-                                _logger.LogInformation($"Clipboard entry sent via WebSocket successfully: {entry.Id}");
-                                
-                                // Only remove from inflight on successful send
-                                await _inflightLock.WaitAsync();
+                                _logger.LogInformation($"Clipboard entry sent via WebSocket: {entry.Id}, waiting for ACK...");
+
+                                // Wait for ACK with timeout
+                                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(AckTimeoutSeconds));
                                 try
                                 {
-                                    _inflightEntries.Remove(entry.Id);
+                                    var ackTask = ackTcs.Task;
+                                    var completedTask = await Task.WhenAny(ackTask, Task.Delay(Timeout.Infinite, cts.Token));
+
+                                    if (completedTask == ackTask)
+                                    {
+                                        var ack = await ackTask;
+                                        _logger.LogInformation($"Received ACK for entry {entry.Id}");
+
+                                        // Update database to mark as synced (use efficient method)
+                                        await _repository.MarkAsSyncedAsync(entry.Id);
+                                        _logger.LogInformation($"Entry {entry.Id} marked as synced in database");
+                                    }
+                                    else
+                                    {
+                                        throw new TimeoutException($"ACK timeout for entry {entry.Id} after {AckTimeoutSeconds}s");
+                                    }
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    throw new TimeoutException($"ACK timeout for entry {entry.Id} after {AckTimeoutSeconds}s");
+                                }
+                            }
+                            finally
+                            {
+                                // Clean up pending ACK (Bug #3 fix: always cleanup even if SendMessageAsync throws)
+                                await _ackLock.WaitAsync();
+                                try
+                                {
+                                    _pendingAcks.Remove(entry.Id);
                                 }
                                 finally
                                 {
-                                    _inflightLock.Release();
+                                    _ackLock.Release();
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, $"Failed to send entry {entry.Id} via WebSocket, will retry");
-                                throw; // Re-throw to trigger retry policy
                             }
                         });
                     }
                     catch (Exception ex)
                     {
-                        // Log retry exhaustion - entry remains in inflight for future retry
-                        _logger.LogError(ex, $"All retry attempts exhausted for entry {entry.Id}");
-                        
-                        // Remove from inflight after all retries exhausted
-                        await _inflightLock.WaitAsync();
-                        try
-                        {
-                            _inflightEntries.Remove(entry.Id);
-                        }
-                        finally
-                        {
-                            _inflightLock.Release();
-                        }
+                        _logger.LogError(ex, $"Failed to send and confirm entry {entry.Id} - will retry on reconnect");
                     }
                 }, $"Send Entry: {entry.Id}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Failed to send entry {entry.Id}");
-            // Remove from in-flight on error
-            await _inflightLock.WaitAsync();
-            try
-            {
-                _inflightEntries.Remove(entry.Id);
-            }
-            finally
-            {
-                _inflightLock.Release();
-            }
+            _logger.LogError(ex, $"Failed to initiate send for entry {entry.Id}");
         }
     }
 
@@ -588,8 +758,57 @@ public class ClipboardSyncService(
 
     private void OnWebSocketMessageReceived(string message)
     {
-        // Process incoming clipboard updates in background
-        RunBackgroundTask(async ct => await ProcessIncomingClipboardAsync(message), "WebSocket Message");
+        // Try to parse as ACK first
+        RunBackgroundTask(async ct => await ProcessWebSocketMessageAsync(message), "WebSocket Message");
+    }
+
+    private async Task ProcessWebSocketMessageAsync(string message)
+    {
+        try
+        {
+            // Try to deserialize as ACK response
+            var ackResponse = JsonSerializer.Deserialize<WebSocketAckResponse>(message);
+            if (ackResponse?.type == "ack")
+            {
+                _logger.LogDebug($"Received ACK for entry {ackResponse.id}");
+                
+                // Find and complete the pending ACK task
+                await _ackLock.WaitAsync();
+                try
+                {
+                    if (_pendingAcks.TryGetValue(ackResponse.id, out var tcs))
+                    {
+                        tcs.TrySetResult(ackResponse);
+                        _pendingAcks.Remove(ackResponse.id);
+                    }
+                }
+                finally
+                {
+                    _ackLock.Release();
+                }
+                return;
+            }
+
+            // Not an ACK - deserialize as clipboard entry
+            var entry = JsonSerializer.Deserialize<ClipboardEntry>(message);
+            if (entry == null)
+            {
+                _logger.LogWarning("Failed to deserialize WebSocket message");
+                return;
+            }
+
+            // Issue #1 fix: Route remote entry through unified channel
+            var evt = new ClipboardPipelineEvent.RemoteEntry(entry, DateTime.UtcNow);
+            
+            if (!_clipboardChannel.Writer.TryWrite(evt))
+            {
+                _logger.LogWarning($"Clipboard channel is full, remote entry {entry.id} will be dropped");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process WebSocket message");
+        }
     }
 
     private async Task ProcessIncomingClipboardAsync(string message)
@@ -619,15 +838,14 @@ public class ClipboardSyncService(
                 return;
             }
 
-            // Decrypt content
-            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
-            if (string.IsNullOrEmpty(masterKeyBase64))
+            // Issue #2 fix: Use cached master key
+            var masterKey = await GetMasterKeyAsync();
+            if (masterKey == null)
             {
-                _logger.LogWarning("Master key not found - cannot decrypt clipboard content");
+                _logger.LogWarning("Master key not available, user may not be authenticated");
                 return;
             }
 
-            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             var ciphertext = _cryptographyService.FromBase64(entry.ciphertext ?? string.Empty);
             var nonce = _cryptographyService.FromBase64(entry.nonce ?? string.Empty);
 
@@ -658,7 +876,6 @@ public class ClipboardSyncService(
                 // replace it with the authoritative version from server
 
                 _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
-                await _repository.DeleteByIdAsync(existingEntry.Id);
             }
 
             // Normalize server timestamp to UTC and truncate to milliseconds
@@ -676,13 +893,30 @@ public class ClipboardSyncService(
                 Ciphertext = entry.ciphertext ?? string.Empty,
                 Nonce = entry.nonce ?? string.Empty,
                 BlobVersion = entry.blob_version,
-                CreatedAt = serverTimestamp
+                CreatedAt = serverTimestamp,
+                IsSynced = true // Entries from server are already synced
             };
 
-            await _repository.UpsertAsync(dbEntry);
+            // Issue #3 fix: Wrap delete+upsert in transaction to prevent data loss
+            await _repository.RunInTransactionAsync(async () =>
+            {
+                if (existingEntry != null && existingEntry.Id != entry.id)
+                {
+                    await _repository.DeleteByIdAsync(existingEntry.Id);
+                }
+                await _repository.UpsertAsync(dbEntry);
+            });
 
-            // Write to OS clipboard via cross-platform monitor abstraction
-            await _monitor.SetClipboardTextAsync(plaintext);
+            // Bug #1 fix: Set suppression guard before writing to OS clipboard
+            _isRemoteUpdate = true;
+            try
+            {
+                await _monitor.SetClipboardTextAsync(plaintext);
+            }
+            finally
+            {
+                _isRemoteUpdate = false;
+            }
         }
         catch (Exception ex)
         {
@@ -693,6 +927,65 @@ public class ClipboardSyncService(
     private void OnWebSocketDisconnected()
     {
         _logger.LogWarning("WebSocket disconnected - clipboard sync paused until reconnection");
+        
+        // Bug #3 fix: Clear pending ACKs to prevent stuck tasks
+        RunBackgroundTask(async ct =>
+        {
+            await _ackLock.WaitAsync();
+            try
+            {
+                if (_pendingAcks.Count > 0)
+                {
+                    _logger.LogWarning($"Clearing {_pendingAcks.Count} pending ACKs due to disconnect");
+                    foreach (var tcs in _pendingAcks.Values)
+                    {
+                        tcs.TrySetCanceled();
+                    }
+                    _pendingAcks.Clear();
+                }
+            }
+            finally
+            {
+                _ackLock.Release();
+            }
+        }, "Clear Pending ACKs");
+        
+        // On reconnect, retry unsynced entries
+        RunBackgroundTask(async ct =>
+        {
+            try
+            {
+                // Wait a bit for reconnection
+                await Task.Delay(2000, ct);
+                
+                if (_webSocketService.IsConnected)
+                {
+                    _logger.LogInformation("WebSocket reconnected, retrying unsynced entries");
+                    var unsyncedEntries = await _repository.GetUnsyncedAsync();
+                    
+                    if (unsyncedEntries.Count > 0)
+                    {
+                        _logger.LogInformation($"Found {unsyncedEntries.Count} unsynced entries to retry");
+                        foreach (var entry in unsyncedEntries)
+                        {
+                            await SendExistingEntryAsync(entry);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogInformation("No unsynced entries to retry");
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Reconnect retry cancelled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retry unsynced entries on reconnect");
+            }
+        }, "Reconnect Retry");
     }
 
     private void OnWebSocketError(string errorMessage)

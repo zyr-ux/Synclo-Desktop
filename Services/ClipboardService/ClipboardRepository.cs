@@ -18,10 +18,14 @@ public interface IClipboardRepository
     Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0);
     Task<ClipboardDbModel?> GetByIdAsync(string id);
     Task<ClipboardDbModel?> GetByHashAsync(string hash);
+    Task<Dictionary<string, ClipboardDbModel>> GetHashMapAsync(IEnumerable<string> hashes);
+    Task<List<ClipboardDbModel>> GetUnsyncedAsync();
     Task UpsertAsync(ClipboardDbModel entry);
     Task UpsertAsync(IEnumerable<ClipboardDbModel> entries);
+    Task MarkAsSyncedAsync(string id);
     Task DeleteByIdAsync(string id);
     Task ClearAllAsync();
+    Task RunInTransactionAsync(Func<Task> action);
     event Action? OnDataChanged;
 }
 
@@ -78,11 +82,14 @@ CREATE TABLE IF NOT EXISTS clipboard_entries (
     ciphertext TEXT NOT NULL,
     nonce TEXT NOT NULL,
     blob_version INTEGER NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    is_deleted_remotely INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
 CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_is_synced ON clipboard_entries(is_synced);
 ";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
@@ -120,7 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       created_at
+       created_at, is_synced, is_deleted_remotely
 FROM clipboard_entries
 ORDER BY created_at DESC, ROWID DESC
 LIMIT $limit OFFSET $offset
@@ -192,6 +199,95 @@ LIMIT $limit OFFSET $offset
         }).Unwrap();
     }
 
+    public Task<List<ClipboardDbModel>> GetUnsyncedAsync()
+    {
+        return _db.StartNew(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT id, content, content_hash, ciphertext, nonce, blob_version,
+       created_at, is_synced, is_deleted_remotely
+FROM clipboard_entries
+WHERE is_synced = 0
+ORDER BY created_at ASC
+";
+
+                var list = new List<ClipboardDbModel>();
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(MapFromReader(reader));
+
+                return list;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get unsynced entries");
+                throw;
+            }
+        }).Unwrap();
+    }
+
+    // Issue #4 fix: Bulk hash fetch to avoid N+1 queries (Robust chunked implementation)
+    public Task<Dictionary<string, ClipboardDbModel>> GetHashMapAsync(IEnumerable<string> hashes)
+    {
+        return _db.StartNew((Func<Task<Dictionary<string, ClipboardDbModel>>>)(async () =>
+        {
+            var result = new Dictionary<string, ClipboardDbModel>();
+            var uniqueHashes = hashes.Distinct().ToList();
+            
+            if (uniqueHashes.Count == 0) return result;
+
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                // Chunk size to stay safely under SQLite's default variable limit (999)
+                const int ChunkSize = 900; 
+                
+                foreach (var chunk in uniqueHashes.Chunk(ChunkSize))
+                {
+                    var cmd = connection.CreateCommand();
+                    var placeholders = string.Join(",", chunk.Select((_, i) => $"$p{i}"));
+                    
+                    cmd.CommandText = $@"
+                        SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
+                               created_at, is_synced, is_deleted_remotely
+                        FROM clipboard_entries
+                        WHERE content_hash IN ({placeholders})";
+
+                    for (int i = 0; i < chunk.Length; i++)
+                    {
+                        cmd.Parameters.AddWithValue($"$p{i}", chunk[i]);
+                    }
+
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    // Process chunk results
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var entry = MapFromReader(reader);
+                        // Use TryAdd safely
+                        if (!result.ContainsKey(entry.ContentHash))
+                        {
+                            result[entry.ContentHash] = entry;
+                        }
+                    }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get hash map");
+                throw;
+            }
+        })).Unwrap();
+    }
+
 
     // ---------------------------------------------------------
     // WRITES
@@ -253,8 +349,8 @@ LIMIT $limit OFFSET $offset
                     cmd.Transaction = tx;
                     cmd.CommandText = @"
 INSERT OR REPLACE INTO clipboard_entries
-(id, content, content_hash, ciphertext, nonce, blob_version, created_at)
-VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
+(id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted_remotely)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted_remotely)";
                     AddParams(cmd, entry);
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
@@ -266,6 +362,35 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to upsert clipboard entries");
+                throw;
+            }
+        })).Unwrap();
+    }
+
+
+    public Task MarkAsSyncedAsync(string id)
+    {
+        return _db.StartNew((Func<Task>)(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE clipboard_entries SET is_synced = 1 WHERE id = $id";
+                cmd.Parameters.AddWithValue("$id", id);
+                
+                var rowsAffected = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                if (rowsAffected > 0)
+                {
+                    NotifyObservers();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to mark entry {id} as synced");
                 throw;
             }
         })).Unwrap();
@@ -314,6 +439,39 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to clear all entries");
+                throw;
+            }
+        })).Unwrap();
+    }
+
+    public Task RunInTransactionAsync(Func<Task> action)
+    {
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
+
+        return _db.StartNew((Func<Task>)(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                using var tx = connection.BeginTransaction();
+                try
+                {
+                    await action().ConfigureAwait(false);
+                    tx.Commit();
+                    NotifyObservers();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to execute transaction");
                 throw;
             }
         })).Unwrap();
@@ -371,6 +529,8 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
         cmd.Parameters.AddWithValue("$nonce", entry.Nonce);
         cmd.Parameters.AddWithValue("$ver", entry.BlobVersion);
         cmd.Parameters.AddWithValue("$created", entry.CreatedAt.ToString("O"));
+        cmd.Parameters.AddWithValue("$synced", entry.IsSynced ? 1 : 0);
+        cmd.Parameters.AddWithValue("$deleted_remotely", entry.IsDeletedRemotely ? 1 : 0);
     }
 
     private static ClipboardDbModel MapFromReader(SqliteDataReader reader)
@@ -385,7 +545,9 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created)";
             BlobVersion = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
             CreatedAt = reader.IsDBNull(6)
                 ? DateTime.UtcNow
-                : DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+                : DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            IsSynced = reader.FieldCount > 7 && !reader.IsDBNull(7) && reader.GetInt32(7) == 1,
+            IsDeletedRemotely = reader.FieldCount > 8 && !reader.IsDBNull(8) && reader.GetInt32(8) == 1
         };
     }
 }
