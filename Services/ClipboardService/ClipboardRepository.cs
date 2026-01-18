@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS clipboard_entries (
     blob_version INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     is_synced INTEGER NOT NULL DEFAULT 0,
-    is_deleted_remotely INTEGER NOT NULL DEFAULT 0
+    is_deleted INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
@@ -129,7 +129,7 @@ CREATE INDEX IF NOT EXISTS idx_is_synced ON clipboard_entries(is_synced);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       created_at, is_synced, is_deleted_remotely
+       created_at, is_synced, is_deleted
 FROM clipboard_entries
 ORDER BY created_at DESC, ROWID DESC
 LIMIT $limit OFFSET $offset
@@ -213,7 +213,7 @@ LIMIT $limit OFFSET $offset
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       created_at, is_synced, is_deleted_remotely
+       created_at, is_synced, is_deleted
 FROM clipboard_entries
 WHERE is_synced = 0
 ORDER BY created_at ASC
@@ -258,7 +258,7 @@ ORDER BY created_at ASC
                     
                     cmd.CommandText = $@"
                         SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                               created_at, is_synced, is_deleted_remotely
+                               created_at, is_synced, is_deleted
                         FROM clipboard_entries
                         WHERE content_hash IN ({placeholders})";
 
@@ -313,7 +313,7 @@ ORDER BY created_at ASC
                     
                     cmd.CommandText = $@"
                         SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                               created_at, is_synced, is_deleted_remotely
+                               created_at, is_synced, is_deleted
                         FROM clipboard_entries
                         WHERE id IN ({placeholders})";
 
@@ -404,8 +404,8 @@ ORDER BY created_at ASC
                     cmd.Transaction = tx;
                     cmd.CommandText = @"
 INSERT OR REPLACE INTO clipboard_entries
-(id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted_remotely)
-VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted_remotely)";
+(id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted)";
                     AddParams(cmd, entry);
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
@@ -466,7 +466,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     UPDATE clipboard_entries 
-                    SET is_deleted_remotely = 1, is_synced = 0 
+                    SET is_deleted = 1, is_synced = 0 
                     WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
                 
@@ -620,7 +620,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
         cmd.Parameters.AddWithValue("$ver", entry.BlobVersion);
         cmd.Parameters.AddWithValue("$created", entry.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("$synced", entry.IsSynced ? 1 : 0);
-        cmd.Parameters.AddWithValue("$deleted_remotely", entry.IsDeletedRemotely ? 1 : 0);
+        cmd.Parameters.AddWithValue("$deleted", entry.IsDeleted ? 1 : 0);
     }
 
     private static ClipboardDbModel MapFromReader(SqliteDataReader reader)
@@ -637,7 +637,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 ? DateTime.UtcNow
                 : DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
             IsSynced = reader.FieldCount > 7 && !reader.IsDBNull(7) && reader.GetInt32(7) == 1,
-            IsDeletedRemotely = reader.FieldCount > 8 && !reader.IsDBNull(8) && reader.GetInt32(8) == 1
+            IsDeleted = reader.FieldCount > 8 && !reader.IsDBNull(8) && reader.GetInt32(8) == 1
         };
     }
 }
