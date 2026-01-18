@@ -56,7 +56,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="models:ClipboardDbModel">
                             <StackPanel>
-                                <Grid ColumnDefinitions="*,Auto,120">
+                                <Grid ColumnDefinitions="*,Auto,140">
 
                                     <Button Grid.Column="0"
                                             Classes="textButton"

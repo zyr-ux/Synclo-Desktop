@@ -35,8 +35,17 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
         
-        // Fire and forget initial load
-        _ = RefreshDataAsync(silent: true);
+        // Fire and forget initial load with delay to ensure services are ready
+        Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            await RefreshDataAsync(silent: true);
+            // Only show success if no error occurred
+            if (ErrorMessage == null)
+            {
+                _notificationService.ShowSuccess("Clipboard history refreshed.");
+            }
+        });
     }
 
     private void OnHistoryUpdated()
