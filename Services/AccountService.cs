@@ -24,17 +24,46 @@ public interface IAccountService
     event Func<Task>? OnLogout;
 }
 
-public sealed class AccountService(
-    IApiService api,
-    HttpClient http,
-    ISettingsService settings,
-    IDeviceService deviceService,
-    ICryptographyService cryptographyService,
-    ISecureStorage secureStorage,
-    IUtils utils,
-    IRefreshTokenService refreshTokenService,
-    IWebSocketService webSocketService) : IAccountService
+public sealed class AccountService : IAccountService
 {
+    private readonly IApiService api;
+    private readonly HttpClient http;
+    private readonly ISettingsService settings;
+    private readonly IDeviceService deviceService;
+    private readonly ICryptographyService cryptographyService;
+    private readonly ISecureStorage secureStorage;
+    private readonly IUtils utils;
+    private readonly IRefreshTokenService refreshTokenService;
+    private readonly IWebSocketService webSocketService;
+    private readonly INotificationService notificationService;
+
+    public AccountService(
+        IApiService api,
+        HttpClient http,
+        ISettingsService settings,
+        IDeviceService deviceService,
+        ICryptographyService cryptographyService,
+        ISecureStorage secureStorage,
+        IUtils utils,
+        IRefreshTokenService refreshTokenService,
+        IWebSocketService webSocketService,
+        INotificationService notificationService)
+    {
+        this.api = api;
+        this.http = http;
+        this.settings = settings;
+        this.deviceService = deviceService;
+        this.cryptographyService = cryptographyService;
+        this.secureStorage = secureStorage;
+        this.utils = utils;
+        this.refreshTokenService = refreshTokenService;
+        this.webSocketService = webSocketService;
+        this.notificationService = notificationService;
+
+        // Subscribe to device deletion event
+        webSocketService.OnDeviceDeleted += OnDeviceDeletedHandler;
+    }
+
     public const string Prefix = "com.synclo.app";
     public const string AccessToken = $"{Prefix}.auth.access_token";
     public const string RefreshToken = $"{Prefix}.auth.refresh_token";
@@ -52,6 +81,23 @@ public sealed class AccountService(
     }
 
     public async Task<string?> GetStoredEmailAsync() => await secureStorage.LoadAsync(UserEmail);
+
+    private void OnDeviceDeletedHandler()
+    {
+        // Device was deleted remotely - trigger logout
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                notificationService.ShowWarning("This device has been logged out remotely");
+                await LogoutAsync();
+            }
+            catch
+            {
+                // Swallow exceptions during logout to prevent crashes
+            }
+        });
+    }
 
     // -------------------- KDF ENFORCEMENT --------------------
     public async Task EnforceLocalKdfVersionAsync()

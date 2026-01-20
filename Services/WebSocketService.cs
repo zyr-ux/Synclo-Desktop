@@ -20,6 +20,7 @@ public interface IWebSocketService : IDisposable
     event Action? OnConnected;
     event Action? OnDisconnected;
     event Action<string>? OnError;
+    event Action? OnDeviceDeleted;
 }
 
 public sealed class WebSocketService : IWebSocketService
@@ -50,6 +51,7 @@ public sealed class WebSocketService : IWebSocketService
     public event Action? OnConnected;
     public event Action? OnDisconnected;
     public event Action<string>? OnError;
+    public event Action? OnDeviceDeleted;
 
     private void OnTokenRefreshed(string token)
     {
@@ -259,6 +261,11 @@ public sealed class WebSocketService : IWebSocketService
                             : "Unknown error";
                         OnError?.Invoke(errorMsg);
                         return true;
+                    
+                    case "device_deleted":
+                        // Device was deleted remotely - trigger logout
+                        OnDeviceDeleted?.Invoke();
+                        return true;
                 }
             }
         }
@@ -313,6 +320,13 @@ public sealed class WebSocketService : IWebSocketService
             if (code == 4002)
             {
                 _ = ScheduleReconnectBackground();
+                return;
+            }
+
+            if (code == 4003)
+            {
+                // Device deleted remotely - trigger logout
+                OnDeviceDeleted?.Invoke();
                 return;
             }
 

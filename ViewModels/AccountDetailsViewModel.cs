@@ -78,8 +78,15 @@ public partial class AccountDetailsViewModel : ViewModelBase
         {
             await LogoutAsync();
         }
+        catch (DeviceNotFoundException)
+        {
+            // Device was deleted remotely - trigger logout
+            _notificationService.ShowWarning("This device has been logged out remotely");
+            await LogoutAsync();
+        }
         catch
         {
+            // Network or server error - show offline message
             _notificationService.ShowError("Device Offline");
         }
     }

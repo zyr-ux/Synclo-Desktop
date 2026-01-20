@@ -29,6 +29,14 @@ public sealed class DeviceService(IApiService api, ISettingsService settings, IS
     {
         using var res = await api.GetAsync("/api/devices", ct);
         var content = await res.Content.ReadAsStringAsync(ct);
+        
+        // Check if device was deleted (unauthorized/forbidden)
+        if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized || 
+            res.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new DeviceNotFoundException("This device is no longer registered. It may have been removed remotely.");
+        }
+        
         if (!res.IsSuccessStatusCode)
             throw new ServerFailureException(content);
 

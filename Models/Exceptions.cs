@@ -27,3 +27,6 @@ public sealed class InvalidBlobVersionException(string message) : Exception(mess
 
 // NEW - Rate limit exception
 public sealed class RateLimitException(string message) : Exception(message);
+
+// NEW - Device not found (deleted remotely)
+public sealed class DeviceNotFoundException(string message) : Exception(message);
