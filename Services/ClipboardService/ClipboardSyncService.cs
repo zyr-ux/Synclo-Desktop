@@ -494,9 +494,10 @@ public class ClipboardSyncService(
                     continue;
 
                 // Normalize Timestamp
-                var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Utc
-                    ? entry.timestamp
+                var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(entry.timestamp, DateTimeKind.Utc) // Treating Unspecified as UTC
                     : entry.timestamp.ToUniversalTime();
+
                 serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
 
                 var dbEntry = new ClipboardDbModel
@@ -932,8 +933,11 @@ public class ClipboardSyncService(
                 return;
             }
 
-            entry.timestamp = entry.timestamp.Kind == DateTimeKind.Utc ? entry.timestamp : entry.timestamp.ToUniversalTime();
-            entry.timestamp = _utils.TruncateToMilliseconds(entry.timestamp);
+            var timestamp = entry.timestamp.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(entry.timestamp, DateTimeKind.Utc)
+                : entry.timestamp.ToUniversalTime();
+            
+            entry.timestamp = _utils.TruncateToMilliseconds(timestamp);
 
             // Handle tombstones (deleted entries) - they have null ciphertext/nonce
             if (entry.is_deleted)
@@ -1145,8 +1149,8 @@ public class ClipboardSyncService(
     {
         ClearMasterKeyCache();
         
-        // Cleanup tombstones on logout to ensure no tracking of deleted items remains
-        await _repository.PurgeTombstonesAsync();
+        // Wipe local database completely on logout/failure to ensure fresh state on next login
+        await _repository.ClearAllAsync();
         
         // Disconnect WebSocket
         await _webSocketService.DisconnectAsync();
