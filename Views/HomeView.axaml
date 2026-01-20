@@ -35,6 +35,18 @@
                                             Height="26"/>
             </Button>
         </StackPanel>
+        
+        <TextBlock Grid.Row="0"
+                   Grid.RowSpan="2"
+                   Text="{Binding HomeStatusMessage}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   TextAlignment="Center"
+                   FontSize="20"
+                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                   Foreground="{DynamicResource Accent}"
+                   IsVisible="{Binding HomeStatusMessageVisibility}"
+                   IsHitTestVisible="False"/>
 
         <!-- ScrollViewer is FLUSH to the edge -->
         <ScrollViewer Grid.Row="1"

@@ -17,23 +17,33 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly INotificationService _notificationService;
     private readonly IClipboardSyncService _clipboardSyncService;
+    private readonly IAccountService _accountService;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
     private CancellationTokenSource? _updateCts;
+    private bool _isLoggedIn;
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private ObservableCollection<ClipboardDbModel> _historyEntries = new();
+    [ObservableProperty] private string? _homeStatusMessage;
+    [ObservableProperty] private bool _homeStatusMessageVisibility;
+    
 
     public HomeViewModel(
         IClipboardMonitor clipboardMonitor,
         INotificationService notificationService,
-        IClipboardSyncService clipboardSyncService)
+        IClipboardSyncService clipboardSyncService,
+        IAccountService accountService)
     {
         _clipboardMonitor = clipboardMonitor;
         _notificationService = notificationService;
         _clipboardSyncService = clipboardSyncService;
+        _accountService = accountService;
         
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
+        _accountService.OnLogin += async () => await UpdateHomeStatusAsync();
+        _accountService.OnLogout += async () => await UpdateHomeStatusAsync();
+        
         
         // Fire and forget initial load with delay to ensure services are ready
         Task.Run(async () =>
@@ -45,6 +55,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             {
                 _notificationService.ShowSuccess("Clipboard history refreshed.");
             }
+            await UpdateHomeStatusAsync();
         });
     }
 
@@ -69,6 +80,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 if (token.IsCancellationRequested) return; // Check again after async call
 
                 ApplyCollectionDiff(entries);
+                await UpdateHomeStatusAsync();
             }
             catch (OperationCanceledException) { /* Ignored */ }
             finally
@@ -228,6 +240,26 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         catch (Exception)
         {
             entry.IsDeleting = false;
+        }
+    }
+
+    private async Task UpdateHomeStatusAsync()
+    {
+        _isLoggedIn = await _accountService.IsAuthenticatedAsync();
+
+        switch (_isLoggedIn)
+        {
+            case false:
+                HomeStatusMessage = "You are not logged in. Pls log in to use Synclo!";
+                HomeStatusMessageVisibility = true;
+                break;
+            case true when HistoryEntries.Count == 0:
+                HomeStatusMessage = "Looks like this is empty! Copy something rn!";
+                HomeStatusMessageVisibility = true;
+                break;
+            default:
+                HomeStatusMessageVisibility = false;
+                break;
         }
     }
 
