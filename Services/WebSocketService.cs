@@ -158,7 +158,7 @@ public sealed class WebSocketService : IWebSocketService
         try
         {
             // Use centralized token refresh to prevent concurrent refresh attempts
-            await _refreshTokenService.RefreshAsync(_cts?.Token ?? CancellationToken.None);
+            await _refreshTokenService.RefreshAsync();
 
             var newToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
             if (string.IsNullOrWhiteSpace(newToken)) return;
@@ -306,7 +306,7 @@ public sealed class WebSocketService : IWebSocketService
                 try
                 {
                     // Use centralized token refresh to prevent concurrent refresh attempts
-                    await _refreshTokenService.RefreshAsync(_cts?.Token ?? CancellationToken.None);
+                    await _refreshTokenService.RefreshAsync();
                 }
                 catch
                 {

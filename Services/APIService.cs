@@ -84,7 +84,7 @@ public sealed class ApiService : IApiService
         response.Dispose();
 
         // Use centralized refresh service
-        await _refreshTokenService.RefreshAsync(ct);
+        await _refreshTokenService.RefreshAsync();
         
         // Retry request with new token
         return await SendReqHelper(method, url, body, ct);
