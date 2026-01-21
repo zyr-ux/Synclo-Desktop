@@ -56,7 +56,7 @@
                 </Border>
 
                 <!-- Start on boot -->
-                <Border Background="{DynamicResource Accent}"
+                <Border Background="Transparent"
                         CornerRadius="8"
                         Padding="16">
                     <Grid ColumnDefinitions="Auto,*,Auto">
@@ -66,23 +66,23 @@
                             Height="36"
                             Margin="0,0,16,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundD}" />
+                            Foreground="{DynamicResource ForegroundL}" />
 
                         <TextBlock Grid.Column="1"
                                    Text="Start on boot"
                                    FontFamily="{StaticResource Inconsolata-Bold}"
                                    FontSize="24"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource ForegroundD}" />
+                                   Foreground="{DynamicResource ForegroundL}" />
 
                         <ToggleSwitch Grid.Column="2"
                                       VerticalAlignment="Center"
-                                      Foreground="{DynamicResource ForegroundD}" />
+                                      Foreground="{DynamicResource ForegroundL}" />
                     </Grid>
                 </Border>
 
                 <!-- Background sync -->
-                <Border Background="{DynamicResource Accent}"
+                <Border Background="Transparent"
                         CornerRadius="8"
                         Padding="16">
                     <Grid ColumnDefinitions="Auto,*,Auto">
@@ -92,23 +92,23 @@
                             Height="36"
                             Margin="0,0,16,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundD}" />
+                            Foreground="{DynamicResource ForegroundL}" />
 
                         <TextBlock Grid.Column="1"
                                    Text="Background Sync"
                                    FontFamily="{StaticResource Inconsolata-Bold}"
                                    FontSize="24"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource ForegroundD}" />
+                                   Foreground="{DynamicResource ForegroundL}" />
 
                         <ToggleSwitch Grid.Column="2"
                                       VerticalAlignment="Center"
-                                      Foreground="{DynamicResource ForegroundD}" />
+                                      Foreground="{DynamicResource ForegroundL}" />
                     </Grid>
                 </Border>
 
                 <!-- Minimize to tray -->
-                <Border Background="{DynamicResource Accent}"
+                <Border Background="Transparent"
                         CornerRadius="8"
                         Padding="16">
                     <Grid ColumnDefinitions="Auto,*,Auto">
@@ -118,18 +118,18 @@
                             Height="36"
                             Margin="0,0,16,0"
                             VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundD}" />
+                            Foreground="{DynamicResource ForegroundL}" />
 
                         <TextBlock Grid.Column="1"
                                    Text="Minimize to Tray"
                                    FontFamily="{StaticResource Inconsolata-Bold}"
                                    FontSize="24"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource ForegroundD}" />
+                                   Foreground="{DynamicResource ForegroundL}" />
 
                         <ToggleSwitch Grid.Column="2"
                                       VerticalAlignment="Center"
-                                      Foreground="{DynamicResource ForegroundD}" />
+                                      Foreground="{DynamicResource ForegroundL}" />
                     </Grid>
                 </Border>
 
