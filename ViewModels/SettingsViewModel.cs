@@ -17,7 +17,6 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ISettingsService _settings;
     private readonly IApiService _apiService;
     private readonly IThemeService _themeService;
-    private readonly IClipboardSyncService _clipboardSyncService;
     private readonly IStartupManager _startupManager;
     
     [ObservableProperty] private string _selectedTheme = "System";
@@ -27,24 +26,20 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
     [ObservableProperty] private double _gridOpacity;
     
-    [ObservableProperty] private bool _isAutoSyncEnabled;
     [ObservableProperty] private bool _isStartOnBootEnabled;
 
     public SettingsViewModel(
         ISettingsService settings, 
         IApiService apiService, 
         IThemeService themeService,
-        IClipboardSyncService clipboardSyncService,
         IStartupManager startupManager)
     {
         _settings = settings;
         _apiService = apiService;
         _themeService = themeService;
-        _clipboardSyncService = clipboardSyncService;
         _startupManager = startupManager;
         
         SelectedTheme = _settings.Settings.Theme;
-        IsAutoSyncEnabled = _settings.Settings.background_sync_enabled;
         
         // Load start on boot status
         _ = LoadStartOnBootStatusAsync();
@@ -71,14 +66,7 @@ public partial class SettingsViewModel : ViewModelBase
         _settings.Save();
     }
 
-    partial void OnIsAutoSyncEnabledChanged(bool value)
-    {
-        _settings.Settings.background_sync_enabled = value;
-        _settings.Save();
-        
-        // Start/stop clipboard monitoring
-        _ = _clipboardSyncService.SetEnabledAsync(value);
-    }
+
 
     partial void OnIsStartOnBootEnabledChanged(bool value)
     {

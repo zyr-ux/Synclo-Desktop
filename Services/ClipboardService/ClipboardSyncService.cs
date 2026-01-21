@@ -30,7 +30,6 @@ public interface IClipboardSyncService : IDisposable
     Task InitializeAsync();
     Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100);
     Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100);
-    Task SetEnabledAsync(bool enabled);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
@@ -195,17 +194,10 @@ public class ClipboardSyncService(
                     if (!_webSocketService.IsConnected) _ = _webSocketService.ConnectAsync();
                 }
 
-                // Start monitoring if auto-sync is enabled
-                if (_settingsService.Settings.background_sync_enabled)
-                {
-                    _logger.LogInformation("Auto-sync enabled, starting clipboard monitor");
-                    await _monitor.StartAsync();
-                    _logger.LogInformation($"Clipboard monitor started. IsRunning: {_monitor.IsRunning}");
-                }
-                else
-                {
-                    _logger.LogWarning("Auto-sync is DISABLED - clipboard monitor will NOT start");
-                }
+                // Always start clipboard monitoring
+                _logger.LogInformation("Starting clipboard monitor");
+                await _monitor.StartAsync();
+                _logger.LogInformation($"Clipboard monitor started. IsRunning: {_monitor.IsRunning}");
 
                 // Start consumer task for clipboard channel (Bug #7, #8 fix)
                 _consumerTask = Task.Run(() => ProcessClipboardChannelAsync(_shutdownCts.Token), _shutdownCts.Token);
@@ -291,17 +283,7 @@ public class ClipboardSyncService(
         }
     }
 
-    public async Task SetEnabledAsync(bool enabled)
-    {
-        // Bug #10 fix: Persist settings so preference survives restart
-        _settingsService.Settings.background_sync_enabled = enabled;
-        _settingsService.Save();
-        
-        if (enabled)
-            await _monitor.StartAsync();
-        else
-            await _monitor.StopAsync();
-    }
+
 
     public async Task DeleteClipboardEntryAsync(string clipboardId)
     {
@@ -705,11 +687,7 @@ public class ClipboardSyncService(
                 return;
             }
 
-            if (!_settingsService.Settings.background_sync_enabled)
-            {
-                _logger.LogInformation("Auto-sync disabled, skipping");
-                return;
-            }
+            // Clipboard monitoring is always on - process all clipboard changes
 
             var contentHash = _utils.ComputeHash(content);
             _logger.LogDebug($"Content hash: {contentHash.Substring(0, 16)}...");
