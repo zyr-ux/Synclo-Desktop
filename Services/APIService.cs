@@ -83,10 +83,17 @@ public sealed class ApiService : IApiService
 
         response.Dispose();
 
-        // Use centralized refresh service
-        await _refreshTokenService.RefreshAsync();
+        // Trigger refresh and wait for result
+        _refreshTokenService.RaiseTokenExpired();
+        var result = await _refreshTokenService.WaitForRefreshAsync(ct);
         
-        // Retry request with new token
+        if (result == AuthRefreshResult.SessionExpired)
+            throw new SessionExpiredException();
+        
+        if (result == AuthRefreshResult.NetworkFailure)
+            throw new NetworkFailureException();
+        
+        // Success - retry request with new token
         return await SendReqHelper(method, url, body, ct);
     }
 

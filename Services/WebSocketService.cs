@@ -123,45 +123,12 @@ public sealed class WebSocketService : IWebSocketService
     {
         if (_disposed || _manualDisconnect || IsConnected) return;
 
-        var token = await _secureStorage.LoadAsync(AccountService.AccessToken);
-        if (string.IsNullOrWhiteSpace(token)) return;
+        var attemptRefresh = true;
 
-        await DisconnectInternal();
-
-        _socket = new ClientWebSocket();
-        _cts = new CancellationTokenSource();
-
-        // Use Authorization header instead of query parameter
-        _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-        var url = "wss://synclo.zyrux.dev/ws/clipboard";
-
-        try
+        while (true)
         {
-            await _socket.ConnectAsync(new Uri(url), _cts.Token);
-            _retryCount = 0;
-            _ = ReceiveLoop();
-            _pingTask = StartPingLoop(_cts.Token);
-            OnConnected?.Invoke();
-        }
-        catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket || ex.Message.Contains("403"))
-        {
-            await Handle403AndRetry();
-        }
-        catch
-        {
-            _ = ScheduleReconnectBackground();
-        }
-    }
-
-    private async Task Handle403AndRetry()
-    {
-        try
-        {
-            // Use centralized token refresh to prevent concurrent refresh attempts
-            await _refreshTokenService.RefreshAsync();
-
-            var newToken = await _secureStorage.LoadAsync(AccountService.AccessToken);
-            if (string.IsNullOrWhiteSpace(newToken)) return;
+            var token = await _secureStorage.LoadAsync(AccountService.AccessToken);
+            if (string.IsNullOrWhiteSpace(token)) return;
 
             await DisconnectInternal();
 
@@ -169,19 +136,38 @@ public sealed class WebSocketService : IWebSocketService
             _cts = new CancellationTokenSource();
 
             // Use Authorization header instead of query parameter
-            _socket.Options.SetRequestHeader("Authorization", $"Bearer {newToken}");
+            _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
             var url = "wss://synclo.zyrux.dev/ws/clipboard";
-            await _socket.ConnectAsync(new Uri(url), _cts.Token);
-            _retryCount = 0;
-            _ = ReceiveLoop();
-            _pingTask = StartPingLoop(_cts.Token);
-            OnConnected?.Invoke();
-        }
-        catch
-        {
-            _ = ScheduleReconnectBackground();
+
+            try
+            {
+                await _socket.ConnectAsync(new Uri(url), _cts.Token);
+                _retryCount = 0;
+                _ = ReceiveLoop();
+                _pingTask = StartPingLoop(_cts.Token);
+                OnConnected?.Invoke();
+                return;
+            }
+            catch (WebSocketException ex) when (attemptRefresh && (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket || ex.Message.Contains("403")))
+            {
+                // Only try to refresh once per connection attempt
+                attemptRefresh = false;
+                
+                // Notify that token expired - RefreshTokenService will handle it
+                _refreshTokenService.RaiseTokenExpired();
+                
+                // OnTokenRefreshed handler will trigger reconnection
+                return;
+            }
+            catch
+            {
+                _ = ScheduleReconnectBackground();
+                return;
+            }
         }
     }
+
+
 
     private async Task ReceiveLoop()
     {
@@ -288,7 +274,10 @@ public sealed class WebSocketService : IWebSocketService
 
         if (status is WebSocketCloseStatus.PolicyViolation)
         {
-            await Handle403AndRetry();
+            // Notify that token expired
+            _refreshTokenService.RaiseTokenExpired();
+            
+            // OnTokenRefreshed handler will trigger reconnection
             return;
         }
 
@@ -303,16 +292,10 @@ public sealed class WebSocketService : IWebSocketService
             var code = (int)status.Value;
             if (code == 4001)
             {
-                try
-                {
-                    // Use centralized token refresh to prevent concurrent refresh attempts
-                    await _refreshTokenService.RefreshAsync();
-                }
-                catch
-                {
-                    // If refresh fails, schedule normal reconnect (which may lead to logout)
-                }
-
+                // Notify that token expired
+                _refreshTokenService.RaiseTokenExpired();
+                
+                // OnTokenRefreshed handler will trigger reconnection
                 _ = ScheduleReconnectBackground();
                 return;
             }
@@ -332,7 +315,10 @@ public sealed class WebSocketService : IWebSocketService
 
             if (code == 1008)
             {
-                await Handle403AndRetry();
+                // Notify that token expired
+                _refreshTokenService.RaiseTokenExpired();
+                
+                // OnTokenRefreshed handler will trigger reconnection
                 return;
             }
         }

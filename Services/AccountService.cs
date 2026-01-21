@@ -17,7 +17,6 @@ public interface IAccountService
     Task LoginAsync(string email, string password, CancellationToken ct = default);
     Task RegisterAsync(string email, string password, CancellationToken ct = default);
     Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default);
-    Task<string> RefreshTokenAsync();
     Task LogoutAsync();
     Task DeleteAccountAsync(CancellationToken ct = default);
     event Func<Task>? OnLogin;
@@ -349,12 +348,7 @@ public sealed class AccountService : IAccountService
             SupportedKdfVersion.ToString());
     }
 
-    // -------------------- TOKEN REFRESH --------------------
 
-    public async Task<string> RefreshTokenAsync()
-    {
-        return await refreshTokenService.RefreshAsync();
-    }
 
     // -------------------- LOGIN / LOGOUT EVENTS --------------------
 
