@@ -196,7 +196,7 @@ public class ClipboardSyncService(
                 }
 
                 // Start monitoring if auto-sync is enabled
-                if (_settingsService.Settings.auto_sync_enabled)
+                if (_settingsService.Settings.background_sync_enabled)
                 {
                     _logger.LogInformation("Auto-sync enabled, starting clipboard monitor");
                     await _monitor.StartAsync();
@@ -294,7 +294,7 @@ public class ClipboardSyncService(
     public async Task SetEnabledAsync(bool enabled)
     {
         // Bug #10 fix: Persist settings so preference survives restart
-        _settingsService.Settings.auto_sync_enabled = enabled;
+        _settingsService.Settings.background_sync_enabled = enabled;
         _settingsService.Save();
         
         if (enabled)
@@ -705,7 +705,7 @@ public class ClipboardSyncService(
                 return;
             }
 
-            if (!_settingsService.Settings.auto_sync_enabled)
+            if (!_settingsService.Settings.background_sync_enabled)
             {
                 _logger.LogInformation("Auto-sync disabled, skipping");
                 return;

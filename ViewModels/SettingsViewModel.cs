@@ -44,7 +44,7 @@ public partial class SettingsViewModel : ViewModelBase
         _startupManager = startupManager;
         
         SelectedTheme = _settings.Settings.Theme;
-        IsAutoSyncEnabled = _settings.Settings.auto_sync_enabled;
+        IsAutoSyncEnabled = _settings.Settings.background_sync_enabled;
         
         // Load start on boot status
         _ = LoadStartOnBootStatusAsync();
@@ -73,7 +73,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     partial void OnIsAutoSyncEnabledChanged(bool value)
     {
-        _settings.Settings.auto_sync_enabled = value;
+        _settings.Settings.background_sync_enabled = value;
         _settings.Save();
         
         // Start/stop clipboard monitoring
