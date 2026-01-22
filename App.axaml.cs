@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Notifications;
 using Avalonia.Data.Core.Plugins;
@@ -60,6 +61,7 @@ public class App : Application
         collection.AddSingleton<INotificationService, NotificationService>();
         collection.AddSingleton<DialogService.IDialogService, DialogService>();
         collection.AddSingleton<IThemeService, ThemeService>();
+        collection.AddSingleton<IApplicationControlService, ApplicationControlService>();
         collection.AddSingleton<IUtils, Utils>();
 
         // Clipboard subsystem (dependant services)
@@ -138,14 +140,21 @@ public class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Required for background sync: app runs until explicit shutdown
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
             DisableAvaloniaDataAnnotationValidation();
 
             var mainVm = services.GetRequiredService<MainWindowViewModel>();
+            var appControlService = services.GetRequiredService<IApplicationControlService>();
 
             var mainWindow = new MainWindow
             {
                 DataContext = mainVm
             };
+
+            // Wire up close behavior (hide vs exit)
+            mainWindow.Initialize(appControlService);
 
             // ✅ Initialize notification manager BEFORE VM startup
             var notificationService = services.GetRequiredService<INotificationService>();
@@ -160,7 +169,7 @@ public class App : Application
 
             desktop.MainWindow = mainWindow;
 
-            // ✅ Now it's safe to initialize the VM
+            // Now it's safe to initialize the VM
             Dispatcher.UIThread.InvokeAsync(mainVm.InitializeApplicationAsync);
 
             desktop.Exit += async (_, _) =>
