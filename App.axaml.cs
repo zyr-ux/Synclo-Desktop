@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -98,7 +99,20 @@ public class App : Application
             return new SecureStorageLinux();
         });
 
+        // Single instance manager (must be registered before building provider)
+        collection.AddSingleton<SingleInstanceManager>();
+
         var services = collection.BuildServiceProvider();
+
+        // ========== SINGLE INSTANCE CHECK (must be first) ==========
+        var instanceManager = services.GetRequiredService<SingleInstanceManager>();
+        if (!instanceManager.IsPrimary)
+        {
+            // Signal primary instance to show window and exit
+            instanceManager.SignalPrimary();
+            Environment.Exit(0);
+            return; // Safety: won't reach here
+        }
 
         var apiService = services.GetRequiredService<IApiService>();
         var accountService = services.GetRequiredService<IAccountService>();
@@ -154,6 +168,7 @@ public class App : Application
                 await clipboardSyncService.ShutdownAsync();
                 webSocketService.Dispose();
                 apiService.Dispose();
+                instanceManager.Dispose();
                 mainVm.Dispose();
             };
         }
