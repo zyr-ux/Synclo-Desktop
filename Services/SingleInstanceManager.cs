@@ -7,7 +7,6 @@ using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
@@ -19,21 +18,16 @@ public sealed class SingleInstanceManager : IDisposable
     private const string MutexNameWindows = @"Global\Synclo.SingleInstance.Mutex";
     private const string MutexNameUnix = "Synclo.SingleInstance.Mutex";
     private const string PipeName = "Synclo.SingleInstance.IPC";
-
     private const byte CommandShowWindow = 0x01;
-
-    private const int MaxRetryAttempts = 5;
-    private const int RetryDelayMs = 200;
-    private const int ConnectTimeoutMs = 400;
 
     private readonly Mutex _mutex;
     private readonly CancellationTokenSource _cts = new();
     private readonly ILogger<SingleInstanceManager>? _logger;
-    private readonly bool _isPrimary;
-    private Task? _acceptLoopTask;
-    private bool _disposed;
 
-    public bool IsPrimary => _isPrimary;
+    private Task? _acceptLoopTask;
+    private volatile bool _disposed;
+
+    public bool IsPrimary { get; }
 
     public SingleInstanceManager(ILogger<SingleInstanceManager>? logger = null)
     {
@@ -43,10 +37,19 @@ public sealed class SingleInstanceManager : IDisposable
             ? MutexNameWindows
             : MutexNameUnix;
 
-        _mutex = new Mutex(initiallyOwned: true, mutexName, out bool createdNew);
-        _isPrimary = createdNew;
+        _mutex = new Mutex(false, mutexName);
 
-        if (_isPrimary)
+        try
+        {
+            IsPrimary = _mutex.WaitOne(TimeSpan.Zero, false);
+        }
+        catch (AbandonedMutexException)
+        {
+            // Previous instance crashed — we are now primary
+            IsPrimary = true;
+        }
+
+        if (IsPrimary)
         {
             _acceptLoopTask = Task.Run(AcceptLoopAsync);
         }
@@ -57,36 +60,24 @@ public sealed class SingleInstanceManager : IDisposable
     /// </summary>
     public bool SignalPrimary()
     {
-        for (int attempt = 1; attempt <= MaxRetryAttempts; attempt++)
+        try
         {
-            try
-            {
-                using var client = CreatePipeClient();
-                client.Connect(ConnectTimeoutMs);
+            using var client = new NamedPipeClientStream(
+                ".",
+                PipeName,
+                PipeDirection.Out,
+                PipeOptions.Asynchronous);
 
-                client.WriteByte(CommandShowWindow);
-                client.Flush();
-                return true;
-            }
-            catch (TimeoutException)
-            {
-            }
-            catch (IOException) when (attempt < MaxRetryAttempts)
-            {
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to signal primary instance");
-                return false;
-            }
-
-            if (attempt < MaxRetryAttempts)
-            {
-                Thread.Sleep(RetryDelayMs);
-            }
+            client.Connect(1500);
+            client.WriteByte(CommandShowWindow);
+            client.Flush();
+            return true;
         }
-
-        return false;
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to signal primary instance");
+            return false;
+        }
     }
 
     private async Task AcceptLoopAsync()
@@ -100,7 +91,7 @@ public sealed class SingleInstanceManager : IDisposable
                 server = CreatePipeServer();
                 await server.WaitForConnectionAsync(_cts.Token).ConfigureAwait(false);
 
-                _ = Task.Run(() => HandleClientAsync(server), _cts.Token);
+                _ = HandleClientAsync(server, _cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -111,50 +102,37 @@ public sealed class SingleInstanceManager : IDisposable
             {
                 server?.Dispose();
                 _logger?.LogError(ex, "IPC accept loop error");
-
-                try
-                {
-                    await Task.Delay(100, _cts.Token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
+                await Task.Delay(100, _cts.Token).ConfigureAwait(false);
             }
         }
     }
 
-    private static async Task HandleClientAsync(NamedPipeServerStream server)
+    private static async Task HandleClientAsync(
+        NamedPipeServerStream server,
+        CancellationToken ct)
     {
         await using (server.ConfigureAwait(false))
         {
-            int command = server.ReadByte();
-            if (command == CommandShowWindow)
+            var buffer = new byte[1];
+            var read = await server.ReadAsync(buffer, 0, 1, ct).ConfigureAwait(false);
+
+            if (read == 1 && buffer[0] == CommandShowWindow)
             {
                 ActivateMainWindow();
             }
         }
     }
 
-    private static NamedPipeClientStream CreatePipeClient()
-    {
-        return new NamedPipeClientStream(
-            serverName: ".",
-            pipeName: PipeName,
-            direction: PipeDirection.Out,
-            options: PipeOptions.None);
-    }
-
     private static NamedPipeServerStream CreatePipeServer()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var pipeSecurity = new PipeSecurity();
+            var security = new PipeSecurity();
             var user = WindowsIdentity.GetCurrent().User;
 
             if (user != null)
             {
-                pipeSecurity.AddAccessRule(
+                security.AddAccessRule(
                     new PipeAccessRule(
                         user,
                         PipeAccessRights.ReadWrite,
@@ -162,41 +140,40 @@ public sealed class SingleInstanceManager : IDisposable
             }
 
             return NamedPipeServerStreamAcl.Create(
-                pipeName: PipeName,
-                direction: PipeDirection.In,
-                maxNumberOfServerInstances: NamedPipeServerStream.MaxAllowedServerInstances,
-                transmissionMode: PipeTransmissionMode.Byte,
-                options: PipeOptions.Asynchronous,
-                inBufferSize: 0,
-                outBufferSize: 0,
-                pipeSecurity: pipeSecurity);
+                PipeName,
+                PipeDirection.In,
+                NamedPipeServerStream.MaxAllowedServerInstances,
+                PipeTransmissionMode.Byte,
+                PipeOptions.Asynchronous,
+                0,
+                0,
+                security);
         }
 
         return new NamedPipeServerStream(
-            pipeName: PipeName,
-            direction: PipeDirection.In,
-            maxNumberOfServerInstances: NamedPipeServerStream.MaxAllowedServerInstances,
-            transmissionMode: PipeTransmissionMode.Byte,
-            options: PipeOptions.Asynchronous);
+            PipeName,
+            PipeDirection.In,
+            NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous);
     }
 
     private static void ActivateMainWindow()
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                var window = desktop.MainWindow;
-                if (window == null) return;
+            if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                return;
 
-                window.WindowState = WindowState.Normal;
-                window.Show();
+            var window = desktop.MainWindow;
+            if (window == null) return;
 
-                // Windows foreground workaround
-                window.Topmost = true;
-                window.Activate();
-                window.Topmost = false;
-            }
+            window.WindowState = Avalonia.Controls.WindowState.Normal;
+            window.Show();
+
+            window.Topmost = true;
+            window.Activate();
+            window.Topmost = false;
         });
     }
 
@@ -209,7 +186,7 @@ public sealed class SingleInstanceManager : IDisposable
 
         try
         {
-            _acceptLoopTask?.Wait(TimeSpan.FromMilliseconds(500));
+            _acceptLoopTask?.Wait(300);
         }
         catch
         {
@@ -217,15 +194,13 @@ public sealed class SingleInstanceManager : IDisposable
 
         _cts.Dispose();
 
-        if (_isPrimary)
+        try
         {
-            try
-            {
+            if (IsPrimary)
                 _mutex.ReleaseMutex();
-            }
-            catch
-            {
-            }
+        }
+        catch
+        {
         }
 
         _mutex.Dispose();
