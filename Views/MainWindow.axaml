@@ -53,7 +53,7 @@
 
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
-                                 IsChecked="True"
+                                 IsChecked="{Binding IsHomePage}"
                                  Command="{Binding ShowHomeCommand}"
                                  HorizontalContentAlignment="Left"
                                  Padding="16 0">
@@ -65,6 +65,7 @@
 
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
+                                 IsChecked="{Binding IsAccountPage}"
                                  Command="{Binding ShowAccountCommand}"
                                  HorizontalContentAlignment="Left"
                                  Padding="16 0">
@@ -76,6 +77,7 @@
 
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
+                                 IsChecked="{Binding IsSettingsPage}"
                                  Command="{Binding ShowSettingsCommand}"
                                  HorizontalContentAlignment="Left"
                                  Padding="16 0">

@@ -13,6 +13,13 @@ using Synclo.Services;
 
 namespace Synclo.ViewModels;
 
+public enum NavigationPage
+{
+    Home,
+    Account,
+    Settings
+}
+
 public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IViewModelFactory _factory;
@@ -23,6 +30,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private IBrush _statusColor = Brushes.Gray;
+    [ObservableProperty, 
+    NotifyPropertyChangedFor(nameof(IsHomePage)), 
+    NotifyPropertyChangedFor(nameof(IsAccountPage)), 
+    NotifyPropertyChangedFor(nameof(IsSettingsPage))]
+    private NavigationPage _currentPage = NavigationPage.Home;
+    
+    // Computed properties for direct binding without converters
+    public bool IsHomePage => CurrentPage == NavigationPage.Home;
+    public bool IsAccountPage => CurrentPage == NavigationPage.Account;
+    public bool IsSettingsPage => CurrentPage == NavigationPage.Settings;
+    
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(10));
     private readonly CancellationTokenSource _cts = new();
     private Task? _pollingTask;
@@ -40,6 +58,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         _apiService = apiService;
         _webSocketService = webSocketService;
         CurrentViewModel = _factory.Create<HomeViewModel>();
+        CurrentPage = NavigationPage.Home;
         _ = Task.Run(CheckStatus);
     }
 
@@ -144,18 +163,24 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    private void ShowHome() => SwitchTo<HomeViewModel>();
-
-    [RelayCommand]
-    private void ShowSettings() => SwitchTo<SettingsViewModel>();
-
-    [RelayCommand]
-    private void ShowAccount() => SwitchTo<AccountViewModel>();
-
-    private void SwitchTo<T>() where T : ViewModelBase
+    private void ShowHome()
     {
+        CurrentPage = NavigationPage.Home;
+        CurrentViewModel = _factory.Create<HomeViewModel>();
+    }
 
-        CurrentViewModel = _factory.Create<T>();
+    [RelayCommand]
+    private void ShowSettings()
+    {
+        CurrentPage = NavigationPage.Settings;
+        CurrentViewModel = _factory.Create<SettingsViewModel>();
+    }
+
+    [RelayCommand]
+    private void ShowAccount()
+    {
+        CurrentPage = NavigationPage.Account;
+        CurrentViewModel = _factory.Create<AccountViewModel>();
     }
     
     public void Dispose()
