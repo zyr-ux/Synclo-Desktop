@@ -42,6 +42,20 @@
         
     </Application.Resources>
     
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/avalonia-logo.ico"
+                      ToolTipText="Synclo - Clipboard Sync">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Show/Hide" Click="OnShowHideClicked" />
+                        <NativeMenuItem Header="Settings" Click="OnSettingsClicked" />
+                        <NativeMenuItem Header="Exit" Click="OnExitClicked" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
 
     
 </Application>

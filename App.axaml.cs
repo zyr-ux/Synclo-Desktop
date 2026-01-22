@@ -137,6 +137,13 @@ public class App : Application
         });
 
         accountService.OnLogout += webSocketService.DisconnectAsync;
+        
+        // Handle Tray Icon Visibility
+        settingsService.SettingsChanged += s => 
+        {
+            Dispatcher.UIThread.InvokeAsync(() => UpdateTrayIconVisibility(s.minimize_to_tray));
+        };
+        UpdateTrayIconVisibility(settingsService.Settings.minimize_to_tray);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -186,6 +193,66 @@ public class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+
+    private void OnExitClicked(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+        }
+    }
+
+    private void OnShowHideClicked(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var mainWindow = desktop.MainWindow;
+            if (mainWindow == null) return;
+
+            if (mainWindow.IsVisible)
+            {
+                mainWindow.Hide();
+            }
+            else
+            {
+                mainWindow.Show();
+                mainWindow.Activate();
+            }
+        }
+    }
+
+    private void OnSettingsClicked(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var mainWindow = desktop.MainWindow;
+            if (mainWindow == null) return;
+
+            // Show window if hidden
+            if (!mainWindow.IsVisible)
+            {
+                mainWindow.Show();
+                mainWindow.Activate();
+            }
+
+            // Navigate to Settings
+            if (mainWindow.DataContext is MainWindowViewModel vm)
+            {
+                vm.ShowSettingsCommand.Execute(null);
+            }
+        }
+    }
+
+    private void UpdateTrayIconVisibility(bool isVisible)
+    {
+        var icons = TrayIcon.GetIcons(this);
+        if (icons == null) return;
+
+        foreach (var icon in icons)
+        {
+            icon.IsVisible = isVisible;
+        }
+    }
 
     private void DisableAvaloniaDataAnnotationValidation()
     {
