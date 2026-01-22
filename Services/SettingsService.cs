@@ -9,12 +9,15 @@ public interface ISettingsService
 {
     AppSettings Settings { get; }
     void Save();
+    event Action<AppSettings>? SettingsChanged;
 }
 
 public sealed class SettingsService : ISettingsService
 {
     private const string FileName = "settings.json";
     private readonly string _path;
+    public AppSettings Settings { get; }
+    public event Action<AppSettings>? SettingsChanged;
 
     public SettingsService()
     {
@@ -22,9 +25,7 @@ public sealed class SettingsService : ISettingsService
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         Settings = Load();
     }
-
-    public AppSettings Settings { get; }
-
+    
     public void Save()
     {
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions
@@ -33,6 +34,7 @@ public sealed class SettingsService : ISettingsService
         });
 
         File.WriteAllText(_path, json);
+        SettingsChanged?.Invoke(Settings);
     }
 
     private AppSettings Load()

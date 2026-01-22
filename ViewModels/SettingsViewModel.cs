@@ -18,15 +18,16 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IApiService _apiService;
     private readonly IThemeService _themeService;
     private readonly IStartupManager _startupManager;
-    
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
-    
     [ObservableProperty] private MaterialIconKind _healthCheckIcon = MaterialIconKind.QuestionMark;
     [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
     [ObservableProperty] private double _gridOpacity;
-    
     [ObservableProperty] private bool _isStartOnBootEnabled;
+    [ObservableProperty] private bool _backgroundSyncEnabled;
+    [ObservableProperty] private bool _minimizeToTray;
+    
+    public List<string> AvailableThemes { get; } = ["System", "Light", "Dark"];
 
     public SettingsViewModel(
         ISettingsService settings, 
@@ -60,18 +61,14 @@ public partial class SettingsViewModel : ViewModelBase
             IsStartOnBootEnabled = false;
         }
     }
-
-    public List<string> AvailableThemes { get; } = new() { "System", "Light", "Dark" };
-
+    
     partial void OnSelectedThemeChanged(string value)
     {
         _themeService.ApplyTheme(value);
         _settings.Settings.Theme = value;
         _settings.Save();
     }
-
-
-
+    
     partial void OnIsStartOnBootEnabledChanged(bool value)
     {
         _settings.Settings.start_on_boot = value;
@@ -108,15 +105,19 @@ public partial class SettingsViewModel : ViewModelBase
             }
         });
     }
-
-    [ObservableProperty] private bool _backgroundSyncEnabled;
+    
     partial void OnBackgroundSyncEnabledChanged(bool value)
     {
         _settings.Settings.background_sync_enabled = value;
+        
+        if (value)
+        {
+            MinimizeToTray = true;
+        }
+        
         _settings.Save();
     }
-
-    [ObservableProperty] private bool _minimizeToTray;
+    
     partial void OnMinimizeToTrayChanged(bool value)
     {
         _settings.Settings.minimize_to_tray = value;
