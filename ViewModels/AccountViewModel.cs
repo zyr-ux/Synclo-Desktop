@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Synclo.Factory;
@@ -5,7 +6,7 @@ using Synclo.Services;
 
 namespace Synclo.ViewModels;
 
-public partial class AccountViewModel : ViewModelBase
+public partial class AccountViewModel : ViewModelBase, IDisposable
 {
     private readonly IViewModelFactory _factory;
     private readonly IAccountService _accountService;
@@ -18,6 +19,7 @@ public partial class AccountViewModel : ViewModelBase
     {
         _factory = factory;
         _accountService = accountService;
+        _accountService.OnLogout += OnLogoutAsync;
         _ = InitializeAsync();
     }
 
@@ -54,5 +56,16 @@ public partial class AccountViewModel : ViewModelBase
     private void OnLogout()
     {
         ShowLogin();
+    }
+
+    private async Task OnLogoutAsync()
+    {
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(ShowLogin);
+    }
+
+    public void Dispose()
+    {
+        _accountService.OnLogout -= OnLogoutAsync;
+        (_currentViewModel as IDisposable)?.Dispose();
     }
 }
