@@ -1,9 +1,9 @@
 using System;
+using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
-using System.Threading;
 
 namespace Synclo.Services;
 
@@ -18,8 +18,9 @@ public interface IApplicationControlService
 public sealed class ApplicationControlService : IApplicationControlService
 {
     private readonly ISettingsService _settings;
-    public event Action? ShutdownRequested;
     private int _shutdownRequested;
+
+    public event Action? ShutdownRequested;
 
     public ApplicationControlService(ISettingsService settings)
     {
@@ -45,7 +46,6 @@ public sealed class ApplicationControlService : IApplicationControlService
         });
     }
 
-
     public void Shutdown()
     {
         if (Interlocked.Exchange(ref _shutdownRequested, 1) != 0)
@@ -53,7 +53,14 @@ public sealed class ApplicationControlService : IApplicationControlService
 
         Dispatcher.UIThread.Post(() =>
         {
-            ShutdownRequested?.Invoke();
+            try
+            {
+                ShutdownRequested?.Invoke();
+            }
+            catch
+            {
+                // Never allow shutdown to fail due to subscribers
+            }
 
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -62,10 +69,8 @@ public sealed class ApplicationControlService : IApplicationControlService
         });
     }
 
-
     public bool ShouldMinimizeOnClose()
     {
-        // Minimize on close if background sync OR tray icon is enabled
         return _settings.Settings.background_sync_enabled ||
                _settings.Settings.minimize_to_tray;
     }
