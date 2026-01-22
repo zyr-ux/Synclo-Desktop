@@ -43,6 +43,10 @@ public partial class SettingsViewModel : ViewModelBase
         
         // Load start on boot status
         _ = LoadStartOnBootStatusAsync();
+        
+        // Load other settings
+        BackgroundSyncEnabled = _settings.Settings.background_sync_enabled;
+        MinimizeToTray = _settings.Settings.minimize_to_tray;
     }
 
     private async Task LoadStartOnBootStatusAsync()
@@ -103,6 +107,20 @@ public partial class SettingsViewModel : ViewModelBase
                 System.Diagnostics.Debug.WriteLine($"Failed to configure autostart: {ex.Message}");
             }
         });
+    }
+
+    [ObservableProperty] private bool _backgroundSyncEnabled;
+    partial void OnBackgroundSyncEnabledChanged(bool value)
+    {
+        _settings.Settings.background_sync_enabled = value;
+        _settings.Save();
+    }
+
+    [ObservableProperty] private bool _minimizeToTray;
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        _settings.Settings.minimize_to_tray = value;
+        _settings.Save();
     }
 
     [RelayCommand]

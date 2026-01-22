@@ -76,6 +76,7 @@
                                    Foreground="{DynamicResource ForegroundL}" />
 
                         <ToggleSwitch Grid.Column="2"
+                                      IsChecked="{Binding IsStartOnBootEnabled}"
                                       VerticalAlignment="Center"
                                       Foreground="{DynamicResource ForegroundL}" />
                     </Grid>
@@ -102,6 +103,7 @@
                                    Foreground="{DynamicResource ForegroundL}" />
 
                         <ToggleSwitch Grid.Column="2"
+                                      IsChecked="{Binding BackgroundSyncEnabled}"
                                       VerticalAlignment="Center"
                                       Foreground="{DynamicResource ForegroundL}" />
                     </Grid>
@@ -128,6 +130,7 @@
                                    Foreground="{DynamicResource ForegroundL}" />
 
                         <ToggleSwitch Grid.Column="2"
+                                      IsChecked="{Binding MinimizeToTray}"
                                       VerticalAlignment="Center"
                                       Foreground="{DynamicResource ForegroundL}" />
                     </Grid>
