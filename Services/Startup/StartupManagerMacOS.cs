@@ -45,6 +45,7 @@ public class StartupManagerMacOS : IStartupManager
     <key>ProgramArguments</key>
     <array>
         <string>{executablePath}</string>
+        <string>--autostart</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

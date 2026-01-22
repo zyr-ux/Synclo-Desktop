@@ -39,7 +39,7 @@ public class StartupManagerLinux : IStartupManager
             var desktopEntry = $@"[Desktop Entry]
 Type=Application
 Name=Synclo
-Exec={executablePath}
+Exec={executablePath} --autostart
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true

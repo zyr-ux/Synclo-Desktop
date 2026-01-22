@@ -37,7 +37,7 @@ public class StartupManagerWindows : IStartupManager
             var executablePath = GetExecutablePath();
             
             using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, true);
-            key?.SetValue(AppName, $"\"{executablePath}\"");
+            key?.SetValue(AppName, $"\"{executablePath}\" --autostart");
             
             return Task.CompletedTask;
         }

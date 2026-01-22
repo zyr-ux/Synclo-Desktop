@@ -15,6 +15,7 @@ namespace Synclo.Services;
 
 public sealed class SingleInstanceManager : IDisposable
 {
+    public event Action? SignalReceived;
     private const string MutexNameWindows = @"Global\Synclo.SingleInstance.Mutex";
     private const string MutexNameUnix = "Synclo.SingleInstance.Mutex";
     private const string PipeName = "Synclo.SingleInstance.IPC";
@@ -107,7 +108,7 @@ public sealed class SingleInstanceManager : IDisposable
         }
     }
 
-    private static async Task HandleClientAsync(
+    private async Task HandleClientAsync(
         NamedPipeServerStream server,
         CancellationToken ct)
     {
@@ -118,7 +119,7 @@ public sealed class SingleInstanceManager : IDisposable
 
             if (read == 1 && buffer[0] == CommandShowWindow)
             {
-                ActivateMainWindow();
+                SignalReceived?.Invoke();
             }
         }
     }
@@ -158,24 +159,7 @@ public sealed class SingleInstanceManager : IDisposable
             PipeOptions.Asynchronous);
     }
 
-    private static void ActivateMainWindow()
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
-                return;
 
-            var window = desktop.MainWindow;
-            if (window == null) return;
-
-            window.WindowState = Avalonia.Controls.WindowState.Normal;
-            window.Show();
-
-            window.Topmost = true;
-            window.Activate();
-            window.Topmost = false;
-        });
-    }
 
     public void Dispose()
     {

@@ -26,6 +26,7 @@ namespace Synclo;
 
 public class App : Application
 {
+    private MainWindow? _mainWindow;
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -138,6 +139,30 @@ public class App : Application
 
         accountService.OnLogout += webSocketService.DisconnectAsync;
         
+        // Handle Single Instance signal
+        instanceManager.SignalReceived += () =>
+        {
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_mainWindow == null) return;
+                
+                // Ensure window is visible and active
+                if (!_mainWindow.IsVisible)
+                {
+                    _mainWindow.Show();
+                }
+                
+                if (_mainWindow.WindowState == WindowState.Minimized)
+                {
+                    _mainWindow.WindowState = WindowState.Normal;
+                }
+                
+                _mainWindow.Activate();
+                _mainWindow.Topmost = true;
+                _mainWindow.Topmost = false;
+            });
+        };
+        
         // Handle Tray Icon Visibility
         settingsService.SettingsChanged += s => 
         {
@@ -174,7 +199,18 @@ public class App : Application
 
             notificationService.SetManager(notificationManager);
 
-            desktop.MainWindow = mainWindow;
+            _mainWindow = mainWindow;
+
+            // Check for autostart
+            var isAutostart = desktop.Args?.Contains("--autostart") ?? false;
+            
+            if (!isAutostart)
+            {
+                desktop.MainWindow = mainWindow;
+            }
+            // If autostart, we don't set desktop.MainWindow immediately, 
+            // so the app starts in background mode (Implicit hide).
+            // However, we must ensure the VM is initialized either way.
 
             // Now it's safe to initialize the VM
             Dispatcher.UIThread.InvokeAsync(mainVm.InitializeApplicationAsync);
@@ -204,42 +240,36 @@ public class App : Application
 
     private void OnShowHideClicked(object? sender, EventArgs e)
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            var mainWindow = desktop.MainWindow;
-            if (mainWindow == null) return;
+        if (_mainWindow == null) return;
 
-            if (mainWindow.IsVisible)
-            {
-                mainWindow.Hide();
-            }
-            else
-            {
-                mainWindow.Show();
-                mainWindow.Activate();
-            }
+        if (_mainWindow.IsVisible)
+        {
+            _mainWindow.Hide();
+        }
+        else
+        {
+            _mainWindow.Show();
+            _mainWindow.WindowState = WindowState.Normal;
+            _mainWindow.Activate();
         }
     }
 
     private void OnSettingsClicked(object? sender, EventArgs e)
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        if (_mainWindow == null) return;
+
+        // Show window if hidden
+        if (!_mainWindow.IsVisible)
         {
-            var mainWindow = desktop.MainWindow;
-            if (mainWindow == null) return;
+            _mainWindow.Show();
+            _mainWindow.WindowState = WindowState.Normal;
+            _mainWindow.Activate();
+        }
 
-            // Show window if hidden
-            if (!mainWindow.IsVisible)
-            {
-                mainWindow.Show();
-                mainWindow.Activate();
-            }
-
-            // Navigate to Settings
-            if (mainWindow.DataContext is MainWindowViewModel vm)
-            {
-                vm.ShowSettingsCommand.Execute(null);
-            }
+        // Navigate to Settings
+        if (_mainWindow.DataContext is MainWindowViewModel vm)
+        {
+            vm.ShowSettingsCommand.Execute(null);
         }
     }
 
