@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Synclo.Services.ClipboardService;
+namespace Synclo.Services.ClipboardMonitor;
 
 
 public interface IClipboardMonitor
