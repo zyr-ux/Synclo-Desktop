@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
@@ -18,13 +19,20 @@ public interface IClipboardProvider
 
 public class AvaloniaClipboardProvider : IClipboardProvider
 {
+    private Window? _hostWindow;
+
+    public void SetHostWindow(Window window)
+    {
+        _hostWindow = window;
+    }
+
     public async Task<string?> GetTextAsync()
     {
         return await Dispatcher.UIThread.InvokeAsync(async () =>
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var clipboard = desktop.MainWindow?.Clipboard;
+                var clipboard = (_hostWindow ?? desktop.MainWindow)?.Clipboard;
                 if (clipboard != null) return await clipboard.TryGetTextAsync();
             }
 
@@ -38,7 +46,7 @@ public class AvaloniaClipboardProvider : IClipboardProvider
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var clipboard = desktop.MainWindow?.Clipboard;
+                var clipboard = (_hostWindow ?? desktop.MainWindow)?.Clipboard;
                 if (clipboard != null) await clipboard.SetTextAsync(text);
             }
         });

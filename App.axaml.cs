@@ -203,6 +203,12 @@ public class App : Application
 
             _mainWindow = mainWindow;
 
+            // Fix: Ensure clipboard provider uses the correct window even if hidden (autostart)
+            if (services.GetService<IClipboardProvider>() is AvaloniaClipboardProvider provider)
+            {
+                provider.SetHostWindow(mainWindow);
+            }
+
             // Check for autostart
             var isAutostart = desktop.Args?.Contains("--autostart") ?? false;
             
