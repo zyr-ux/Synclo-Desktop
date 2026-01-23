@@ -46,7 +46,8 @@
         <TrayIcons>
             <TrayIcon Icon="/Assets/avalonia-logo.ico"
                       IsVisible="False"
-                      ToolTipText="Synclo - Clipboard Sync">
+                      ToolTipText="Synclo - Clipboard Sync"
+                      Clicked="OnShowHideClicked">
                 <TrayIcon.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Show/Hide" Click="OnShowHideClicked" />
