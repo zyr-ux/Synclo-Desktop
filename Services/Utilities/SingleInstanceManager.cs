@@ -1,27 +1,27 @@
 using System;
-using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Synclo.Services.Utilities;
 
 public sealed class SingleInstanceManager : IDisposable
 {
+    
+    private const bool EnableSingleInstance = false;
+    
     public event Action? SignalReceived;
+
     private const string MutexNameWindows = @"Global\Synclo.SingleInstance.Mutex";
     private const string MutexNameUnix = "Synclo.SingleInstance.Mutex";
     private const string PipeName = "Synclo.SingleInstance.IPC";
     private const byte CommandShowWindow = 0x01;
 
-    private readonly Mutex _mutex;
+    private readonly Mutex? _mutex;
     private readonly CancellationTokenSource _cts = new();
     private readonly ILogger<SingleInstanceManager>? _logger;
 
@@ -33,6 +33,12 @@ public sealed class SingleInstanceManager : IDisposable
     public SingleInstanceManager(ILogger<SingleInstanceManager>? logger = null)
     {
         _logger = logger;
+
+        if (!EnableSingleInstance)
+        {
+            IsPrimary = true;
+            return;
+        }
 
         var mutexName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? MutexNameWindows
@@ -61,6 +67,9 @@ public sealed class SingleInstanceManager : IDisposable
     /// </summary>
     public bool SignalPrimary()
     {
+        if (!EnableSingleInstance)
+            return false;
+
         try
         {
             using var client = new NamedPipeClientStream(
@@ -159,12 +168,13 @@ public sealed class SingleInstanceManager : IDisposable
             PipeOptions.Asynchronous);
     }
 
-
-
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+
+        if (!EnableSingleInstance)
+            return;
 
         _cts.Cancel();
 
@@ -181,12 +191,12 @@ public sealed class SingleInstanceManager : IDisposable
         try
         {
             if (IsPrimary)
-                _mutex.ReleaseMutex();
+                _mutex?.ReleaseMutex();
         }
         catch
         {
         }
 
-        _mutex.Dispose();
+        _mutex?.Dispose();
     }
 }
