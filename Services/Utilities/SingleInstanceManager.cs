@@ -11,8 +11,8 @@ namespace Synclo.Services.Utilities;
 
 public sealed class SingleInstanceManager : IDisposable
 {
-    
-    private const bool EnableSingleInstance = false;
+    // change this when working in dev
+    private const bool EnableSingleInstance = true;
     
     public event Action? SignalReceived;
 
