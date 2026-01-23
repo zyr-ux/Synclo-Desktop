@@ -11,7 +11,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 
-namespace Synclo.Services;
+namespace Synclo.Services.Utilities;
 
 public sealed class SingleInstanceManager : IDisposable
 {

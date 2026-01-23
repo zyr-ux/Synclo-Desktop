@@ -10,8 +10,9 @@ using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.Services.SecretsManager;
 using System.Collections.Generic;
+using Synclo.Services.Utilities;
 
-namespace Synclo.Services;
+namespace Synclo.Services.API;
 
 public enum AuthRefreshResult
 {

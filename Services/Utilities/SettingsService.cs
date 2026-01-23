@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using Synclo.Models;
 
-namespace Synclo.Services;
+namespace Synclo.Services.Utilities;
 
 public interface ISettingsService
 {

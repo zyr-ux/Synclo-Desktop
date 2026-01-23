@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Synclo.Services.Utilities;
 
 namespace Synclo.Services.ClipboardService.ClipboardMonitoringService;
 

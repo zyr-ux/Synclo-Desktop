@@ -5,7 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 
-namespace Synclo.Services;
+namespace Synclo.Services.Utilities;
 
 public interface IApplicationControlService
 {
@@ -15,17 +15,11 @@ public interface IApplicationControlService
     event Action? ShutdownRequested;
 }
 
-public sealed class ApplicationControlService : IApplicationControlService
+public sealed class ApplicationControlService(ISettingsService settings) : IApplicationControlService
 {
-    private readonly ISettingsService _settings;
     private int _shutdownRequested;
 
     public event Action? ShutdownRequested;
-
-    public ApplicationControlService(ISettingsService settings)
-    {
-        _settings = settings;
-    }
 
     public void ShowMainWindow()
     {
@@ -71,7 +65,7 @@ public sealed class ApplicationControlService : IApplicationControlService
 
     public bool ShouldMinimizeOnClose()
     {
-        return _settings.Settings.background_sync_enabled ||
-               _settings.Settings.minimize_to_tray;
+        return settings.Settings.background_sync_enabled ||
+               settings.Settings.minimize_to_tray;
     }
 }

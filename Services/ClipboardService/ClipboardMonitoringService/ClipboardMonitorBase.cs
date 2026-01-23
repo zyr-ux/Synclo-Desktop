@@ -6,6 +6,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
+using Synclo.Services.Utilities;
 
 namespace Synclo.Services.ClipboardService.ClipboardMonitoringService;
 

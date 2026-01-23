@@ -6,8 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Models;
 using Synclo.Services.SecretsManager;
+using Synclo.Services.Utilities;
 
-namespace Synclo.Services;
+namespace Synclo.Services.API;
 
 public interface IAccountService
 {

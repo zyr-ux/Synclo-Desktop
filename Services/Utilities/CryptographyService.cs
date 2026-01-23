@@ -3,8 +3,9 @@ using System.Buffers;
 using System.Security.Cryptography;
 using System.Text;
 using Konscious.Security.Cryptography;
+using Synclo.Services.API;
 
-namespace Synclo.Services;
+namespace Synclo.Services.Utilities;
 
 public interface ICryptographyService
 {

@@ -10,7 +10,7 @@ using Synclo.Models;
 using Polly;
 using Synclo.Services.SecretsManager;
 
-namespace Synclo.Services;
+namespace Synclo.Services.API;
 
 public interface IApiService : IDisposable
 {

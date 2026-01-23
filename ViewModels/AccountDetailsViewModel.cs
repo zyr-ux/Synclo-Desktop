@@ -10,6 +10,7 @@ using Synclo.Components;
 using Synclo.Factory;
 using Synclo.Models;
 using Synclo.Services;
+using Synclo.Services.API;
 
 namespace Synclo.ViewModels;
 

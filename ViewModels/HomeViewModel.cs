@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Synclo.Models;
 using Synclo.Services;
+using Synclo.Services.API;
 using Synclo.Services.ClipboardService;
 
 namespace Synclo.ViewModels;

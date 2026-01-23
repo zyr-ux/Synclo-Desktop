@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Services.SecretsManager;
 
-namespace Synclo.Services;
+namespace Synclo.Services.API;
 
 public interface IWebSocketService : IDisposable
 {

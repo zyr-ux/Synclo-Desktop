@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Synclo.Factory;
 using Synclo.Services;
+using Synclo.Services.API;
 
 namespace Synclo.ViewModels;
 
