@@ -178,13 +178,7 @@ public sealed class SingleInstanceManager : IDisposable
 
         _cts.Cancel();
 
-        try
-        {
-            _acceptLoopTask?.Wait(300);
-        }
-        catch
-        {
-        }
+
 
         _cts.Dispose();
 

@@ -248,14 +248,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
     {
         _cts.Cancel();
         _refreshQueue.Writer.Complete();
-        try
-        {
-            _processorTask.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch
-        {
-            // Ignore cleanup errors
-        }
+        // Fire and forget - don't block shutdown
         _cts.Dispose();
     }
 
