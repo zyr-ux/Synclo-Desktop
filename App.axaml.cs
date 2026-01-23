@@ -212,13 +212,25 @@ public class App : Application
             // Check for autostart
             var isAutostart = desktop.Args?.Contains("--autostart") ?? false;
             
-            if (!isAutostart)
+            // If autostart, we determine visibility based on user preference
+            if (isAutostart)
             {
+                var settings = services.GetRequiredService<ISettingsService>().Settings;
+                var startHidden = settings.background_sync_enabled || settings.minimize_to_tray;
+                
+                if (!startHidden)
+                {
+                    desktop.MainWindow = mainWindow;
+                }
+                // Else: Do not set MainWindow, so it starts in "background" mode (Headless)
+            }
+            else
+            {
+                // Normal user launch -> Show window
                 desktop.MainWindow = mainWindow;
             }
-            // If autostart, we don't set desktop.MainWindow immediately, 
-            // so the app starts in background mode (Implicit hide).
-            // However, we must ensure the VM is initialized either way.
+            
+            // Ensure VM initialization happens regardless of visibility
 
             // Now it's safe to initialize the VM
             Dispatcher.UIThread.InvokeAsync(mainVm.InitializeApplicationAsync);

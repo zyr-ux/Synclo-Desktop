@@ -48,13 +48,51 @@
                         <ComboBox Grid.Column="2"
                                   Width="160"
                                   VerticalAlignment="Center"
-                                  HorizontalContentAlignment="Center"
+                                  HorizontalContentAlignment="Left"
+                                  Padding="2"
                                   FontFamily="{DynamicResource Inconsolata-Medium}"
                                   ItemsSource="{Binding AvailableThemes}"
                                   SelectedItem="{Binding SelectedTheme}" />
                     </Grid>
                 </Border>
+                
+                <!-- Close Behavior -->
+                <Border Background="{DynamicResource Accent}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <materialIcons:MaterialIcon
+                            Kind="CloseCircleOutline"
+                            Width="36"
+                            Height="36"
+                            Margin="0,0,16,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundD}" />
 
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Close Behaviour"
+                                       FontFamily="{StaticResource Inconsolata-Bold}"
+                                       FontSize="24"
+                                       Foreground="{DynamicResource ForegroundD}" />
+                            <TextBlock Text="What happens when you close the window?"
+                                       FontFamily="{StaticResource Inconsolata-Medium}"
+                                       FontSize="16"
+                                       Margin="0,4,0,0"
+                                       Foreground="{DynamicResource ForegroundD}"
+                                       Opacity="0.7"/>
+                        </StackPanel>
+
+                        <ComboBox Grid.Column="2"
+                                  Width="250"
+                                  VerticalAlignment="Center"
+                                  HorizontalContentAlignment="Left"
+                                  Padding="2"
+                                  FontFamily="{DynamicResource Inconsolata-Medium}"
+                                  ItemsSource="{Binding AvailableCloseBehaviors}"
+                                  SelectedItem="{Binding SelectedCloseBehavior}" />
+                    </Grid>
+                </Border>
+                
                 <!-- Start on boot -->
                 <Border Background="Transparent"
                         CornerRadius="8"
@@ -69,7 +107,7 @@
                             Foreground="{DynamicResource ForegroundL}" />
 
                         <TextBlock Grid.Column="1"
-                                   Text="Start on boot"
+                                   Text="Launch on System Startup"
                                    FontFamily="{StaticResource Inconsolata-Bold}"
                                    FontSize="24"
                                    VerticalAlignment="Center"
@@ -77,60 +115,6 @@
 
                         <ToggleSwitch Grid.Column="2"
                                       IsChecked="{Binding IsStartOnBootEnabled}"
-                                      VerticalAlignment="Center"
-                                      Foreground="{DynamicResource ForegroundL}" />
-                    </Grid>
-                </Border>
-
-                <!-- Background sync -->
-                <Border Background="Transparent"
-                        CornerRadius="8"
-                        Padding="16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <materialIcons:MaterialIcon
-                            Kind="Sync"
-                            Width="36"
-                            Height="36"
-                            Margin="0,0,16,0"
-                            VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundL}" />
-
-                        <TextBlock Grid.Column="1"
-                                   Text="Background Sync"
-                                   FontFamily="{StaticResource Inconsolata-Bold}"
-                                   FontSize="24"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource ForegroundL}" />
-
-                        <ToggleSwitch Grid.Column="2"
-                                      IsChecked="{Binding BackgroundSyncEnabled}"
-                                      VerticalAlignment="Center"
-                                      Foreground="{DynamicResource ForegroundL}" />
-                    </Grid>
-                </Border>
-
-                <!-- Minimize to tray -->
-                <Border Background="Transparent"
-                        CornerRadius="8"
-                        Padding="16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <materialIcons:MaterialIcon
-                            Kind="TrayArrowDown"
-                            Width="36"
-                            Height="36"
-                            Margin="0,0,16,0"
-                            VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundL}" />
-
-                        <TextBlock Grid.Column="1"
-                                   Text="Minimize to Tray"
-                                   FontFamily="{StaticResource Inconsolata-Bold}"
-                                   FontSize="24"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource ForegroundL}" />
-
-                        <ToggleSwitch Grid.Column="2"
-                                      IsChecked="{Binding MinimizeToTray}"
                                       VerticalAlignment="Center"
                                       Foreground="{DynamicResource ForegroundL}" />
                     </Grid>

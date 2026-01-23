@@ -26,10 +26,12 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private IBrush _healthCheckColor = Brushes.Gray;
     [ObservableProperty] private double _gridOpacity;
     [ObservableProperty] private bool _isStartOnBootEnabled;
-    [ObservableProperty] private bool _backgroundSyncEnabled;
-    [ObservableProperty] private bool _minimizeToTray;
     
     public List<string> AvailableThemes { get; } = ["System", "Light", "Dark"];
+    
+    public List<string> AvailableCloseBehaviors { get; } = ["Quit Application", "Minimize to System Tray", "Run in Background (Hidden)"];
+    
+    [ObservableProperty] private string _selectedCloseBehavior="";
 
     public SettingsViewModel(
         ISettingsService settings, 
@@ -48,8 +50,7 @@ public partial class SettingsViewModel : ViewModelBase
         _ = LoadStartOnBootStatusAsync();
         
         // Load other settings
-        BackgroundSyncEnabled = _settings.Settings.background_sync_enabled;
-        MinimizeToTray = _settings.Settings.minimize_to_tray;
+        InitializeCloseBehavior();
     }
 
     private async Task LoadStartOnBootStatusAsync()
@@ -108,22 +109,52 @@ public partial class SettingsViewModel : ViewModelBase
         });
     }
     
-    partial void OnBackgroundSyncEnabledChanged(bool value)
+    public enum CloseBehavior // Public for View binding
     {
-        _settings.Settings.background_sync_enabled = value;
-        
-        if (value)
+        Quit,
+        MinimizeToTray,
+        RunInBackground
+    }
+    
+    partial void OnSelectedCloseBehaviorChanged(string value)
+    {
+        switch (value)
         {
-            MinimizeToTray = true;
+            case "Quit Application":
+                _settings.Settings.background_sync_enabled = false;
+                _settings.Settings.minimize_to_tray = false;
+                break;
+            case "Minimize to System Tray":
+                _settings.Settings.background_sync_enabled = true;
+                _settings.Settings.minimize_to_tray = true;
+                break;
+            case "Run in Background (Hidden)":
+                _settings.Settings.background_sync_enabled = true;
+                _settings.Settings.minimize_to_tray = false;
+                break;
         }
-        
+
         _settings.Save();
     }
     
-    partial void OnMinimizeToTrayChanged(bool value)
+    private void InitializeCloseBehavior()
     {
-        _settings.Settings.minimize_to_tray = value;
-        _settings.Save();
+        // Settings -> UI
+        bool sync = _settings.Settings.background_sync_enabled;
+        bool tray = _settings.Settings.minimize_to_tray;
+        
+        if (sync && tray)
+        {
+            SelectedCloseBehavior = "Minimize to System Tray";
+        }
+        else if (sync && !tray)
+        {
+            SelectedCloseBehavior = "Run in Background (Hidden)";
+        }
+        else
+        {
+            SelectedCloseBehavior = "Quit Application";
+        }
     }
 
     [RelayCommand]

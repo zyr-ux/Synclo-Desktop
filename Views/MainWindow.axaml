@@ -9,7 +9,7 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Synclo"
-        Width="800" Height="500"
+        Width="950" Height="600"
         WindowStartupLocation="CenterScreen"
         MinWidth="200"
         MinHeight="350">
