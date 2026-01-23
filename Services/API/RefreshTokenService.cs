@@ -163,6 +163,16 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
                 
                 try
                 {
+                    // Check if session is already expired before starting work
+                    lock (_refreshLock)
+                    {
+                        if (_sessionExpired)
+                        {
+                            result = AuthRefreshResult.SessionExpired;
+                            continue; // Skip processing, just complete waiters in finally
+                        }
+                    }
+
                     // Perform the actual refresh
                     token = await DoActualRefreshAsync();
                     result = AuthRefreshResult.Success;
@@ -173,20 +183,12 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
                 catch (SessionExpiredException)
                 {
                     result = AuthRefreshResult.SessionExpired;
-                    lock (_refreshLock)
-                    {
-                        _sessionExpired = true;
-                    }
-                    SafeInvokeSessionExpired();
+                    HandleSessionExpiration();
                 }
                 catch (SecurityBreachException)
                 {
                     result = AuthRefreshResult.SessionExpired;
-                    lock (_refreshLock)
-                    {
-                        _sessionExpired = true;
-                    }
-                    SafeInvokeSessionExpired();
+                    HandleSessionExpiration();
                 }
                 catch (NetworkFailureException)
                 {
@@ -207,7 +209,8 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
                         _isRefreshing = false;
                         
                         // If refresh was requested while we were refreshing, trigger another one
-                        if (_refreshRequestedWhileRefreshing)
+                        // BUT ONLY if session is still valid
+                        if (_refreshRequestedWhileRefreshing && !_sessionExpired)
                         {
                             _refreshRequestedWhileRefreshing = false;
                             _refreshQueue.Writer.TryWrite(new RefreshRequest
@@ -373,6 +376,24 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
         catch
         {
             // Suppress errors from event handlers
+        }
+    }
+
+    private void HandleSessionExpiration()
+    {
+        bool shouldFire = false;
+        lock (_refreshLock)
+        {
+            if (!_sessionExpired)
+            {
+                _sessionExpired = true;
+                shouldFire = true;
+            }
+        }
+
+        if (shouldFire)
+        {
+            SafeInvokeSessionExpired();
         }
     }
 

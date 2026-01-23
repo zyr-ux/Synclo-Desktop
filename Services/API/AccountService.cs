@@ -363,7 +363,7 @@ public sealed class AccountService : IAccountService
             await OnLogout.Invoke();
         }
 
-        if (!string.IsNullOrWhiteSpace(settings.Settings.device_id))
+        if (!string.IsNullOrWhiteSpace(settings.Settings.device_id) && await IsAuthenticatedAsync())
         {
             try { await deviceService.DeleteDeviceAsync(settings.Settings.device_id); }
             catch { }
