@@ -12,18 +12,25 @@ public sealed class ClipboardMonitorWindows : IClipboardMonitor, IDisposable
     private readonly IClipboardProvider _clipboardProvider;
     private readonly ILogger<ClipboardMonitorWindows> _logger;
     private readonly IUtils _utils;
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
+    private readonly object _startLock = new();
 
     private Thread? _messageThread;
     private IntPtr _hwnd;
-    private bool _disposed;
+    private volatile bool _disposed;
+    private volatile bool _stopping; // New: Tracks intentional shutdown
     private string? _lastClipboardHash;
+
+    private TaskCompletionSource? _initTcs;
+    private volatile bool _startedSuccessfully;
 
     private delegate IntPtr WndProcDelegate(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
     private WndProcDelegate? _wndProcDelegate;
 
     public event Action<string>? OnClipboardChanged;
+    public event Action<Exception?>? OnMonitorStopped;
 
-    public bool IsRunning => _messageThread is { IsAlive: true };
+    public bool IsRunning => _messageThread is { IsAlive: true } && _startedSuccessfully;
 
     public ClipboardMonitorWindows(
         IClipboardProvider clipboardProvider,
@@ -37,74 +44,123 @@ public sealed class ClipboardMonitorWindows : IClipboardMonitor, IDisposable
 
     public Task StartAsync()
     {
-        if (IsRunning)
-            return Task.CompletedTask;
-
-        _messageThread = new Thread(MessageLoop)
+        // Fix 2: Start guard to prevent race conditions on _initTcs
+        lock (_startLock)
         {
-            IsBackground = true,
-            Name = "SyncloClipboardMonitorWindows"
-        };
+            if (_messageThread != null)
+                return _initTcs?.Task ?? Task.CompletedTask;
 
-        _messageThread.SetApartmentState(ApartmentState.STA);
-        _messageThread.Start();
+            _initTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _stopping = false;
+            _startedSuccessfully = false;
 
-        return Task.CompletedTask;
+            _messageThread = new Thread(MessageLoop)
+            {
+                IsBackground = true,
+                Name = "SyncloClipboardMonitorWindows"
+            };
+
+            _messageThread.SetApartmentState(ApartmentState.STA);
+            _messageThread.Start();
+        }
+
+        return _initTcs.Task;
     }
 
     public Task StopAsync()
     {
-        if (_hwnd != IntPtr.Zero)
-            PostMessage(_hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+        _stopping = true; // Fix 3: Mark as intentional stop
 
-        _messageThread = null;
+        if (_hwnd != IntPtr.Zero)
+        {
+            PostMessage(_hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+        }
+
         return Task.CompletedTask;
     }
 
     public async Task SetClipboardTextAsync(string text)
     {
+        await _updateLock.WaitAsync();
         try
         {
             await _clipboardProvider.SetTextAsync(text);
             _lastClipboardHash = _utils.ComputeHash(text);
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Failed to set clipboard text");
-            throw;
+            _updateLock.Release();
         }
     }
 
     private void MessageLoop()
     {
-        _hwnd = CreateMessageWindow();
-
-        if (_hwnd == IntPtr.Zero)
-        {
-            _logger.LogError("ClipboardMonitorWindows: Failed to create message window");
-            return;
-        }
-
-        if (!AddClipboardFormatListener(_hwnd))
-        {
-            _logger.LogError("ClipboardMonitorWindows: AddClipboardFormatListener failed");
-            return;
-        }
+        Exception? fatalError = null;
 
         try
         {
-            MSG msg;
-            while (GetMessage(out msg, IntPtr.Zero, 0, 0))
+            _hwnd = CreateMessageWindow();
+            if (_hwnd == IntPtr.Zero)
+                throw new InvalidOperationException("Failed to create message window");
+
+            bool hooked = false;
+            for (int i = 0; i < 3; i++)
             {
+                if (AddClipboardFormatListener(_hwnd))
+                {
+                    hooked = true;
+                    break;
+                }
+                Thread.Sleep(100);
+            }
+
+            if (!hooked)
+                throw new InvalidOperationException("Failed to register clipboard listener");
+
+            _startedSuccessfully = true;
+            _initTcs?.TrySetResult();
+            _initTcs = null;
+
+            MSG msg;
+            int ret;
+            while ((ret = GetMessage(out msg, IntPtr.Zero, 0, 0)) != 0)
+            {
+                if (ret == -1)
+                {
+                    throw new InvalidOperationException("GetMessage failed with error code " + Marshal.GetLastWin32Error());
+                }
+
                 TranslateMessage(ref msg);
                 DispatchMessage(ref msg);
             }
         }
+        catch (Exception ex)
+        {
+            fatalError = ex;
+            _logger.LogError(ex, "Clipboard monitor crashed");
+
+            if (_initTcs != null)
+            {
+                _initTcs.TrySetException(ex);
+                _initTcs = null;
+            }
+        }
         finally
         {
-            RemoveClipboardFormatListener(_hwnd);
-            DestroyWindow(_hwnd);
-            _hwnd = IntPtr.Zero;
+            _startedSuccessfully = false;
+
+            if (_hwnd != IntPtr.Zero)
+            {
+                RemoveClipboardFormatListener(_hwnd);
+                DestroyWindow(_hwnd);
+                _hwnd = IntPtr.Zero;
+            }
+
+            // Fix 3: Only fire stopped event if not intentional
+            if (!_stopping && !_disposed)
+                OnMonitorStopped?.Invoke(fatalError);
+                
+            _messageThread = null;
         }
     }
 
@@ -120,11 +176,12 @@ public sealed class ClipboardMonitorWindows : IClipboardMonitor, IDisposable
             hInstance = GetModuleHandle(null)
         };
 
-        if (RegisterClassEx(ref wc) == 0)
+        var atom = RegisterClassEx(ref wc);
+        if (atom == 0)
         {
             var err = Marshal.GetLastWin32Error();
-            _logger.LogError("RegisterClassEx failed with error {Error}", err);
-            return IntPtr.Zero;
+            if (err != ERROR_CLASS_ALREADY_EXISTS)
+                return IntPtr.Zero;
         }
 
         return CreateWindowEx(
@@ -160,16 +217,26 @@ public sealed class ClipboardMonitorWindows : IClipboardMonitor, IDisposable
     {
         try
         {
+            // Fix 4: I/O outside the lock to prevent stalling
             var text = await _clipboardProvider.GetTextAsync();
             if (string.IsNullOrEmpty(text))
                 return;
 
             var hash = _utils.ComputeHash(text);
-            if (hash == _lastClipboardHash)
-                return;
 
-            _lastClipboardHash = hash;
-            OnClipboardChanged?.Invoke(text);
+            await _updateLock.WaitAsync();
+            try
+            {
+                if (hash == _lastClipboardHash)
+                    return;
+
+                _lastClipboardHash = hash;
+                OnClipboardChanged?.Invoke(text);
+            }
+            finally
+            {
+                _updateLock.Release();
+            }
         }
         catch (Exception ex)
         {
@@ -179,17 +246,24 @@ public sealed class ClipboardMonitorWindows : IClipboardMonitor, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-
+        if (_disposed) return;
         _disposed = true;
-        StopAsync().Wait();
+        _stopping = true; // Prevent event fire
+
+        // Fix 1: Removed Join(). Fire and forget the close message.
+        if (_hwnd != IntPtr.Zero)
+        {
+            PostMessage(_hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        _updateLock.Dispose();
     }
 
     #region Win32
 
     private const int WM_CLIPBOARDUPDATE = 0x031D;
     private const int WM_CLOSE = 0x0010;
+    private const int ERROR_CLASS_ALREADY_EXISTS = 1410;
     private static readonly IntPtr HWND_MESSAGE = new(-3);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -257,8 +331,8 @@ public sealed class ClipboardMonitorWindows : IClipboardMonitor, IDisposable
     [DllImport("user32.dll")]
     private static extern bool DestroyWindow(IntPtr hwnd);
 
-    [DllImport("user32.dll")]
-    private static extern bool GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
 
     [DllImport("user32.dll")]
     private static extern IntPtr DispatchMessage(ref MSG lpmsg);

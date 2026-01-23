@@ -235,20 +235,47 @@ public class App : Application
             // Now it's safe to initialize the VM
             Dispatcher.UIThread.InvokeAsync(mainVm.InitializeApplicationAsync);
 
-            desktop.Exit += async (_, _) =>
+
+
+            // Wire up shutdown request handler for graceful async shutdown
+            var isShuttingDown = false;
+            desktop.ShutdownRequested += (s, e) =>
             {
-                await clipboardSyncService.ShutdownAsync();
-                webSocketService.Dispose();
-                apiService.Dispose();
-                instanceManager.Dispose();
-                mainVm.Dispose();
+                if (isShuttingDown) return;
+
+                // Cancel immediate shutdown to allow async cleanup
+                e.Cancel = true;
+                isShuttingDown = true;
+
+                // Run cleanup on UI thread (preserving context)
+                Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    try
+                    {
+                        var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
+                        await clipboardSyncService.ShutdownAsync();
+                        
+                        webSocketService.Dispose();
+                        apiService.Dispose();
+                        instanceManager.Dispose();
+                        mainVm.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log fallback if logger is available, otherwise silent
+                        Console.WriteLine($"Error during shutdown: {ex}");
+                    }
+                    finally
+                    {
+                         // Force shutdown now that we are done
+                         desktop.Shutdown();
+                    }
+                });
             };
+
+            base.OnFrameworkInitializationCompleted();
         }
-
-
-        base.OnFrameworkInitializationCompleted();
     }
-
 
     private void OnExitClicked(object? sender, EventArgs e)
     {
