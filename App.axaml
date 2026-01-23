@@ -45,6 +45,7 @@
     <TrayIcon.Icons>
         <TrayIcons>
             <TrayIcon Icon="/Assets/avalonia-logo.ico"
+                      IsVisible="False"
                       ToolTipText="Synclo - Clipboard Sync">
                 <TrayIcon.Menu>
                     <NativeMenu>
