@@ -105,8 +105,8 @@ public class ClipboardSyncService(
         webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
 
     // ACK tracking for clipboard sync
-    private readonly Dictionary<string, TaskCompletionSource<WebSocketAckResponse>> _pendingAcks = new();
-    private readonly SemaphoreSlim _ackLock = new(1, 1);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<WebSocketAckResponse>> _pendingAcks = new();
+    // _ackLock removed as _pendingAcks is now thread-safe
     private const int AckTimeoutSeconds = 5;
     
     // Bug #1.2 fix: Track pending uploads to prevent data loss on shutdown
@@ -136,7 +136,7 @@ public class ClipboardSyncService(
 
     private CancellationTokenSource? _debounceCts;
     private bool _disposed;
-    private bool _isInitialized;
+    private volatile bool _isInitialized;
 
 
     public async Task InitializeAsync()
@@ -182,6 +182,7 @@ public class ClipboardSyncService(
                 // Subscribe to events
                 _monitor.OnClipboardChanged += OnClipboardChanged;
                 _webSocketService.OnMessageReceived += OnWebSocketMessageReceived;
+                _webSocketService.OnConnected += OnWebSocketConnected;
                 _webSocketService.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketService.OnError += OnWebSocketError;
                 _accountService.OnLogout += OnAccountLoggedOut;
@@ -373,6 +374,7 @@ public class ClipboardSyncService(
         {
             _monitor.OnClipboardChanged -= OnClipboardChanged;
             _webSocketService.OnMessageReceived -= OnWebSocketMessageReceived;
+            _webSocketService.OnConnected -= OnWebSocketConnected;
             _webSocketService.OnDisconnected -= OnWebSocketDisconnected;
             _webSocketService.OnError -= OnWebSocketError;
             _accountService.OnLogout -= OnAccountLoggedOut;
@@ -381,7 +383,7 @@ public class ClipboardSyncService(
             _debounceCts?.Dispose();
 
             _refreshLock.Dispose();
-            _ackLock.Dispose();
+            // _ackLock.Dispose(); // Removed
             _initLock.Dispose();
             _masterKeyLock.Dispose();
             _remoteUpdateLock.Dispose();
@@ -538,14 +540,22 @@ public class ClipboardSyncService(
     {
         if (_shutdownCts.IsCancellationRequested) return;
 
-        // Bug #1 fix: Check suppression guard to prevent feedback loop
-        // Try to acquire the lock without waiting - if locked, a remote update is in progress
-        if (!_remoteUpdateLock.Wait(0)) // Probe-only acquire: do not hold lock
+        // Bug #3 fix: Wrap semaphore usage in try/finally to prevent leaks
+        var lockAcquired = false;
+        try
         {
-            _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
-            return;
+            // Bug #1 fix: Check suppression guard
+            lockAcquired = _remoteUpdateLock.Wait(0);
+            if (!lockAcquired)
+            {
+                _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
+                return;
+            }
         }
-        _remoteUpdateLock.Release();
+        finally
+        {
+            if (lockAcquired) _remoteUpdateLock.Release();
+        }
 
         _logger.LogDebug($"OnClipboardChanged fired with content length: {content?.Length ?? 0}");
 
@@ -568,18 +578,33 @@ public class ClipboardSyncService(
                 await Task.Delay(DebounceDelayMs, token);
                 if (token.IsCancellationRequested) return;
 
+                // Bug #2 fix: Check shutdown token again after delay
+                if (_shutdownCts.IsCancellationRequested) return;
+
                 // Issue #1 fix: Write local content to unified channel
                 var evt = new ClipboardPipelineEvent.LocalUpsert(content, DateTime.UtcNow);
         
-                // Defensive check before writing
-                if (!_clipboardChannel.Writer.TryWrite(evt)) // Fast check
+                // Bug #2 fix: Protect against channel closure during write
+                try 
                 {
-                    await _clipboardChannel.Writer.WriteAsync(evt, token);
+                     // Defensive check before writing
+                    if (!_clipboardChannel.Writer.TryWrite(evt)) // Fast check
+                    {
+                        await _clipboardChannel.Writer.WriteAsync(evt, token);
+                    }
+                }
+                catch (ChannelClosedException)
+                {
+                    _logger.LogWarning("Attempted to write to closed clipboard channel");
                 }
             }
             catch (OperationCanceledException)
             {
                 // Debounced
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in clipboard debounce task");
             }
         });
     }
@@ -773,45 +798,58 @@ public class ClipboardSyncService(
 
                         var ackTcs = new TaskCompletionSource<WebSocketAckResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
                         
-                        await _ackLock.WaitAsync();
-                        try { _pendingAcks[entry.Id] = ackTcs; }
-                        finally { _ackLock.Release(); }
+                            // Bug #1 fix: Use thread-safe dictionary without explicit lock
+                            _pendingAcks[entry.Id] = ackTcs;
 
-                        try
-                        {
-                            var request = new ClipboardSyncRequest
+                            try
                             {
-                                id = entry.Id,
-                                timestamp = entry.CreatedAt,
-                                blob_version = entry.BlobVersion,
-                                is_deleted = isTombstone, // <--- CRITICAL FIX
-                                // If deleted, send null payload. If upsert, send ciphertext.
-                                ciphertext = isTombstone ? null : entry.Ciphertext,
-                                nonce = isTombstone ? null : entry.Nonce,
-                            };
+                                var request = new ClipboardSyncRequest
+                                {
+                                    id = entry.Id,
+                                    timestamp = entry.CreatedAt,
+                                    blob_version = entry.BlobVersion,
+                                    is_deleted = isTombstone, // <--- CRITICAL FIX
+                                    // If deleted, send null payload. If upsert, send ciphertext.
+                                    ciphertext = isTombstone ? null : entry.Ciphertext,
+                                    nonce = isTombstone ? null : entry.Nonce,
+                                };
 
-                            await _webSocketService.SendMessageAsync(request);
+                                await _webSocketService.SendMessageAsync(request);
 
-                            var ackTask = ackTcs.Task;
-                            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(AckTimeoutSeconds));
-                            
-                            if (await Task.WhenAny(ackTask, timeoutTask) == ackTask)
-                            {
-                                await ackTask; // Propagate exceptions if any
-                                _logger.LogInformation($"Received ACK for {entry.Id}");
-                                await _repository.MarkAsSyncedAsync(entry.Id);
+                                var ackTask = ackTcs.Task;
+                                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(AckTimeoutSeconds));
+                                
+                                if (await Task.WhenAny(ackTask, timeoutTask) == ackTask)
+                                {
+                                    await ackTask; // Propagate exceptions if any
+                                    _logger.LogInformation($"Received ACK for {entry.Id}");
+                                    await _repository.MarkAsSyncedAsync(entry.Id);
+                                }
+                                else
+                                {
+                                    // Bug #4 fix: Explicitly handle timeout with Retry
+                                    throw new TimeoutException($"ACK timeout for {entry.Id}");
+                                }
                             }
-                            else
+                            catch (TimeoutException)
                             {
-                                throw new TimeoutException($"ACK timeout for {entry.Id}");
+                                _logger.LogWarning($"ACK timed out for {entry.Id} - entry remains unsynced");
+
+                                // Schedule retry
+                                RunBackgroundTask(async ct =>
+                                {
+                                    await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                                    if (!_shutdownCts.IsCancellationRequested)
+                                    {
+                                        await SendExistingEntryAsync(entry);
+                                    }
+                                }, "Retry Unsynced Entry");
+                                throw; // Propagate to outer logger
                             }
-                        }
-                        finally
-                        {
-                            await _ackLock.WaitAsync();
-                            try { _pendingAcks.Remove(entry.Id); }
-                            finally { _ackLock.Release(); }
-                        }
+                            finally
+                            {
+                                _pendingAcks.TryRemove(entry.Id, out _);
+                            }
                     });
                 }
                 catch (Exception ex)
@@ -856,18 +894,10 @@ public class ClipboardSyncService(
                     if (ackResponse != null)
                     {
                         _logger.LogDebug($"Received ACK for entry {ackResponse.id}");
-                        await _ackLock.WaitAsync();
-                        try
+                        // Bug #1 fix: Thread-safe removal/access
+                        if (_pendingAcks.TryGetValue(ackResponse.id, out var tcs))
                         {
-                            // Single ACK ownership: only signal, don't remove (sender owns cleanup)
-                            if (_pendingAcks.TryGetValue(ackResponse.id, out var tcs))
-                            {
-                                tcs.TrySetResult(ackResponse);
-                            }
-                        }
-                        finally
-                        {
-                            _ackLock.Release();
+                            tcs.TrySetResult(ackResponse);
                         }
                     }
                     return;
@@ -895,7 +925,14 @@ public class ClipboardSyncService(
             // Route remote entry through unified channel (handles both upserts and deletes)
             var evt = new ClipboardPipelineEvent.RemoteEntry(entry, DateTime.UtcNow);
             
-            await _clipboardChannel.Writer.WriteAsync(evt, ct);
+            try
+            {
+                await _clipboardChannel.Writer.WriteAsync(evt, ct);
+            }
+            catch (ChannelClosedException)
+            {
+                 _logger.LogDebug("Clipboard channel closed; dropping remote event");
+            }
         }
         catch (Exception ex)
         {
@@ -1029,69 +1066,41 @@ public class ClipboardSyncService(
     {
         _logger.LogWarning("WebSocket disconnected - clipboard sync paused until reconnection");
         
+        if (_pendingAcks.IsEmpty) return;
+
+        _logger.LogWarning($"Clearing {_pendingAcks.Count} pending ACKs due to disconnect");
+
         // Bug #3 fix: Clear pending ACKs to prevent stuck tasks
-        RunBackgroundTask(async ct =>
+        foreach (var kvp in _pendingAcks)
         {
-            await _ackLock.WaitAsync();
-            try
-            {
-                if (_pendingAcks.Count > 0)
-                {
-                    _logger.LogWarning($"Clearing {_pendingAcks.Count} pending ACKs due to disconnect");
-                    foreach (var tcs in _pendingAcks.Values)
-                    {
-                        tcs.TrySetCanceled();
-                    }
-                    _pendingAcks.Clear();
-                }
-            }
-            finally
-            {
-                _ackLock.Release();
-            }
-        }, "Clear Pending ACKs");
+             kvp.Value.TrySetCanceled();
+        }
+        _pendingAcks.Clear();
+    }
         
-        // On reconnect, retry unsynced entries
-        RunBackgroundTask(async ct =>
+
+
+    private void OnWebSocketConnected()
+    {
+         RunBackgroundTask(async ct =>
         {
             try
             {
-                // Fix 4: Poll for reconnection with maximum wait time to prevent infinite loop
-                const int MaxReconnectWaitMinutes = 5;
-                var reconnectDeadline = DateTime.UtcNow.AddMinutes(MaxReconnectWaitMinutes);
+                _logger.LogInformation("WebSocket reconnected, retrying unsynced entries");
+                var unsyncedEntries = await _repository.GetUnsyncedAsync();
                 
-                while (!_webSocketService.IsConnected && !ct.IsCancellationRequested)
+                if (unsyncedEntries.Count > 0)
                 {
-                    if (DateTime.UtcNow > reconnectDeadline)
+                    _logger.LogInformation($"Found {unsyncedEntries.Count} unsynced entries to retry");
+                    foreach (var entry in unsyncedEntries)
                     {
-                        _logger.LogWarning($"Reconnect wait timeout exceeded ({MaxReconnectWaitMinutes} minutes), abandoning retry");
-                        return;
-                    }
-                    await Task.Delay(500, ct);
-                }
-                
-                if (_webSocketService.IsConnected)
-                {
-                    _logger.LogInformation("WebSocket reconnected, retrying unsynced entries");
-                    var unsyncedEntries = await _repository.GetUnsyncedAsync();
-                    
-                    if (unsyncedEntries.Count > 0)
-                    {
-                        _logger.LogInformation($"Found {unsyncedEntries.Count} unsynced entries to retry");
-                        foreach (var entry in unsyncedEntries)
-                        {
-                            await SendExistingEntryAsync(entry);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogInformation("No unsynced entries to retry");
+                        await SendExistingEntryAsync(entry);
                     }
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogDebug("Reconnect retry cancelled");
+                else
+                {
+                    _logger.LogInformation("No unsynced entries to retry");
+                }
             }
             catch (Exception ex)
             {
