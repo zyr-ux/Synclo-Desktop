@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Synclo.Services.Utilities;
@@ -26,13 +27,34 @@ public class AvaloniaClipboardProvider : IClipboardProvider
         _hostWindow = window;
     }
 
+    private IClipboard? GetClipboard(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        // 1. Try explicitly set host window
+        if (_hostWindow?.Clipboard is { } hostClipboard)
+            return hostClipboard;
+
+        // 2. Try application main window
+        if (desktop.MainWindow?.Clipboard is { } mainClipboard)
+            return mainClipboard;
+
+        // 3. Fallback: Try to find ANY open window that provides a clipboard
+        // This is crucial for "tray-only" mode if the main window was closed/disposed
+        foreach (var window in desktop.Windows)
+        {
+            if (window.Clipboard is { } clipboard)
+                return clipboard;
+        }
+
+        return null;
+    }
+
     public async Task<string?> GetTextAsync()
     {
         return await Dispatcher.UIThread.InvokeAsync(async () =>
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var clipboard = (_hostWindow ?? desktop.MainWindow)?.Clipboard;
+                var clipboard = GetClipboard(desktop);
                 if (clipboard != null) return await clipboard.TryGetTextAsync();
             }
 
@@ -46,7 +68,7 @@ public class AvaloniaClipboardProvider : IClipboardProvider
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var clipboard = (_hostWindow ?? desktop.MainWindow)?.Clipboard;
+                var clipboard = GetClipboard(desktop);
                 if (clipboard != null) await clipboard.SetTextAsync(text);
             }
         });
