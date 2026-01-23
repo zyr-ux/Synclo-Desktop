@@ -4,13 +4,12 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Synclo.Services.Utilities;
 
-namespace Synclo.Services.ClipboardService.ClipboardMonitoringService;
+namespace Synclo.Services.ClipboardMonitor;
 
 public interface IClipboardProvider
 {

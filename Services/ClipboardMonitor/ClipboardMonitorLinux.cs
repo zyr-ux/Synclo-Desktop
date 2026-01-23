@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Synclo.Services.Utilities;
 
-namespace Synclo.Services.ClipboardService.ClipboardMonitoringService;
+namespace Synclo.Services.ClipboardMonitor;
 
-public class ClipboardMonitorMacOS(
+public class ClipboardMonitorLinux(
     IClipboardProvider clipboardProvider,
-    ILogger<ClipboardMonitorMacOS> logger,
+    ILogger<ClipboardMonitorLinux> logger,
     IUtils utils)
     : ClipboardMonitorBase(clipboardProvider, logger,utils);
