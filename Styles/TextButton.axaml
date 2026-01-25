@@ -16,21 +16,20 @@
         </Border>
     </Design.PreviewWith>
 
-    <Style Selector="Button.listAction">
+    <Style Selector="Button.textButton">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Foreground" Value="{DynamicResource Accent}" />
         <Setter Property="Padding" Value="10,0" />
-        <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FontSize" Value="18" />
         <Setter Property="FontFamily" Value="{DynamicResource Inconsolata-Medium}" />
     </Style>
-    <Style Selector="Button.listAction:pointerover /template/ ContentPresenter">
+    <Style Selector="Button.textButton:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Opacity" Value="0.4" />
     </Style>
-    <Style Selector="Button.listAction:disabled /template/ ContentPresenter">
+    <Style Selector="Button.textButton:disabled /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Opacity" Value="0.4" />
     </Style>

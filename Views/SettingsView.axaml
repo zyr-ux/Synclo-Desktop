@@ -3,89 +3,124 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="Synclo.Views.SettingsView"
              xmlns:vm="using:Synclo.ViewModels"
+             mc:Ignorable="d"
+             d:DesignWidth="800"
+             d:DesignHeight="450"
+             x:Class="Synclo.Views.SettingsView"
              x:DataType="vm:SettingsViewModel"
              Background="{DynamicResource PrimaryBackground}">
 
-    <StackPanel Orientation="Vertical"
-                Margin="20 20 20 20"
-                Spacing="20">
+    <!-- ScrollViewer is FLUSH to app edges -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
 
-        <!--Theme Switcher-->
-        <Border Background="{DynamicResource Accent}"
-                CornerRadius="8"
-                Padding="16"
-                Margin="0 12 0 0">
-            <Grid
-                ColumnDefinitions="Auto, * , Auto">
-                <!-- <Svg Path="/Assets/Icons/palette.svg" -->
-                <!--      Grid.RowSpan="2" -->
-                <!--      Width="28" -->
-                <!--      Height="28" -->
-                <!--      VerticalAlignment="Center" -->
-                <!--      Margin="0 0 16 0" /> -->
-                <materialIcons:MaterialIcon
-                    Grid.RowSpan="2"
-                    Kind="PaletteOutline"
-                    Width="36"
-                    Height="36"
-                    VerticalAlignment="Center"
-                    Margin="0 0 16 0"
-                    Foreground="{DynamicResource ForegroundD}" />
+        <!-- All padding lives here -->
+        <Border Padding="20">
+            <StackPanel Orientation="Vertical"
+                        Spacing="20">
 
+                <!-- Theme -->
+                <Border Background="{DynamicResource Accent}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <materialIcons:MaterialIcon
+                            Kind="PaletteOutline"
+                            Width="36"
+                            Height="36"
+                            Margin="0,0,16,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundD}" />
 
-                <!-- ComboBox -->
-                <ComboBox Grid.Column="2"
-                          Width="160"
-                          VerticalAlignment="Center"
-                          HorizontalContentAlignment="Center"
-                          FontFamily="{DynamicResource Inconsolata-Medium}"
-                          SelectedItem="{Binding SelectedTheme}"
-                          ItemsSource="{Binding AvailableThemes}" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Theme"
+                                       FontFamily="{StaticResource Inconsolata-Bold}"
+                                       FontSize="24"
+                                       Foreground="{DynamicResource ForegroundD}" />
+                            <TextBlock Text="Select theme to apply"
+                                       FontFamily="{StaticResource Inconsolata-Medium}"
+                                       FontSize="16"
+                                       Margin="0,4,0,0"
+                                       Foreground="{DynamicResource ForegroundD}" />
+                        </StackPanel>
 
-                <StackPanel
-                    Grid.Column="1">
-                    <TextBlock Text="Theme"
-                               FontFamily="{StaticResource Inconsolata-Bold}"
-                               FontSize="24"
-                               Foreground="{DynamicResource ForegroundD}"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text="Select theme to apply"
-                               FontSize="16"
-                               FontFamily="{StaticResource Inconsolata-Medium}"
-                               Foreground="{DynamicResource ForegroundD}"
-                               Margin="0 4 0 0" />
-                </StackPanel>
-            </Grid>
+                        <ComboBox Grid.Column="2"
+                                  Width="160"
+                                  VerticalAlignment="Center"
+                                  HorizontalContentAlignment="Left"
+                                  Padding="2"
+                                  FontFamily="{DynamicResource Inconsolata-Medium}"
+                                  ItemsSource="{Binding AvailableThemes}"
+                                  SelectedItem="{Binding SelectedTheme}" />
+                    </Grid>
+                </Border>
+                
+                <!-- Close Behavior -->
+                <Border Background="{DynamicResource Accent}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <materialIcons:MaterialIcon
+                            Kind="CloseCircleOutline"
+                            Width="36"
+                            Height="36"
+                            Margin="0,0,16,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundD}" />
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Close Behaviour"
+                                       FontFamily="{StaticResource Inconsolata-Bold}"
+                                       FontSize="24"
+                                       Foreground="{DynamicResource ForegroundD}" />
+                            <TextBlock Text="What happens when you close the window?"
+                                       FontFamily="{StaticResource Inconsolata-Medium}"
+                                       FontSize="16"
+                                       Margin="0,4,0,0"
+                                       Foreground="{DynamicResource ForegroundD}"
+                                       Opacity="0.7"/>
+                        </StackPanel>
+
+                        <ComboBox Grid.Column="2"
+                                  Width="250"
+                                  VerticalAlignment="Center"
+                                  HorizontalContentAlignment="Left"
+                                  Padding="2"
+                                  FontFamily="{DynamicResource Inconsolata-Medium}"
+                                  ItemsSource="{Binding AvailableCloseBehaviors}"
+                                  SelectedItem="{Binding SelectedCloseBehavior}" />
+                    </Grid>
+                </Border>
+                
+                <!-- Start on boot -->
+                <Border Background="Transparent"
+                        CornerRadius="8"
+                        Padding="16">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <materialIcons:MaterialIcon
+                            Kind="Laptop"
+                            Width="36"
+                            Height="36"
+                            Margin="0,0,16,0"
+                            VerticalAlignment="Center"
+                            Foreground="{DynamicResource ForegroundL}" />
+
+                        <TextBlock Grid.Column="1"
+                                   Text="Launch on System Startup"
+                                   FontFamily="{StaticResource Inconsolata-Bold}"
+                                   FontSize="24"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ForegroundL}" />
+
+                        <ToggleSwitch Grid.Column="2"
+                                      IsChecked="{Binding IsStartOnBootEnabled}"
+                                      VerticalAlignment="Center"
+                                      Foreground="{DynamicResource ForegroundL}" />
+                    </Grid>
+                </Border>
+
+            </StackPanel>
         </Border>
-
-        <!--Test Connection Button-->
-        <Button
-            Width="200"
-            Height="50"
-            Content="Test Connection"
-            FontFamily="{DynamicResource Inconsolata-Bold}"
-            FontSize="18"
-            HorizontalContentAlignment="Center"
-            VerticalContentAlignment="Center"
-            CornerRadius="10"
-            Background="{DynamicResource Accent}"
-            Foreground="{DynamicResource ForegroundD}" />
-
-        <!--Stop Syncing Button-->
-        <Button
-            Width="200"
-            Height="50"
-            Content="Stop Syncing"
-            FontFamily="{DynamicResource Inconsolata-Bold}"
-            FontSize="18"
-            HorizontalContentAlignment="Center"
-            VerticalContentAlignment="Center"
-            CornerRadius="10"
-            Background="{DynamicResource Accent}"
-            Foreground="{DynamicResource ForegroundD}" />
-
-    </StackPanel>
+    </ScrollViewer>
 </UserControl>

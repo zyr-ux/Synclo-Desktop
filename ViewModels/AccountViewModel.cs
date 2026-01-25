@@ -1,166 +1,72 @@
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
+using System;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using Synclo.Models;
+using Synclo.Factory;
 using Synclo.Services;
+using Synclo.Services.API;
 
 namespace Synclo.ViewModels;
 
-public partial class AccountViewModel : ViewModelBase
+public partial class AccountViewModel : ViewModelBase, IDisposable
 {
-    private readonly AccountService _accountService;
-    private readonly DeviceCacheService _deviceCacheService;
+    private readonly IViewModelFactory _factory;
+    private readonly IAccountService _accountService;
 
-    [ObservableProperty] private string _email = string.Empty;
-    [ObservableProperty] private bool _isBusy;
-    [ObservableProperty] private bool _isLoggedIn;
-    [ObservableProperty] private string _password = string.Empty;
-    [ObservableProperty] private string _username = string.Empty;
-    public ObservableCollection<DeviceModel> Devices { get; } = new();
+    [ObservableProperty] private ViewModelBase? _currentViewModel;
 
-    public AccountViewModel()
+    public AccountViewModel(
+        IViewModelFactory factory,
+        IAccountService accountService)
     {
-        _accountService = App.APIService.AccountService;
-        _deviceCacheService = App.APIService.DeviceCacheService;
+        _factory = factory;
+        _accountService = accountService;
+        _accountService.OnLogout += OnLogoutAsync;
         _ = InitializeAsync();
     }
-    
+
     private async Task InitializeAsync()
     {
         if (await _accountService.IsAuthenticatedAsync())
         {
-            IsLoggedIn = true;
-            Email = await _accountService.GetStoredEmailAsync() ?? "";
-            var atIndex = Email.IndexOf('@');
-            Username = atIndex > 0 ? Email.Substring(0, atIndex) : Email;
-
-            await LoadDevicesAsync();
+            ShowAccountDetails();
+        }
+        else
+        {
+            ShowLogin();
         }
     }
 
-    private async Task OnAuthSuccess()
+    private void ShowLogin()
     {
-        var atIndex = Email.IndexOf('@');
-        Username = atIndex > 0 ? Email.Substring(0, atIndex) : Email;
-        IsLoggedIn = true;
-
-        await LoadDevicesAsync();
-        _ = App.APIService.WebSocketService.ConnectAsync();
+        var loginViewModel = _factory.Create<LoginViewModel>();
+        loginViewModel.LoginSucceeded += OnLoginSuccess;
+        CurrentViewModel = loginViewModel;
     }
 
-    private void UpdateDeviceList(IEnumerable<DeviceModel> list)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            Devices.Clear();
-            foreach (var d in list) Devices.Add(d);
-        });
+    private void ShowAccountDetails() {
+        var accountDetailsViewModel = _factory.Create<AccountDetailsViewModel>();
+        accountDetailsViewModel.LoggedOut += OnLogout;
+        CurrentViewModel = accountDetailsViewModel;
     }
 
-    private async Task LoadDevicesAsync()
+    private void OnLoginSuccess()
     {
-        // 1. Show cached data immediately
-        var cached = await _deviceCacheService.LoadAsync();
-        UpdateDeviceList(cached);
-
-        // 2. Fetch fresh data from API
-        try
-        {
-            var fresh = await App.APIService.DeviceService.GetDevicesAsync();
-            UpdateDeviceList(fresh);
-            await _deviceCacheService.SaveAsync(fresh);
-        }
-        catch (SessionExpiredException)
-        {
-            await LogoutAsync();
-        }
-        catch
-        {
-            /* Fallback to cached list is already shown */
-        }
+        ShowAccountDetails();
     }
 
-    [RelayCommand]
-    private async Task LoginAsync()
+    private void OnLogout()
     {
-        if (IsBusy) return;
-        IsBusy = true;
-
-        try
-        {
-            await _accountService.LoginAsync(Email, Password);
-            Password = string.Empty;
-            await OnAuthSuccess();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        ShowLogin();
     }
 
-    [RelayCommand]
-    private async Task RegisterAsync()
+    private async Task OnLogoutAsync()
     {
-        if (IsBusy) return;
-        IsBusy = true;
-
-        try
-        {
-            await _accountService.RegisterAsync(Email, Password);
-            Password = string.Empty;
-            await OnAuthSuccess();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(ShowLogin);
     }
 
-    [RelayCommand]
-    private async Task RefreshAsync()
+    public void Dispose()
     {
-        await LoadDevicesAsync();
-    }
-
-    [RelayCommand]
-    private async Task LogoutAsync()
-    {
-        IsBusy = true;
-        try
-        {
-            await _accountService.LogoutAsync();
-            await App.APIService.WebSocketService.DisconnectAsync();
-
-            Devices.Clear();
-            Email = Password = Username = string.Empty;
-            IsLoggedIn = false;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task LogoutDeviceAsync(string deviceId)
-    {
-        try
-        {
-            await App.APIService.DeviceService.DeleteDeviceAsync(deviceId);
-            var target = Devices.FirstOrDefault(x => x.device_id == deviceId);
-            if (target != null)
-            {
-                Devices.Remove(target);
-                await _deviceCacheService.SaveAsync(Devices.ToList());
-            }
-        }
-        catch
-        {
-            /* Handle error */
-        }
+        _accountService.OnLogout -= OnLogoutAsync;
+        (_currentViewModel as IDisposable)?.Dispose();
     }
 }

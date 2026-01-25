@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
+             xmlns:vm="using:Synclo.ViewModels"
+             x:Class="Synclo.Views.AccountDetailsView"
+             x:DataType="vm:AccountDetailsViewModel"
+             Background="{DynamicResource PrimaryBackground}">
+
+    <Grid>
+
+        <!-- Page padding -->
+        <Border Padding="40">
+
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+                <!-- Header -->
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            Spacing="10"
+                            Margin="0,0,0,20">
+                    <TextBlock Text="Logged in as :"
+                               FontSize="28"
+                               Foreground="{DynamicResource Yellow}"
+                               FontFamily="{DynamicResource Inconsolata-Bold}" />
+                    <TextBlock Text="{Binding Username}"
+                               FontSize="28"
+                               Foreground="{DynamicResource Accent}"
+                               FontFamily="{DynamicResource Inconsolata-Medium}" />
+                </StackPanel>
+
+                <!-- Title -->
+                <TextBlock Grid.Row="1"
+                           Text="Manage Devices"
+                           FontSize="36"
+                           Foreground="{DynamicResource Accent}"
+                           FontFamily="{DynamicResource Inconsolata-Bold}"
+                           Margin="0,0,0,15" />
+
+                <!-- Devices card -->
+                <Border Grid.Row="2"
+                        Background="#303030"
+                        CornerRadius="12"
+                        Padding="20">
+
+                    <!-- ONLY scrollable area -->
+                    <ScrollViewer MaxHeight="250"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Interaction.Behaviors>
+                            <ia:VerticalScrollViewerAnimatedBehavior/>
+                        </Interaction.Behaviors>
+
+                        <ItemsControl ItemsSource="{Binding Devices}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="15"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding device_name}"
+                                                       FontSize="18"
+                                                       Foreground="#e0e0e0"
+                                                       FontFamily="{DynamicResource Inconsolata-Bold}" />
+                                            <TextBlock Text=" - this device"
+                                                       FontSize="18"
+                                                       Foreground="#666666"
+                                                       IsVisible="{Binding IsThisDevice}"
+                                                       FontFamily="{DynamicResource Inconsolata-Bold}" />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1"
+                                                Content="Logout"
+                                                Classes="textButton"
+                                                IsVisible="{Binding !IsThisDevice}"
+                                                Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
+                                                CommandParameter="{Binding device_id}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Actions -->
+                <StackPanel Grid.Row="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Bottom"
+                            HorizontalAlignment="Right"
+                            Spacing="20"
+                            Margin="0,20,0,0">
+
+                    <Button Classes="custom-button"
+                            Content="Delete Account"
+                            Width="150"
+                            Height="50"
+                            Command="{Binding DeleteAccountCommand}"
+                            IsEnabled="{Binding !IsBusy}" />
+
+                    <Button Classes="custom-button"
+                            Content="Reset Password"
+                            Width="150"
+                            Height="50"
+                            Command="{Binding ResetPasswordCommand}"
+                            IsEnabled="{Binding !IsBusy}" />
+
+                    <Button Classes="custom-button"
+                            Content="Logout"
+                            Width="100"
+                            Height="50"
+                            Command="{Binding LogoutCommand}"
+                            IsEnabled="{Binding !IsBusy}" />
+                </StackPanel>
+
+            </Grid>
+
+        </Border>
+
+    </Grid>
+</UserControl>
