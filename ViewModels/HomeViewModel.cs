@@ -50,7 +50,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         // Fire and forget initial load with delay to ensure services are ready
         Task.Run(async () =>
         {
-            await Task.Delay(1000);
+            await Task.Delay(500);
             await RefreshDataAsync(silent: true);
             // Only show success if no error occurred
             if (ErrorMessage == null)
