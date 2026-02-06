@@ -313,9 +313,9 @@ public sealed class WebSocketService : IWebSocketService
 
             if (code == 4003)
             {
-                // Device deleted remotely - trigger logout
-                // 4003 usually means THIS connection is unauthorized/deleted
-                OnDeviceDeleted?.Invoke(null);
+                // Device deleted remotely - connection closed by server
+                // Note: The "device_deleted" message handler already triggered OnDeviceDeleted
+                // This close status is just the server closing the connection afterward
                 return;
             }
 
