@@ -1,7 +1,11 @@
+using System.Collections.Generic;
+
 namespace Synclo.Models;
 
 public class ClipboardSyncResponse
 {
-    public required string status { get; set; }
-    public required string id { get; set; }
+    public List<ClipboardEntry> entries { get; set; } = new();
+    public long next_offset { get; set; }
+    public bool has_more { get; set; }
+    public int? total_count { get; set; }
 }

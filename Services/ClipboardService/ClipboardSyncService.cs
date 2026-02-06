@@ -159,6 +159,12 @@ public class ClipboardSyncService(
                     if (inactivityDuration.TotalDays > InactivityThresholdDays)
                     {
                         await _repository.ClearAllAsync();
+                        
+                        // Reset sync offset on cold start wipe
+                        _settingsService.Settings.last_sync_offset = 0;
+                        _settingsService.Settings.last_sync = null;
+                        _settingsService.Save();
+
                         _notificationService.ShowInfo(
                             $"For your security, clipboard history was cleared after {(int)inactivityDuration.TotalDays} days of inactivity. " +
                             "Refreshing from server...");
@@ -420,126 +426,153 @@ public class ClipboardSyncService(
             // Optimize: Decode key once outside the loop
             var masterKey = Convert.FromBase64String(masterKeyBase64);
 
-            var historyResponse = await _clipboardApiService.GetClipboardHistoryAsync(1, DefaultSyncPageSize, includeDeleted: true)
-                .ConfigureAwait(false);
-
-            if (historyResponse?.history == null || historyResponse.history.Count == 0)
+            long currentOffset = _settingsService.Settings.last_sync_offset;
+            bool hasMore = true;
+            int totalSynced = 0;
+            
+            while (hasMore)
             {
-                _settingsService.Settings.last_sync = DateTime.UtcNow;
-                _settingsService.Save();
-                return;
-            }
+                if (_shutdownCts.IsCancellationRequested) break;
 
-            var incomingBatch = new List<ClipboardDbModel>();
-            var idsToDelete = new List<string>();
+                var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
+                    offset: currentOffset,
+                    limit: DefaultSyncPageSize,
+                    includeDeleted: true
+                ).ConfigureAwait(false);
 
-            // Pre-fetch IDs to check for duplicates/updates
-            var incomingIds = historyResponse.history.Select(e => e.id).ToList();
-            var existingEntriesById = await _repository.GetByIdsAsync(incomingIds);
-
-            foreach (var entry in historyResponse.history)
-            {
-                if (entry == null || string.IsNullOrEmpty(entry.id)) continue;
-
-                // 1. Handle Deletes (Tombstones)
-                if (entry.is_deleted)
+                if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
                 {
-                    // Only bother deleting if we actually have it
-                    if (existingEntriesById.ContainsKey(entry.id))
-                    {
-                        idsToDelete.Add(entry.id);
-                    }
-                    continue;
+                    break;
                 }
 
-                // 2. Handle Encryption (Crucial Step missing in previous version)
-                string plaintext;
-                if (string.IsNullOrEmpty(entry.ciphertext) || string.IsNullOrEmpty(entry.nonce))
-                {
-                    // Fallback if server somehow sends unencrypted data or corrupt data
-                    if (string.IsNullOrEmpty(entry.plaintext)) continue;
-                    plaintext = entry.plaintext;
-                }
-                else
-                {
-                    try
-                    {
-                        plaintext = _cryptographyService.DecryptClipboard(
-                            _cryptographyService.FromBase64(entry.ciphertext),
-                            _cryptographyService.FromBase64(entry.nonce),
-                            masterKey);
-                    }
-                    catch
-                    {
-                        // Handle decryption failure (Ghost Entry)
-                        var safeHash = _utils.ComputeHash(entry.ciphertext);
-                        plaintext = $"Encrypted Content Unavailable [{safeHash}-{entry.id}]";
-                    }
-                }
+                await ProcessSyncBatch(syncResponse.entries, masterKey);
 
-                var contentHash = _utils.ComputeHash(plaintext);
+                currentOffset = syncResponse.next_offset;
+                hasMore = syncResponse.has_more;
+                totalSynced += syncResponse.entries.Count;
                 
-                // Check against ID map
-                existingEntriesById.TryGetValue(entry.id, out var existingById);
-
-                // Deduplication Logic:
-                // If we have the entry by ID, and the content hash matches, it's a true duplicate. Skip.
-                if (existingById != null && existingById.ContentHash == contentHash)
-                    continue;
-
-                // Normalize Timestamp
-                var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Unspecified
-                    ? DateTime.SpecifyKind(entry.timestamp, DateTimeKind.Utc) // Treating Unspecified as UTC
-                    : entry.timestamp.ToUniversalTime();
-
-                serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
-
-                var dbEntry = new ClipboardDbModel
-                {
-                    Id = entry.id,
-                    Content = plaintext,
-                    ContentHash = contentHash,
-                    Ciphertext = entry.ciphertext ?? string.Empty,
-                    Nonce = entry.nonce ?? string.Empty,
-                    BlobVersion = entry.blob_version,
-                    CreatedAt = serverTimestamp,
-                    IsSynced = true // It came from server, so it is synced
-                };
-
-                incomingBatch.Add(dbEntry);
-
-                // If we have an entry with this ID but content/timestamp differed, we need to overwrite it.
-                // SQLite Upsert usually handles this via ID, but explicit delete ensures clean state.
-                if (existingById != null)
-                    idsToDelete.Add(entry.id);
+                _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
             }
 
-            // Database Transaction - REMOVED WRAPPER TO PREVENT DEADLOCK
-            // Executing sequentially instead of atomic transaction prevents reentrancy deadlock 
-            // on the exclusive TaskScheduler.
-            if (idsToDelete.Count > 0 || incomingBatch.Count > 0)
-            {
-                foreach (var id in idsToDelete)
-                {
-                    var isTombstone = historyResponse.history.FirstOrDefault(x => x.id == id)?.is_deleted ?? false;
-                    if (isTombstone)
-                        await _repository.MarkDeletedAsync(id).ConfigureAwait(false);
-                    else
-                        await _repository.DeleteByIdAsync(id).ConfigureAwait(false); 
-                }
-
-                if (incomingBatch.Count > 0)
-                {
-                    await _repository.UpsertAsync(incomingBatch).ConfigureAwait(false);
-                }
-            }
-
+            _settingsService.Settings.last_sync_offset = currentOffset;
             _settingsService.Settings.last_sync = DateTime.UtcNow;
             _settingsService.Save();
+            
+            if (totalSynced > 0)
+            {
+                _logger.LogInformation($"Sync completed: {totalSynced} total entries synced");
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Background sync failed");
+        }
+    }
+
+    private async Task ProcessSyncBatch(List<ClipboardEntry> entries, byte[] masterKey)
+    {
+        var incomingBatch = new List<ClipboardDbModel>();
+        var idsToDelete = new List<string>();
+
+        // Pre-fetch IDs to check for duplicates/updates
+        var incomingIds = entries.Select(e => e.id).ToList();
+        var existingEntriesById = await _repository.GetByIdsAsync(incomingIds);
+
+        foreach (var entry in entries)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.id)) continue;
+
+            // 1. Handle Deletes (Tombstones)
+            if (entry.is_deleted)
+            {
+                // Only bother deleting if we actually have it
+                if (existingEntriesById.ContainsKey(entry.id))
+                {
+                    idsToDelete.Add(entry.id);
+                }
+                continue;
+            }
+
+            // 2. Handle Encryption (Crucial Step missing in previous version)
+            string plaintext;
+            if (string.IsNullOrEmpty(entry.ciphertext) || string.IsNullOrEmpty(entry.nonce))
+            {
+                // Fallback if server somehow sends unencrypted data or corrupt data
+                if (string.IsNullOrEmpty(entry.plaintext)) continue;
+                plaintext = entry.plaintext;
+            }
+            else
+            {
+                try
+                {
+                    plaintext = _cryptographyService.DecryptClipboard(
+                        _cryptographyService.FromBase64(entry.ciphertext),
+                        _cryptographyService.FromBase64(entry.nonce),
+                        masterKey);
+                }
+                catch
+                {
+                    // Handle decryption failure (Ghost Entry)
+                    var safeHash = _utils.ComputeHash(entry.ciphertext);
+                    plaintext = $"Encrypted Content Unavailable [{safeHash}-{entry.id}]";
+                }
+            }
+
+            var contentHash = _utils.ComputeHash(plaintext);
+            
+            // Check against ID map
+            existingEntriesById.TryGetValue(entry.id, out var existingById);
+
+            // Deduplication Logic:
+            // If we have the entry by ID, and the content hash matches, it's a true duplicate. Skip.
+            if (existingById != null && existingById.ContentHash == contentHash)
+                continue;
+
+            // Normalize Timestamp
+            var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(entry.timestamp, DateTimeKind.Utc) // Treating Unspecified as UTC
+                : entry.timestamp.ToUniversalTime();
+
+            serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
+
+            var dbEntry = new ClipboardDbModel
+            {
+                Id = entry.id,
+                Content = plaintext,
+                ContentHash = contentHash,
+                Ciphertext = entry.ciphertext ?? string.Empty,
+                Nonce = entry.nonce ?? string.Empty,
+                BlobVersion = entry.blob_version,
+                CreatedAt = serverTimestamp,
+                IsSynced = true // It came from server, so it is synced
+            };
+
+            incomingBatch.Add(dbEntry);
+
+            // If we have an entry with this ID but content/timestamp differed, we need to overwrite it.
+            // SQLite Upsert usually handles this via ID, but explicit delete ensures clean state.
+            if (existingById != null)
+                idsToDelete.Add(entry.id);
+        }
+
+        // Database Transaction - REMOVED WRAPPER TO PREVENT DEADLOCK
+        // Executing sequentially instead of atomic transaction prevents reentrancy deadlock 
+        // on the exclusive TaskScheduler.
+        if (idsToDelete.Count > 0 || incomingBatch.Count > 0)
+        {
+            foreach (var id in idsToDelete)
+            {
+                var isTombstone = entries.FirstOrDefault(x => x.id == id)?.is_deleted ?? false;
+                if (isTombstone)
+                    await _repository.MarkDeletedAsync(id).ConfigureAwait(false);
+                else
+                    await _repository.DeleteByIdAsync(id).ConfigureAwait(false); 
+            }
+
+            if (incomingBatch.Count > 0)
+            {
+                await _repository.UpsertAsync(incomingBatch).ConfigureAwait(false);
+            }
         }
     }
 
@@ -1161,6 +1194,11 @@ public class ClipboardSyncService(
         
         // Wipe local database completely on logout/failure to ensure fresh state on next login
         await _repository.ClearAllAsync();
+        
+        // Reset sync offset
+        _settingsService.Settings.last_sync_offset = 0;
+        _settingsService.Settings.last_sync = null;
+        _settingsService.Save();
         
         // Disconnect WebSocket
         await _webSocketService.DisconnectAsync();
