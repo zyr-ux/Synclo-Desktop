@@ -176,7 +176,12 @@ public class ClipboardSyncService(
                 if (existingEntries.Count == 0)
                 {
                     _logger.LogInformation("Database is empty, triggering automatic background refresh");
-                    RunBackgroundTask(async ct => await SyncInBackgroundAsync(), "Auto-Refresh on Empty DB");
+                    RunBackgroundTask(async ct => 
+                    {
+                        await SyncInBackgroundAsync();
+                        // Notify UI to refresh after sync completes
+                        OnHistoryUpdated?.Invoke();
+                    }, "Auto-Refresh on Empty DB");
                 }
 
                 // Subscribe to events
