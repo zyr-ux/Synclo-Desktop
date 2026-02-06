@@ -52,16 +52,16 @@ public sealed class AccountService : IAccountService
         IWebSocketService webSocketService,
         INotificationService notificationService)
     {
-        this._api = api;
-        this._http = http;
-        this._settings = settings;
-        this._deviceService = deviceService;
-        this._cryptographyService = cryptographyService;
-        this._secureStorage = secureStorage;
-        this._utils = utils;
-        this._refreshTokenService = refreshTokenService;
-        this._webSocketService = webSocketService;
-        this._notificationService = notificationService;
+        _api = api;
+        _http = http;
+        _settings = settings;
+        _deviceService = deviceService;
+        _cryptographyService = cryptographyService;
+        _secureStorage = secureStorage;
+        _utils = utils;
+        _refreshTokenService = refreshTokenService;
+        _webSocketService = webSocketService;
+        _notificationService = notificationService;
 
         // Subscribe to device deletion event
         webSocketService.OnDeviceDeleted += OnDeviceDeletedHandler;
