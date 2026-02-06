@@ -82,7 +82,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         catch (DeviceNotFoundException)
         {
             // Device was deleted remotely - trigger logout
-            _notificationService.ShowWarning("This device has been logged out remotely");
+            // Note: AccountService.OnDeviceDeletedHandler already shows the notification via WebSocket
             await LogoutAsync();
         }
         catch
