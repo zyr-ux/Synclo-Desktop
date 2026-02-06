@@ -12,7 +12,6 @@ namespace Synclo.Services.ClipboardService;
 public interface IClipboardApiService
 {
     Task<string> GetLatestClipboardAsync();
-    Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20, bool includeDeleted = false);
     Task<ClipboardSyncResponse> GetClipboardSyncAsync(long offset = 0, int limit = 50, bool includeDeleted = true);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
     T Deserialize<T>(string json);
@@ -57,44 +56,6 @@ public class ClipboardApiService(
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get latest clipboard");
-            throw;
-        }
-    }
-
-    public async Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20, bool includeDeleted = false)
-    {
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
-            if (string.IsNullOrEmpty(masterKeyBase64))
-                throw new InvalidOperationException("Master key not found. User must be logged in.");
-
-            var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
-            var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}&include_deleted={includeDeleted.ToString().ToLower()}", cts.Token);
-            response.EnsureSuccessStatusCode();
-
-            var json = await response.Content.ReadAsStringAsync();
-            var historyResponse = _api.Deserialize<ClipboardHistoryResponse>(json);
-
-            foreach (var entry in historyResponse.history)
-            {
-                try
-                {
-                    entry.plaintext = DecryptClipboardEntry(entry, masterKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, $"Failed to decrypt entry {entry?.id ?? "unknown"}, skipping");
-                    entry.plaintext = null; // Mark as failed
-                }
-            }
-
-            return historyResponse;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get clipboard history");
             throw;
         }
     }
