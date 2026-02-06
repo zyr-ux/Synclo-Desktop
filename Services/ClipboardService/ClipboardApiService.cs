@@ -70,8 +70,7 @@ public class ClipboardApiService(
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
-            // Updated endpoint to /api/clipboard/sync
-            var response = await _api.GetAsync($"/api/clipboard/sync?offset={offset}&limit={limit}&include_deleted={includeDeleted.ToString().ToLower()}", cts.Token);
+            var response = await _api.GetAsync($"/api/clipboard/all?offset={offset}&limit={limit}&include_deleted={includeDeleted.ToString().ToLower()}", cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
