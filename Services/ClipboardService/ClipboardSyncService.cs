@@ -190,6 +190,7 @@ public class ClipboardSyncService(
                 _webSocketService.OnConnected += OnWebSocketConnected;
                 _webSocketService.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketService.OnError += OnWebSocketError;
+                _accountService.OnLogin += OnAccountLoggedIn;
                 _accountService.OnLogout += OnAccountLoggedOut;
                 _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
 
@@ -382,6 +383,7 @@ public class ClipboardSyncService(
             _webSocketService.OnConnected -= OnWebSocketConnected;
             _webSocketService.OnDisconnected -= OnWebSocketDisconnected;
             _webSocketService.OnError -= OnWebSocketError;
+            _accountService.OnLogin -= OnAccountLoggedIn;
             _accountService.OnLogout -= OnAccountLoggedOut;
 
             _debounceCts?.Cancel();
@@ -1138,6 +1140,19 @@ public class ClipboardSyncService(
                 _logger.LogError(ex, $"{taskName} failed: {ex.GetType().Name}");
             }
         }, cts);
+    }
+
+    private async Task OnAccountLoggedIn()
+    {
+        _logger.LogInformation("User logged in, triggering automatic refresh from server");
+        
+        // Trigger background refresh to fetch clipboard history from server
+        RunBackgroundTask(async ct => 
+        {
+            await SyncInBackgroundAsync();
+            // Notify UI to refresh after sync completes
+            OnHistoryUpdated?.Invoke();
+        }, "Auto-Refresh on Login");
     }
 
     private async Task OnAccountLoggedOut()
