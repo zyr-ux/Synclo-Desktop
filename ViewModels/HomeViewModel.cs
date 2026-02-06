@@ -247,22 +247,25 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     private async Task UpdateHomeStatusAsync()
     {
-        _isLoggedIn = await _accountService.IsAuthenticatedAsync();
-
-        switch (_isLoggedIn)
+        await Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            case false:
-                HomeStatusMessage = "You are not logged in. Pls log in to use Synclo!";
-                HomeStatusMessageVisibility = true;
-                break;
-            case true when HistoryEntries.Count == 0:
-                HomeStatusMessage = "Looks like this is empty! Copy something rn!";
-                HomeStatusMessageVisibility = true;
-                break;
-            default:
-                HomeStatusMessageVisibility = false;
-                break;
-        }
+            _isLoggedIn = await _accountService.IsAuthenticatedAsync();
+
+            switch (_isLoggedIn)
+            {
+                case false:
+                    HomeStatusMessage = "You are not logged in. Pls log in to use Synclo!";
+                    HomeStatusMessageVisibility = true;
+                    break;
+                case true when HistoryEntries.Count == 0:
+                    HomeStatusMessage = "Looks like this is empty! Copy something rn!";
+                    HomeStatusMessageVisibility = true;
+                    break;
+                default:
+                    HomeStatusMessageVisibility = false;
+                    break;
+            }
+        });
     }
 
     public void Dispose()

@@ -82,14 +82,36 @@ public sealed class AccountService : IAccountService
 
     public async Task<string?> GetStoredEmailAsync() => await secureStorage.LoadAsync(UserEmail);
 
-    private void OnDeviceDeletedHandler()
+    private void OnDeviceDeletedHandler(string? deletedDeviceId)
     {
+        // If a specific device ID was provided, check if it matches OUR device ID
+        var currentDeviceId = settings.Settings.device_id;
+        
+        // If it's another device, ignore the event (do not log out)
+        if (!string.IsNullOrEmpty(deletedDeviceId) && 
+            !string.IsNullOrEmpty(currentDeviceId) && 
+            deletedDeviceId != currentDeviceId)
+        {
+            return; 
+        }
+
         // Device was deleted remotely - trigger logout
         _ = Task.Run(async () =>
         {
             try
             {
-                notificationService.ShowWarning("This device has been logged out remotely");
+                // Ensure UI notification runs on the UI thread
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+                    notificationService.ShowWarning("This device has been logged out remotely"));
+            }
+            catch
+            {
+                // Swallow exceptions during notification (e.g. if app is closing)
+            }
+            
+            try
+            {
+                // Ensure logout happens regardless of notification success
                 await LogoutAsync();
             }
             catch
