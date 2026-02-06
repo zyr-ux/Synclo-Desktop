@@ -44,7 +44,12 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
         _accountService.OnLogin += async () => await UpdateHomeStatusAsync();
-        _accountService.OnLogout += async () => await UpdateHomeStatusAsync();
+        _accountService.OnLogout += async () =>
+        {
+            // Clear UI immediately to prevent race condition with status message
+            HistoryEntries.Clear();
+            await UpdateHomeStatusAsync();
+        };
         
         
         // Fire and forget initial load with delay to ensure services are ready

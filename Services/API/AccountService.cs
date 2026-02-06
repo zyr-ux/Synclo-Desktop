@@ -36,6 +36,9 @@ public sealed class AccountService : IAccountService
     private readonly IRefreshTokenService refreshTokenService;
     private readonly IWebSocketService webSocketService;
     private readonly INotificationService notificationService;
+    
+    // Flag to immediately reflect logout state before secure storage is cleared
+    private volatile bool _isLoggingOut = false;
 
     public AccountService(
         IApiService api,
@@ -76,6 +79,9 @@ public sealed class AccountService : IAccountService
 
     public async Task<bool> IsAuthenticatedAsync()
     {
+        // Check logout flag first to avoid race condition
+        if (_isLoggingOut) return false;
+        
         var token = await secureStorage.LoadAsync(AccessToken);
         return !string.IsNullOrWhiteSpace(token);
     }
@@ -380,6 +386,9 @@ public sealed class AccountService : IAccountService
 
     public async Task LogoutAsync()
     {
+        // Set flag immediately to make IsAuthenticatedAsync() return false
+        _isLoggingOut = true;
+        
         if (OnLogout != null)
         {
             await OnLogout.Invoke();
@@ -402,6 +411,9 @@ public sealed class AccountService : IAccountService
         await secureStorage.DeleteAsync(cryptographyService.KdfVersion);
 
         await deviceService.ClearAsync();
+        
+        // Reset flag after logout completes (for potential re-login)
+        _isLoggingOut = false;
     }
 
     // -------------------- SALT --------------------
