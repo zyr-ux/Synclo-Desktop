@@ -160,8 +160,6 @@ public class ClipboardSyncService(
                     {
                         await _repository.ClearAllAsync();
                         
-                        // Reset sync offset on cold start wipe
-                        _settingsService.Settings.last_sync_offset = 0;
                         _settingsService.Settings.last_sync = null;
                         _settingsService.Save();
 
@@ -426,7 +424,8 @@ public class ClipboardSyncService(
             // Optimize: Decode key once outside the loop
             var masterKey = Convert.FromBase64String(masterKeyBase64);
 
-            long currentOffset = _settingsService.Settings.last_sync_offset;
+            // Always start from offset 0 to ensure tombstones and other features work correctly
+            long currentOffset = 0;
             bool hasMore = true;
             int totalSynced = 0;
             
@@ -454,7 +453,6 @@ public class ClipboardSyncService(
                 _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
             }
 
-            _settingsService.Settings.last_sync_offset = currentOffset;
             _settingsService.Settings.last_sync = DateTime.UtcNow;
             _settingsService.Save();
             
@@ -1195,8 +1193,6 @@ public class ClipboardSyncService(
         // Wipe local database completely on logout/failure to ensure fresh state on next login
         await _repository.ClearAllAsync();
         
-        // Reset sync offset
-        _settingsService.Settings.last_sync_offset = 0;
         _settingsService.Settings.last_sync = null;
         _settingsService.Save();
         
