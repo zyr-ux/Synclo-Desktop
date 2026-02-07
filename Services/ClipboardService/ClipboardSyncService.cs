@@ -52,7 +52,7 @@ public class ClipboardSyncService(
     ILogger<ClipboardSyncService> logger
 ) : IDisposable, IClipboardSyncService
 {
-    private const int DebounceDelayMs = 500;
+    private const int DebounceDelayMs = 50;
     private const int InactivityThresholdDays = 14;
     private const int DefaultHistoryLimit = 100;
     private const int DefaultSyncPageSize = 50;
@@ -121,8 +121,8 @@ public class ClipboardSyncService(
     private const int MaxQueuedClipboardEvents = 100;
     
     // Suppression guard to prevent feedback loop (Bug #1 fix)
-    // Using SemaphoreSlim instead of volatile bool for proper async synchronization
-    private readonly SemaphoreSlim _remoteUpdateLock = new(1, 1);
+    // Using volatile bool for fast lock-free checks
+    private volatile bool _isProcessingRemoteUpdate;
     
     // Consumer task tracking for graceful shutdown (Bug #8 fix)
     private Task? _consumerTask;
@@ -134,7 +134,6 @@ public class ClipboardSyncService(
     private byte[]? _cachedMasterKey;
     private readonly SemaphoreSlim _masterKeyLock = new(1, 1);
 
-    private CancellationTokenSource? _debounceCts;
     private bool _disposed;
     private volatile bool _isInitialized;
 
@@ -390,14 +389,10 @@ public class ClipboardSyncService(
             _accountService.OnLogin -= OnAccountLoggedIn;
             _accountService.OnLogout -= OnAccountLoggedOut;
 
-            _debounceCts?.Cancel();
-            _debounceCts?.Dispose();
-
             _refreshLock.Dispose();
             // _ackLock.Dispose(); // Removed
             _initLock.Dispose();
             _masterKeyLock.Dispose();
-            _remoteUpdateLock.Dispose();
 
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();
@@ -578,21 +573,11 @@ public class ClipboardSyncService(
     {
         if (_shutdownCts.IsCancellationRequested) return;
 
-        // Bug #3 fix: Wrap semaphore usage in try/finally to prevent leaks
-        var lockAcquired = false;
-        try
+        // Bug #1 fix: Check suppression guard (lock-free check)
+        if (_isProcessingRemoteUpdate)
         {
-            // Bug #1 fix: Check suppression guard
-            lockAcquired = _remoteUpdateLock.Wait(0);
-            if (!lockAcquired)
-            {
-                _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
-                return;
-            }
-        }
-        finally
-        {
-            if (lockAcquired) _remoteUpdateLock.Release();
+            _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
+            return;
         }
 
         _logger.LogDebug($"OnClipboardChanged fired with content length: {content?.Length ?? 0}");
@@ -603,20 +588,16 @@ public class ClipboardSyncService(
             return;
         }
 
-        // Fix 1: Move debounce logic here to prevent race conditions
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = new CancellationTokenSource();
-        var token = _debounceCts.Token;
-
+        // Allow each clipboard change to process independently with a small delay
+        // to filter out OS-level duplicate events for the SAME content
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(DebounceDelayMs, token);
-                if (token.IsCancellationRequested) return;
+                // Small delay to debounce OS-level duplicate events
+                await Task.Delay(DebounceDelayMs);
 
-                // Bug #2 fix: Check shutdown token again after delay
+                // Bug #2 fix: Check shutdown token after delay
                 if (_shutdownCts.IsCancellationRequested) return;
 
                 // Issue #1 fix: Write local content to unified channel
@@ -628,7 +609,7 @@ public class ClipboardSyncService(
                      // Defensive check before writing
                     if (!_clipboardChannel.Writer.TryWrite(evt)) // Fast check
                     {
-                        await _clipboardChannel.Writer.WriteAsync(evt, token);
+                        await _clipboardChannel.Writer.WriteAsync(evt, _shutdownCts.Token);
                     }
                 }
                 catch (ChannelClosedException)
@@ -636,13 +617,9 @@ public class ClipboardSyncService(
                     _logger.LogWarning("Attempted to write to closed clipboard channel");
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // Debounced
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in clipboard debounce task");
+                _logger.LogError(ex, "Error in clipboard processing task");
             }
         });
     }
@@ -1079,8 +1056,8 @@ public class ClipboardSyncService(
             }
             await _repository.UpsertAsync(dbEntry).ConfigureAwait(false);
 
-            // Bug #1 fix: Set suppression guard before writing to OS clipboard using semaphore
-            await _remoteUpdateLock.WaitAsync();
+            // Bug #1 fix: Set suppression flag before writing to OS clipboard
+            _isProcessingRemoteUpdate = true;
             try
             {
                 // Bug #1.1 fix: Dispatch to UI thread to prevent STA crash
@@ -1091,7 +1068,7 @@ public class ClipboardSyncService(
             }
             finally
             {
-                _remoteUpdateLock.Release();
+                _isProcessingRemoteUpdate = false;
             }
         }
         catch (Exception ex)
