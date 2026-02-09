@@ -6,6 +6,8 @@
              xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="clr-namespace:Synclo.ViewModels"
              xmlns:models="clr-namespace:Synclo.Models"
+             xmlns:behaviors="clr-namespace:Synclo.Behaviors"
+             xmlns:i="clr-namespace:Avalonia.Xaml.Interactivity;assembly=Avalonia.Xaml.Interactivity"
              mc:Ignorable="d"
              d:DesignWidth="800"
              d:DesignHeight="450"
@@ -54,6 +56,7 @@
                       HorizontalScrollBarVisibility="Disabled">
             <Interaction.Behaviors>
                 <ia:VerticalScrollViewerAnimatedBehavior/>
+                <behaviors:ScrollViewerInfiniteScrollBehavior Command="{Binding LoadMoreCommand}"/>
             </Interaction.Behaviors>
 
             <!-- Content padding goes HERE -->

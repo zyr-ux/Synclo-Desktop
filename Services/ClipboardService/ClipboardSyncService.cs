@@ -31,7 +31,7 @@ internal abstract record ClipboardPipelineEvent
 public interface IClipboardSyncService : IDisposable
 {
     Task InitializeAsync();
-    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100);
+    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100, int offset = 0);
     Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task ShutdownAsync();
@@ -234,11 +234,11 @@ public class ClipboardSyncService(
 
     public event Action? OnHistoryUpdated;
 
-    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100)
+    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100, int offset = 0)
     {
         try
         {
-            var entries = await _repository.GetAllAsync(limit).ConfigureAwait(false);
+            var entries = await _repository.GetAllAsync(limit, offset).ConfigureAwait(false);
             return entries ?? new List<ClipboardDbModel>();
         }
         catch (Exception ex)

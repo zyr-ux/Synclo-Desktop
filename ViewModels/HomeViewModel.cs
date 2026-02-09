@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
@@ -29,6 +30,10 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private ObservableCollection<ClipboardDbModel> _historyEntries = new();
     [ObservableProperty] private string? _homeStatusMessage;
     [ObservableProperty] private bool _homeStatusMessageVisibility;
+    
+    private int _currentOffset = 0;
+    private const int PageSize = 15;
+    private bool _isLoadingMore;
     
 
     public HomeViewModel(
@@ -83,7 +88,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 await Task.Delay(50, token); // Debounce
                 if (token.IsCancellationRequested) return;
 
-                var entries = await _clipboardSyncService.GetHistoryForUI();
+                // Reset offset on full refresh/update
+                _currentOffset = 0;
+                var entries = await _clipboardSyncService.GetHistoryForUI(PageSize, _currentOffset);
                 if (token.IsCancellationRequested) return; // Check again after async call
 
                 ApplyCollectionDiff(entries);
@@ -198,7 +205,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             if (!silent) IsLoading = true;
             ErrorMessage = null;
             
-            var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: 100);
+            var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: PageSize);
             
             // UI update is handled by OnHistoryUpdated event triggered within RefreshFromServerAsync
 
@@ -233,6 +240,42 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
     }
 
+    
+    [RelayCommand]
+    private async Task LoadMore()
+    {
+        if (_isLoadingMore || IsLoading) return;
+
+        try
+        {
+            _isLoadingMore = true;
+            var nextOffset = _currentOffset + PageSize;
+            var newEntries = await _clipboardSyncService.GetHistoryForUI(PageSize, nextOffset);
+
+            if (newEntries.Count > 0)
+            {
+                _currentOffset = nextOffset;
+                foreach (var entry in newEntries)
+                {
+                    // Avoid duplicates
+                    if (!HistoryEntries.Any(x => x.Id == entry.Id))
+                    {
+                        HistoryEntries.Add(entry);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Silently fail for load more, or maybe show a toast
+             _notificationService.ShowError("Failed to load more items: " + ex.Message);
+        }
+        finally
+        {
+            _isLoadingMore = false;
+        }
+    }
+    
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DeleteItemClicked(ClipboardDbModel entry)
     {
