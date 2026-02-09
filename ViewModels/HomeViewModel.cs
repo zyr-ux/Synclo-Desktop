@@ -12,6 +12,7 @@ using Synclo.Services;
 using Synclo.Services.API;
 using Synclo.Services.ClipboardMonitor;
 using Synclo.Services.ClipboardService;
+using Synclo.Services.Utilities;
 
 namespace Synclo.ViewModels;
 
@@ -20,6 +21,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly INotificationService _notificationService;
     private readonly IClipboardSyncService _clipboardSyncService;
+    private readonly ISettingsService _settingsService;
     private readonly IAccountService _accountService;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
     private CancellationTokenSource? _updateCts;
@@ -31,20 +33,21 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string? _homeStatusMessage;
     [ObservableProperty] private bool _homeStatusMessageVisibility;
     
+    private int PageSize => _settingsService.Settings.sync_page_size;
     private int _currentOffset = 0;
-    private const int PageSize = 15;
-    private bool _isLoadingMore;
+    private bool _isLoadingMore = false;
     
-
     public HomeViewModel(
         IClipboardMonitor clipboardMonitor,
         INotificationService notificationService,
         IClipboardSyncService clipboardSyncService,
+        ISettingsService settingsService,
         IAccountService accountService)
     {
         _clipboardMonitor = clipboardMonitor;
         _notificationService = notificationService;
         _clipboardSyncService = clipboardSyncService;
+        _settingsService = settingsService;
         _accountService = accountService;
         
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;

@@ -166,7 +166,7 @@ public class ClipboardSyncService(
                             $"For your security, clipboard history was cleared after {(int)inactivityDuration.TotalDays} days of inactivity. " +
                             "Refreshing from server...");
                         // Refresh history from server in background
-                        RunBackgroundTask(async ct => await RefreshFromServerAsync(DefaultSyncPageSize),
+                        RunBackgroundTask(async ct => await RefreshFromServerAsync(_settingsService.Settings.sync_page_size),
                             "Cold Start Refresh");
                     }
                 }
@@ -457,7 +457,7 @@ public class ClipboardSyncService(
 
                 var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
                     offset: currentOffset,
-                    limit: DefaultSyncPageSize,
+                    limit: _settingsService.Settings.sync_page_size,
                     includeDeleted: true
                 ).ConfigureAwait(false);
 
