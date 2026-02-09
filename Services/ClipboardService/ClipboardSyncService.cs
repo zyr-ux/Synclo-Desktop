@@ -32,7 +32,7 @@ public interface IClipboardSyncService : IDisposable
 {
     Task InitializeAsync();
     Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100, int offset = 0);
-    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100);
+    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100, int offset = 0, bool notify = true);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
@@ -239,6 +239,32 @@ public class ClipboardSyncService(
         try
         {
             var entries = await _repository.GetAllAsync(limit, offset).ConfigureAwait(false);
+            
+            // Auto-fetch from server if local DB has fewer items than requested
+            // This ensures infinite scroll works even if background sync hasn't caught up
+            if (entries.Count < limit)
+            {
+                _logger.LogInformation($"Local DB returned {entries.Count} items (requested {limit}). Fetching from server at offset {offset}...");
+                
+                // Fetch from server (this will also upsert into DB)
+                // We don't await the full sync, just the first batch which returns IReadOnlyList
+                // Pass notify: false to prevent triggering global OnHistoryUpdated which causes loop
+                var serverEntries = await RefreshFromServerAsync(limit, offset, notify: false).ConfigureAwait(false);
+                
+                // Merge results (server entries might overlap or be new)
+                // We prioritize server entries for the missing range
+                var combined = new List<ClipboardDbModel>(entries);
+                foreach (var serverEntry in serverEntries)
+                {
+                    if (!combined.Any(x => x.Id == serverEntry.Id))
+                    {
+                        combined.Add(serverEntry);
+                    }
+                }
+                
+                return combined;
+            }
+
             return entries ?? new List<ClipboardDbModel>();
         }
         catch (Exception ex)
@@ -248,7 +274,7 @@ public class ClipboardSyncService(
         }
     }
 
-    public async Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100)
+    public async Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100, int offset = 0, bool notify = true)
     {
         // Deduplication: Prevent concurrent refreshes
         if (!await _refreshLock.WaitAsync(0).ConfigureAwait(false))
@@ -271,14 +297,15 @@ public class ClipboardSyncService(
             // Fetch from database
             var localEntries = await _repository.GetAllAsync(limit).ConfigureAwait(false);
             // Bug #2.1 fix: Ensure UI updates immediately with local data
-            OnHistoryUpdated?.Invoke();
+            if (notify) OnHistoryUpdated?.Invoke();
 
             // Trigger background sync to catch up with server
             RunBackgroundTask(async ct => 
             {
-                await SyncInBackgroundAsync();
+                // If specific offset requested, sync from there. Otherwise sync from 0.
+                await SyncInBackgroundAsync(startOffset: offset);
                 // Bug #2.1 fix: Ensure UI updates after background sync completes
-                OnHistoryUpdated?.Invoke();
+                if (notify) OnHistoryUpdated?.Invoke();
             }, "Refresh Sync");
 
             // Return empty list if no data (don't return null)
@@ -405,7 +432,7 @@ public class ClipboardSyncService(
         }
     }
 
-    private async Task SyncInBackgroundAsync()
+    private async Task SyncInBackgroundAsync(int startOffset = 0)
     {
         try
         {
@@ -419,8 +446,8 @@ public class ClipboardSyncService(
             // Optimize: Decode key once outside the loop
             var masterKey = Convert.FromBase64String(masterKeyBase64);
 
-            // Always start from offset 0 to ensure tombstones and other features work correctly
-            long currentOffset = 0;
+            // Start from requested offset
+            long currentOffset = startOffset;
             bool hasMore = true;
             int totalSynced = 0;
             

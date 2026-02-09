@@ -88,9 +88,10 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 await Task.Delay(50, token); // Debounce
                 if (token.IsCancellationRequested) return;
 
-                // Reset offset on full refresh/update
-                _currentOffset = 0;
-                var entries = await _clipboardSyncService.GetHistoryForUI(PageSize, _currentOffset);
+                // Reset offset on full refresh/update but maintain visible items
+                var limit = Math.Max(PageSize, _historyEntries.Count);
+                _currentOffset = limit; 
+                var entries = await _clipboardSyncService.GetHistoryForUI(limit, 0);
                 if (token.IsCancellationRequested) return; // Check again after async call
 
                 ApplyCollectionDiff(entries);
@@ -205,7 +206,10 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             if (!silent) IsLoading = true;
             ErrorMessage = null;
             
-            var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: PageSize);
+            // Smart Refresh: Fetch at least as many items as currently visible to preserve scroll position
+            // This ensures meaningful updates (including deletions) without resetting the view to just 1 page
+            var limit = Math.Max(PageSize, HistoryEntries.Count);
+            var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: limit);
             
             // UI update is handled by OnHistoryUpdated event triggered within RefreshFromServerAsync
 
@@ -249,12 +253,14 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         try
         {
             _isLoadingMore = true;
-            var nextOffset = _currentOffset + PageSize;
+            // Use current count as the offset to fetch the next batch
+            var nextOffset = HistoryEntries.Count;
             var newEntries = await _clipboardSyncService.GetHistoryForUI(PageSize, nextOffset);
 
             if (newEntries.Count > 0)
             {
-                _currentOffset = nextOffset;
+                // Update _currentOffset merely for tracking, though next LoadMore will use Count again
+                _currentOffset = nextOffset + newEntries.Count;
                 foreach (var entry in newEntries)
                 {
                     // Avoid duplicates
