@@ -33,7 +33,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string? _homeStatusMessage;
     [ObservableProperty] private bool _homeStatusMessageVisibility;
     
-    private int _currentOffset = 0;
     private int PageSize => _settingsService.Settings.sync_page_size;
     private bool _isLoadingMore;
     
@@ -92,9 +91,10 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 await Task.Delay(50, token); // Debounce
                 if (token.IsCancellationRequested) return;
 
-                // Reset offset on full refresh/update
-                _currentOffset = 0;
-                var entries = await _clipboardSyncService.GetHistoryForUI(PageSize, _currentOffset);
+                // Maintain current scroll position/data by loading at least as many items as we have now
+                // or the default page size, whichever is larger.
+                var loadCount = Math.Max(HistoryEntries.Count, PageSize);
+                var entries = await _clipboardSyncService.GetHistoryForUI(loadCount, 0);
                 if (token.IsCancellationRequested) return; // Check again after async call
 
                 ApplyCollectionDiff(entries);
@@ -253,12 +253,13 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         try
         {
             _isLoadingMore = true;
-            var nextOffset = _currentOffset + PageSize;
+            // Dynamic offset based on current list size
+            // We want to load the *next* batch starting from where we currently are
+            var nextOffset = HistoryEntries.Count;
             var newEntries = await _clipboardSyncService.GetHistoryForUI(PageSize, nextOffset);
 
             if (newEntries.Count > 0)
             {
-                _currentOffset = nextOffset;
                 foreach (var entry in newEntries)
                 {
                     // Avoid duplicates
