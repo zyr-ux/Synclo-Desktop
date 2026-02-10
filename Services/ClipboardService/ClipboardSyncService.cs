@@ -31,8 +31,8 @@ internal abstract record ClipboardPipelineEvent
 public interface IClipboardSyncService : IDisposable
 {
     Task InitializeAsync();
-    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100, int offset = 0);
-    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100);
+    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 0, int offset = 0);
+    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 0);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
@@ -53,8 +53,6 @@ public class ClipboardSyncService(
 ) : IDisposable, IClipboardSyncService
 {
     private const int DebounceDelayMs = 50;
-    private const int InactivityThresholdDays = 29;
-    private const int DefaultHistoryLimit = 100;
     private int DefaultSyncPageSize => _settingsService.Settings.sync_page_size;
     private const int ShutdownTimeoutSeconds = 5;
 
@@ -151,26 +149,6 @@ public class ClipboardSyncService(
 
             try
             {
-                // Cold start check: wipe DB if inactive for too long
-                if (_settingsService.Settings.last_sync.HasValue)
-                {
-                    var inactivityDuration = DateTime.UtcNow - _settingsService.Settings.last_sync.Value;
-                    if (inactivityDuration.TotalDays > InactivityThresholdDays)
-                    {
-                        await _repository.ClearAllAsync();
-                        
-                        _settingsService.Settings.last_sync = null;
-                        _settingsService.Save();
-
-                        _notificationService.ShowInfo(
-                            $"For your security, clipboard history was cleared after {(int)inactivityDuration.TotalDays} days of inactivity. " +
-                            "Refreshing from server...");
-                        // Refresh history from server in background
-                        RunBackgroundTask(async ct => await RefreshFromServerAsync(DefaultSyncPageSize),
-                            "Cold Start Refresh");
-                    }
-                }
-
                 // Cleanup tombstones on startup (keep DB clean)
                 await _repository.PurgeTombstonesAsync();
 
@@ -178,7 +156,11 @@ public class ClipboardSyncService(
                 var existingEntries = await _repository.GetAllAsync(1);
                 if (existingEntries.Count == 0)
                 {
-                    _logger.LogInformation("Database is empty, triggering automatic background refresh");
+                    _logger.LogInformation("Database is empty, resetting last_sync to force full refresh");
+                    // Force a fresh sync by clearing the timestamp
+                    _settingsService.Settings.last_sync = null;
+                    _settingsService.Save();
+
                     RunBackgroundTask(async ct => 
                     {
                         await SyncInBackgroundAsync();
@@ -234,8 +216,12 @@ public class ClipboardSyncService(
 
     public event Action? OnHistoryUpdated;
 
-    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100, int offset = 0)
+    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 0, int offset = 0)
     {
+        // Default to configured page size if 0
+        if (limit <= 0) limit = DefaultSyncPageSize;
+
+
         try
         {
             var entries = await _repository.GetAllAsync(limit, offset).ConfigureAwait(false);
@@ -248,8 +234,11 @@ public class ClipboardSyncService(
         }
     }
 
-    public async Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100)
+    public async Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 0)
     {
+        // Default to configured page size if 0
+        if (limit <= 0) limit = DefaultSyncPageSize;
+
         // Deduplication: Prevent concurrent refreshes
         if (!await _refreshLock.WaitAsync(0).ConfigureAwait(false))
         {
@@ -419,41 +408,75 @@ public class ClipboardSyncService(
             // Optimize: Decode key once outside the loop
             var masterKey = Convert.FromBase64String(masterKeyBase64);
 
-            // Always start from offset 0 to ensure tombstones and other features work correctly
+            // Delta Sync Logic
+            DateTime? since = _settingsService.Settings.last_sync;
             long currentOffset = 0;
             bool hasMore = true;
             int totalSynced = 0;
             
-            while (hasMore)
+            // Track the max updated_at seen in this sync session to update last_sync at the end
+            DateTime? maxUpdatedAt = since;
+
+            try 
             {
-                if (_shutdownCts.IsCancellationRequested) break;
-
-                var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
-                    offset: currentOffset,
-                    limit: DefaultSyncPageSize,
-                    includeDeleted: true
-                ).ConfigureAwait(false);
-
-                if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
+                while (hasMore)
                 {
-                    break;
+                    if (_shutdownCts.IsCancellationRequested) break;
+
+                    var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
+                        since: since,
+                        limit: DefaultSyncPageSize,
+                        offset: currentOffset
+                    ).ConfigureAwait(false);
+
+                    if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
+                    {
+                        break;
+                    }
+
+                    await ProcessSyncBatch(syncResponse.entries, masterKey);
+
+                    // Track max updated_at for next sync
+                    foreach (var entry in syncResponse.entries)
+                    {
+                        if (entry.updated_at > (maxUpdatedAt ?? DateTime.MinValue))
+                        {
+                            maxUpdatedAt = entry.updated_at;
+                        }
+                    }
+
+                    currentOffset = syncResponse.next_offset;
+                    hasMore = syncResponse.has_more;
+                    totalSynced += syncResponse.entries.Count;
+                    
+                    _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
                 }
 
-                await ProcessSyncBatch(syncResponse.entries, masterKey);
-
-                currentOffset = syncResponse.next_offset;
-                hasMore = syncResponse.has_more;
-                totalSynced += syncResponse.entries.Count;
+                // Update last_sync only if we successfully synced everything
+                if (maxUpdatedAt > since || (since == null && maxUpdatedAt != null))
+                {
+                     _settingsService.Settings.last_sync = maxUpdatedAt;
+                     _settingsService.Save();
+                }
                 
-                _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
+                if (totalSynced > 0)
+                {
+                    _logger.LogInformation($"Sync completed: {totalSynced} total entries synced. New last_sync: {maxUpdatedAt}");
+                }
             }
-
-            _settingsService.Settings.last_sync = DateTime.UtcNow;
-            _settingsService.Save();
-            
-            if (totalSynced > 0)
+            catch (HttpRequestException ex) when (ex.Message.Contains("410") || ex.StatusCode == System.Net.HttpStatusCode.Gone)
             {
-                _logger.LogInformation($"Sync completed: {totalSynced} total entries synced");
+                _logger.LogWarning("Sync state expired (410 Gone). Wiping local database and performing fresh sync.");
+                
+                // Hard Reset
+                await _repository.ClearAllAsync();
+                _settingsService.Settings.last_sync = null;
+                _settingsService.Save();
+                
+                // Trigger fresh sync immediately
+                // We use a recursive call here, but ensure we don't infinite loop by clearing last_sync first
+                // The 'since' variable in the NEW call will be null.
+                await SyncInBackgroundAsync(); 
             }
         }
         catch (Exception ex)

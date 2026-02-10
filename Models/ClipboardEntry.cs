@@ -14,5 +14,8 @@ public class ClipboardEntry
     
     public bool is_deleted { get; set; } = false;
     public DateTime? deleted_at { get; set; }
+    
+    // New field for sync logic
+    public DateTime updated_at { get; set; }
 }
 
