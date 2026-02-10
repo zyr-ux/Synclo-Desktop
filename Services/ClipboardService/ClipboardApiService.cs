@@ -71,7 +71,7 @@ public class ClipboardApiService(
 
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             
-            var query = $"/api/sync?limit={limit}&offset={offset}";
+            var query = $"/api/clipboard/sync?limit={limit}&offset={offset}";
             if (since.HasValue)
             {
                 // Format as ISO 8601
