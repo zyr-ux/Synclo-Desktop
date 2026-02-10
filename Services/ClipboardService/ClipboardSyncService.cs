@@ -53,7 +53,7 @@ public class ClipboardSyncService(
 ) : IDisposable, IClipboardSyncService
 {
     private const int DebounceDelayMs = 50;
-    private const int InactivityThresholdDays = 14;
+    private const int InactivityThresholdDays = 29;
     private const int DefaultHistoryLimit = 100;
     private int DefaultSyncPageSize => _settingsService.Settings.sync_page_size;
     private const int ShutdownTimeoutSeconds = 5;
