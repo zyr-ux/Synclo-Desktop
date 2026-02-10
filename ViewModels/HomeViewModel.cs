@@ -21,8 +21,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly INotificationService _notificationService;
     private readonly IClipboardSyncService _clipboardSyncService;
-    private readonly ISettingsService _settingsService;
     private readonly IAccountService _accountService;
+    private readonly ISettingsService _settingsService;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
     private CancellationTokenSource? _updateCts;
     private bool _isLoggedIn;
@@ -33,22 +33,23 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string? _homeStatusMessage;
     [ObservableProperty] private bool _homeStatusMessageVisibility;
     
-    private int PageSize => _settingsService.Settings.sync_page_size;
     private int _currentOffset = 0;
-    private bool _isLoadingMore = false;
+    private int PageSize => _settingsService.Settings.sync_page_size;
+    private bool _isLoadingMore;
     
+
     public HomeViewModel(
         IClipboardMonitor clipboardMonitor,
         INotificationService notificationService,
         IClipboardSyncService clipboardSyncService,
-        ISettingsService settingsService,
-        IAccountService accountService)
+        IAccountService accountService,
+        ISettingsService settingsService)
     {
         _clipboardMonitor = clipboardMonitor;
         _notificationService = notificationService;
         _clipboardSyncService = clipboardSyncService;
-        _settingsService = settingsService;
         _accountService = accountService;
+        _settingsService = settingsService;
         
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
         _accountService.OnLogin += async () => await UpdateHomeStatusAsync();
@@ -91,10 +92,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 await Task.Delay(50, token); // Debounce
                 if (token.IsCancellationRequested) return;
 
-                // Reset offset on full refresh/update but maintain visible items
-                var limit = Math.Max(PageSize, _historyEntries.Count);
-                _currentOffset = limit; 
-                var entries = await _clipboardSyncService.GetHistoryForUI(limit, 0);
+                // Reset offset on full refresh/update
+                _currentOffset = 0;
+                var entries = await _clipboardSyncService.GetHistoryForUI(PageSize, _currentOffset);
                 if (token.IsCancellationRequested) return; // Check again after async call
 
                 ApplyCollectionDiff(entries);
@@ -209,10 +209,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             if (!silent) IsLoading = true;
             ErrorMessage = null;
             
-            // Smart Refresh: Fetch at least as many items as currently visible to preserve scroll position
-            // This ensures meaningful updates (including deletions) without resetting the view to just 1 page
-            var limit = Math.Max(PageSize, HistoryEntries.Count);
-            var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: limit);
+            var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: PageSize);
             
             // UI update is handled by OnHistoryUpdated event triggered within RefreshFromServerAsync
 
@@ -256,14 +253,12 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         try
         {
             _isLoadingMore = true;
-            // Use current count as the offset to fetch the next batch
-            var nextOffset = HistoryEntries.Count;
+            var nextOffset = _currentOffset + PageSize;
             var newEntries = await _clipboardSyncService.GetHistoryForUI(PageSize, nextOffset);
 
             if (newEntries.Count > 0)
             {
-                // Update _currentOffset merely for tracking, though next LoadMore will use Count again
-                _currentOffset = nextOffset + newEntries.Count;
+                _currentOffset = nextOffset;
                 foreach (var entry in newEntries)
                 {
                     // Avoid duplicates
