@@ -13,7 +13,7 @@
     <Application.Styles>
         <FluentTheme />
         <materialIcons:MaterialIconStyles />
-        <StyleInclude Source="avares://Synclo/Styles/RadioButtonSidebar.axaml" />
+        <StyleInclude Source="avares://Synclo/Styles/Sidebar.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/TextButton.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/HistoryItem.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/CustomButton.axaml" />
