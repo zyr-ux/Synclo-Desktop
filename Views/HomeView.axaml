@@ -66,7 +66,7 @@
                 <behaviors:ScrollViewerInfiniteScrollBehavior Command="{Binding LoadMoreCommand}" />
             </Interaction.Behaviors>
 
-            <Border Padding="30,30,30,10">
+            <Border Padding="25,30,25,10">
                 <ItemsControl ItemsSource="{Binding HistoryEntries}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -93,7 +93,7 @@
                                     <TextBlock Grid.Column="1"
                                                VerticalAlignment="Center"
                                                Margin="0,0,30,0"
-                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, h:mm tt}'}"
+                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
                                                Foreground="{DynamicResource Accent}"
                                                FontSize="14"
                                                FontFamily="{DynamicResource Inconsolata-Medium}" />
