@@ -29,7 +29,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private bool _isLoading;
-    [ObservableProperty] private ObservableCollection<ClipboardDbModel> _historyEntries = new();
+    [ObservableProperty] private ObservableCollection<ClipboardDbModel> _historyEntries = [];
     [ObservableProperty] private string? _homeStatusMessage;
     [ObservableProperty] private bool _homeStatusMessageVisibility;
     
@@ -49,23 +49,19 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         _clipboardSyncService = clipboardSyncService;
         _accountService = accountService;
         _settingsService = settingsService;
-        
+
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
         _accountService.OnLogin += async () => await UpdateHomeStatusAsync();
         _accountService.OnLogout += async () =>
         {
-            // Clear UI immediately to prevent race condition with status message
             HistoryEntries.Clear();
             await UpdateHomeStatusAsync();
         };
-        
-        
-        // Fire and forget initial load with delay to ensure services are ready
+
         Task.Run(async () =>
         {
             await Task.Delay(500);
             await RefreshDataAsync(silent: true);
-            // Only show success if no error occurred
             if (ErrorMessage == null)
             {
                 _notificationService.ShowSuccess("Clipboard history refreshed.");
@@ -74,6 +70,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         });
     }
 
+    // Debounces history updates and refreshes the UI with new clipboard entries
     private void OnHistoryUpdated()
     {
         _updateCts?.Cancel();
@@ -82,25 +79,22 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
         Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            // Try to acquire lock without waiting - if another update is in progress, skip this one
             if (!await _updateLock.WaitAsync(0))
                 return;
             
             try
             {
-                await Task.Delay(50, token); // Debounce
+                await Task.Delay(50, token);
                 if (token.IsCancellationRequested) return;
 
-                // Maintain current scroll position/data by loading at least as many items as we have now
-                // or the default page size, whichever is larger.
                 var loadCount = Math.Max(HistoryEntries.Count, PageSize);
                 var entries = await _clipboardSyncService.GetHistoryForUI(loadCount, 0);
-                if (token.IsCancellationRequested) return; // Check again after async call
+                if (token.IsCancellationRequested) return;
 
                 ApplyCollectionDiff(entries);
                 await UpdateHomeStatusAsync();
             }
-            catch (OperationCanceledException) { /* Ignored */ }
+            catch (OperationCanceledException) { }
             finally
             {
                 _updateLock.Release();
@@ -108,14 +102,11 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         });
     }
 
+    // Efficiently syncs the UI collection with new entries, handling insertions, updates, moves, and removals
     private void ApplyCollectionDiff(IReadOnlyList<ClipboardDbModel> newEntries)
     {
-        // 1. Optimize for "New Item at Top" scenario (prevents flicker)
         if (newEntries.Count > 0 && HistoryEntries.Count > 0)
         {
-            // If the very first item is different, it's likely a new copy.
-            // Rebuilding the whole list is often smoother visually than inserting at 0 
-            // and letting the UI shift everything down.
             if (newEntries[0].Id != HistoryEntries[0].Id)
             {
                 HistoryEntries.Clear();
@@ -124,15 +115,12 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             }
         }
 
-        // 2. Standard synchronization
         var existing = HistoryEntries;
         
-        // Update/Insert existing items
         for (int i = 0; i < newEntries.Count; i++)
         {
             var desired = newEntries[i];
             
-            // If we are past the end of existing, just add
             if (i >= existing.Count)
             {
                 existing.Add(desired);
@@ -141,18 +129,15 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
             var current = existing[i];
 
-            // Match at current position?
             if (current.Id == desired.Id)
             {
-                // Update content if changed
                 if (!AreEntriesEqual(current, desired))
                 {
-                    existing[i] = desired; // Replace to trigger UI update
+                    existing[i] = desired;
                 }
             }
             else
             {
-                // Not a match. Is the desired item further down? (Moved up)
                 var foundIndex = -1;
                 for (int j = i + 1; j < existing.Count; j++)
                 {
@@ -165,9 +150,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
                 if (foundIndex != -1)
                 {
-                    // Move it up
                     existing.Move(foundIndex, i);
-                    // Check if content update is needed after move
                     if (!AreEntriesEqual(existing[i], desired))
                     {
                         existing[i] = desired;
@@ -175,19 +158,18 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 }
                 else
                 {
-                    // New item inserted here
                     existing.Insert(i, desired);
                 }
             }
         }
 
-        // 3. Remove excess items
         while (existing.Count > newEntries.Count)
         {
             existing.RemoveAt(existing.Count - 1);
         }
     }
 
+    // Checks if two clipboard entries are equal based on key properties
     private static bool AreEntriesEqual(ClipboardDbModel a, ClipboardDbModel b)
     {
         return a.Id == b.Id &&
@@ -196,12 +178,14 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                a.IsDeleting == b.IsDeleting; 
     }
     
+    // Triggers a manual refresh of the clipboard history
     [RelayCommand]
     private async Task RefreshClipboardHistory()
     {
         await RefreshDataAsync(silent: false);
     }
 
+    // Refreshes clipboard history from the server with optional UI feedback
     private async Task RefreshDataAsync(bool silent)
     {
         try
@@ -210,8 +194,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             ErrorMessage = null;
             
             var entries = await _clipboardSyncService.RefreshFromServerAsync(limit: PageSize);
-            
-            // UI update is handled by OnHistoryUpdated event triggered within RefreshFromServerAsync
 
             if (!silent) 
                 _notificationService.ShowSuccess("Clipboard history refreshed.");
@@ -228,6 +210,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
     }
 
+    // Copies the selected clipboard entry to the current clipboard
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ItemClicked(ClipboardDbModel entry)
     {
@@ -243,8 +226,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             _notificationService.ShowError(ex.Message);
         }
     }
-
     
+    // Loads the next batch of clipboard history entries
     [RelayCommand]
     private async Task LoadMore()
     {
@@ -253,8 +236,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         try
         {
             _isLoadingMore = true;
-            // Dynamic offset based on current list size
-            // We want to load the *next* batch starting from where we currently are
             var nextOffset = HistoryEntries.Count;
             var newEntries = await _clipboardSyncService.GetHistoryForUI(PageSize, nextOffset);
 
@@ -262,7 +243,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             {
                 foreach (var entry in newEntries)
                 {
-                    // Avoid duplicates
                     if (!HistoryEntries.Any(x => x.Id == entry.Id))
                     {
                         HistoryEntries.Add(entry);
@@ -272,8 +252,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            // Silently fail for load more, or maybe show a toast
-             _notificationService.ShowError("Failed to load more items: " + ex.Message);
+            _notificationService.ShowError("Failed to load more items: " + ex.Message);
         }
         finally
         {
@@ -281,6 +260,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
     }
     
+    // Deletes a clipboard entry and marks it as deleting
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DeleteItemClicked(ClipboardDbModel entry)
     {
@@ -298,6 +278,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
     }
 
+    // Updates the home page status message based on login state and history entries
     private async Task UpdateHomeStatusAsync()
     {
         await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -321,6 +302,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         });
     }
 
+    // Cleans up resources and unregisters event handlers
     public void Dispose()
     {
         _updateCts?.Cancel();
