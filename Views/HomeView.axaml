@@ -70,57 +70,63 @@
                 <ItemsControl ItemsSource="{Binding HistoryEntries}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Spacing="25" />
+                            <StackPanel Spacing="10" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
 
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="models:ClipboardDbModel">
-                            <StackPanel>
-                                <Grid ColumnDefinitions="*,Auto,140">
 
-                                    <Button Grid.Column="0"
-                                            Classes="textButton"
-                                            Padding="0"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Center"
-                                            Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                                            CommandParameter="{Binding}">
-                                        <TextBlock Text="{Binding PreviewText}"
-                                                   Foreground="{DynamicResource Accent}"
-                                                   FontSize="18"
-                                                   FontFamily="{DynamicResource Inconsolata-Medium}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Margin="0,0,20,0" />
-                                    </Button>
+                            <Border Classes="HistoryItem">
 
-                                    <Button Grid.Column="1"
-                                            Classes="icon-button"
-                                            Margin="0 0 10 0"
-                                            VerticalAlignment="Center"
-                                            IsEnabled="{Binding !IsDeleting}"
-                                            Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
-                                            CommandParameter="{Binding}">
-                                        <materialIcons:MaterialIcon Kind="Close"
-                                                                    Width="16"
-                                                                    Height="16" />
-                                    </Button>
+                                <Grid ColumnDefinitions="*,Auto,Auto">
 
-                                    <TextBlock Grid.Column="2"
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding PreviewText}"
                                                VerticalAlignment="Center"
-                                               HorizontalAlignment="Right"
-                                               Margin="0 0 4 0"
-                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, h:mm tt}'}"
+                                               Margin="0,0,15,0"
                                                Foreground="{DynamicResource Accent}"
                                                FontSize="16"
-                                               FontFamily="{DynamicResource Inconsolata-Medium}" />
-                                </Grid>
+                                               FontFamily="{DynamicResource Inconsolata-Medium}"
+                                               TextTrimming="CharacterEllipsis" />
 
-                                <Border Height="1"
-                                        Background="{DynamicResource Accent}"
-                                        Margin="0,8,0,0"
-                                        Opacity="0.5" />
-                            </StackPanel>
+                                    <TextBlock Grid.Column="1"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,30,0"
+                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, h:mm tt}'}"
+                                               Foreground="{DynamicResource Accent}"
+                                               FontSize="14"
+                                               FontFamily="{DynamicResource Inconsolata-Medium}" />
+
+                                    <StackPanel Grid.Column="2"
+                                                Orientation="Horizontal"
+                                                Spacing="15">
+
+                                        <Button Classes="icon-button"
+                                                VerticalAlignment="Center"
+                                                Width="30" Height="30"
+                                                Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                                CommandParameter="{Binding}">
+                                            <materialIcons:MaterialIcon Kind="ContentCopy"
+                                                                        Width="18"
+                                                                        Height="18"
+                                                                        Foreground="{DynamicResource Accent}" />
+                                        </Button>
+
+                                        <Button Classes="icon-button"
+                                                VerticalAlignment="Center"
+                                                Width="30" Height="30"
+                                                IsEnabled="{Binding !IsDeleting}"
+                                                Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                                CommandParameter="{Binding}">
+                                            <materialIcons:MaterialIcon Kind="Close"
+                                                                        Width="20"
+                                                                        Height="20"
+                                                                        Foreground="{DynamicResource Accent}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
