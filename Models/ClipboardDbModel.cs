@@ -46,6 +46,91 @@ public partial class ClipboardDbModel : ObservableObject
         };
     }
     
+    public enum ClipboardItemType
+    {
+        Text,
+        Link,
+        Image,
+        Code
+    }
+
+    public ClipboardItemType Type
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Content))
+                return ClipboardItemType.Text;
+
+            var trimmed = Content.Trim();
+
+            // Check for Link
+            if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) && 
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                return ClipboardItemType.Link;
+            }
+            
+            // Check for Image (File path)
+            if (IsImageFile(trimmed))
+            {
+                return ClipboardItemType.Image;
+            }
+
+            // Check for Code (Heuristic)
+            if (IsCode(trimmed))
+            {
+                return ClipboardItemType.Code;
+            }
+
+            return ClipboardItemType.Text;
+        }
+    }
+
+    public Material.Icons.MaterialIconKind IconKind => Type switch
+    {
+        ClipboardItemType.Text => Material.Icons.MaterialIconKind.FormatAlignLeft,
+        ClipboardItemType.Link => Material.Icons.MaterialIconKind.Link,
+        ClipboardItemType.Image => Material.Icons.MaterialIconKind.Image,
+        ClipboardItemType.Code => Material.Icons.MaterialIconKind.CodeBraces, // or CodeTags
+        _ => Material.Icons.MaterialIconKind.Help
+    };
+
+    private static bool IsImageFile(string text)
+    {
+        if (text.Length > 260) return false; // Max path length check
+        if (text.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0) return false;
+
+        var extension = System.IO.Path.GetExtension(text).ToLowerInvariant();
+        return extension is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".svg";
+    }
+
+    private static bool IsCode(string text)
+    {
+        if (text.Length < 20) return false; // Too short to be meaningful code
+
+        int score = 0;
+        
+        // Common code indicators
+        if (text.Contains("{") && text.Contains("}")) score += 2;
+        if (text.Contains(";") && text.Contains("\n")) score += 1;
+        if (text.Contains("public ") || text.Contains("private ") || text.Contains("protected ")) score += 2;
+        if (text.Contains("function ") || text.Contains("def ") || text.Contains("void ")) score += 2;
+        if (text.Contains("import ") || text.Contains("using ") || text.Contains("#include ")) score += 2;
+        if (text.Contains("return ")) score += 1;
+        if (text.Contains("if (") || text.Contains("for (") || text.Contains("while (")) score += 1; // C-style
+        if (text.Contains("=>")) score += 1; // Arrows
+
+        // Specific to detailed code blocks
+        var lines = text.Split('\n');
+        if (lines.Length > 2)
+        {
+            // Indentation check
+            if (lines.Any(l => l.StartsWith("    ") || l.StartsWith("\t"))) score += 1;
+        }
+
+        return score >= 3;
+    }
+
     public string PreviewText
     {
         get

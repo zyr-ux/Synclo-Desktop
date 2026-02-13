@@ -79,9 +79,19 @@
 
                             <Border Classes="HistoryItem">
 
-                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
 
-                                    <TextBlock Grid.Column="0"
+                                    <Border Grid.Column="0"
+                                            Margin="0,0,15,0"
+                                            Padding="4"
+                                            VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="{Binding IconKind}"
+                                                                    Width="16"
+                                                                    Height="16"
+                                                                    Foreground="{DynamicResource Accent}" />
+                                    </Border>
+
+                                    <TextBlock Grid.Column="1"
                                                Text="{Binding PreviewText}"
                                                VerticalAlignment="Center"
                                                Margin="0,0,15,0"
@@ -90,7 +100,7 @@
                                                FontFamily="{DynamicResource Inconsolata-Medium}"
                                                TextTrimming="CharacterEllipsis" />
 
-                                    <TextBlock Grid.Column="1"
+                                    <TextBlock Grid.Column="2"
                                                VerticalAlignment="Center"
                                                Margin="0,0,30,0"
                                                Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
@@ -98,7 +108,7 @@
                                                FontSize="14"
                                                FontFamily="{DynamicResource Inconsolata-Medium}" />
 
-                                    <StackPanel Grid.Column="2"
+                                    <StackPanel Grid.Column="3"
                                                 Orientation="Horizontal"
                                                 Spacing="15">
 
