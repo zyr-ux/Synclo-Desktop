@@ -26,7 +26,7 @@
                 <TextBlock Text="History"
                            FontSize="36"
                            FontFamily="{DynamicResource Inconsolata-Bold}"
-                           Foreground="#FFCC66" />
+                           Foreground="Orange" />
 
                 <Button Classes="icon-button"
                         Margin="20 0 0 0"

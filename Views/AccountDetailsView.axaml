@@ -19,7 +19,7 @@
                         Spacing="10">
                         <TextBlock Text="Logged in as : "
                                    FontSize="36"
-                                   Foreground="{DynamicResource Yellow}"
+                                   Foreground="Orange"
                                    FontFamily="{DynamicResource Inconsolata-Bold}" />
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
