@@ -4,7 +4,8 @@
              xmlns:vm="using:Synclo.ViewModels"
              x:Class="Synclo.Views.AccountDetailsView"
              x:DataType="vm:AccountDetailsViewModel"
-             Background="{DynamicResource PrimaryBackground}">
+             Background="{DynamicResource PrimaryBackground}"
+             CornerRadius="10 0 0 10">
 
     <Grid>
         <!-- Page padding -->
@@ -23,8 +24,7 @@
                                    FontFamily="{DynamicResource Inconsolata-Bold}" />
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
-                                   Foreground="{DynamicResource ForegroundL}"
-                                   Opacity="0.5"
+                                   Foreground="DarkGoldenrod"
                                    FontFamily="{DynamicResource Inconsolata-Medium}" />
                     </StackPanel>
                     

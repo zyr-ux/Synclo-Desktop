@@ -12,13 +12,13 @@
         Width="1000" Height="600"
         WindowStartupLocation="CenterScreen"
         MinWidth="200"
-        MinHeight="350">
+        MinHeight="350"
+        Background="{DynamicResource SecondaryBackground}">
 
     <Grid ColumnDefinitions="250,*">
 
         <!-- Sidebar -->
         <Border Grid.Column="0"
-                Background="{DynamicResource SecondaryBackground}"
                 Padding="0 20 0 10">
 
             <DockPanel LastChildFill="True">
