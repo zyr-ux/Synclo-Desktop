@@ -52,7 +52,7 @@
                 <StackPanel Spacing="10" Orientation="Vertical">
 
                     <TextBlock Text="Synclo"
-                               Foreground="{DynamicResource ForegroundL}"
+                               Foreground="{DynamicResource Accent}"
                                FontSize="43"
                                FontFamily="{DynamicResource Inconsolata-Bold}"
                                HorizontalAlignment="Center"

@@ -19,11 +19,12 @@
                         Spacing="10">
                         <TextBlock Text="Logged in as : "
                                    FontSize="36"
-                                   Foreground="Orange"
+                                   Foreground="{DynamicResource Accent}"
                                    FontFamily="{DynamicResource Inconsolata-Bold}" />
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
-                                   Foreground="{DynamicResource Accent}"
+                                   Foreground="{DynamicResource ForegroundL}"
+                                   Opacity="0.5"
                                    FontFamily="{DynamicResource Inconsolata-Medium}" />
                     </StackPanel>
                     
@@ -82,6 +83,7 @@
                                         <Button Grid.Column="1"
                                                 Content="Logout"
                                                 Classes="textButton"
+                                                Foreground="LightGray"
                                                 IsVisible="{Binding !IsThisDevice}"
                                                 Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
                                                 CommandParameter="{Binding device_id}" />

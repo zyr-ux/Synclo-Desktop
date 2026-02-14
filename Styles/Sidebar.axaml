@@ -59,7 +59,9 @@
 
     <!-- Hover -->
     <Style Selector="RadioButton.sidebar:pointerover:not(:checked)">
-        <Setter Property="Background" Value="{DynamicResource SidebarButtonBackground}" />
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.12" />
+        </Setter>
     </Style>
 
 </Styles>
