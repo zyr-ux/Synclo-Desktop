@@ -24,7 +24,7 @@
                                    FontFamily="{DynamicResource Inconsolata-Bold}" />
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
-                                   Foreground="DarkGoldenrod"
+                                   Foreground="{DynamicResource HighlightColor}"
                                    FontFamily="{DynamicResource Inconsolata-Medium}" />
                     </StackPanel>
                     
