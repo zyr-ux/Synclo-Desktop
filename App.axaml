@@ -15,7 +15,6 @@
         <materialIcons:MaterialIconStyles />
         <StyleInclude Source="avares://Synclo/Styles/Sidebar.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/TextButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/HistoryItem.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/CustomButton.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/IconButton.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/IconButton.axaml" />

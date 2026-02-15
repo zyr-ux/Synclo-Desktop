@@ -70,11 +70,8 @@
 
             <ListBox.ItemTemplate>
                 <DataTemplate DataType="models:ClipboardDbModel">
-
                     <Border Classes="HistoryItem">
-
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-
                             <Border Grid.Column="0"
                                     Margin="0,0,15,0"
                                     Padding="4"

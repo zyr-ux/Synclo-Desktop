@@ -1,6 +1,13 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:ia="using:Xaml.Behaviors.Interactions.Animated">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    
+    <Design.PreviewWith>
+        <Border Padding="20">
+            
+        </Border>
+    </Design.PreviewWith>
+    
     
     <!-- Scope to ListBox with class "HistoryList" -->
     <Style Selector="ListBox.HistoryList">
@@ -10,9 +17,7 @@
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
     </Style>
-
-
-
+    
     <!-- ListBoxItem styles -->
     <Style Selector="ListBox.HistoryList ListBoxItem">
         <Setter Property="Padding" Value="0"/>
