@@ -3,7 +3,7 @@
 
     <Color x:Key="Accent">#c9c4c1</Color>
     <Color x:Key="PrimaryBackground">#1c1c1c</Color>
-    <Color x:Key="SecondaryBackground">#14110f</Color>
+    <Color x:Key="SecondaryBackground">#252525</Color>
     <Color x:Key="ForegroundD">#212121</Color>
     <Color x:Key="ForegroundL">#c9c3bf</Color>
     <SolidColorBrush x:Key="StatusOnline" Color="#00FF00" />
