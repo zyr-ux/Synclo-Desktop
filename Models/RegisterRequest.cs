@@ -9,4 +9,5 @@ public class RegisterRequest
     public string encrypted_master_key { get; set; } // NEW
     public string salt { get; set; } // NEW
     public int kdf_version { get; set; } // NEW
+    public string? os { get; set; } // NEW
 }
