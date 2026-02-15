@@ -44,7 +44,7 @@
 
                 <!-- Devices card -->
                 <Border Grid.Row="2"
-                        Background="#303030"
+                        Background="{DynamicResource SecondaryBackground}"
                         CornerRadius="5"
                         Padding="20">
 
@@ -70,7 +70,7 @@
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="{Binding device_name}"
                                                        FontSize="18"
-                                                       Foreground="#e0e0e0"
+                                                       Foreground="{DynamicResource ForegroundL}"
                                                        FontFamily="{DynamicResource Inconsolata-Bold}" />
                                             <TextBlock Text=" - this device"
                                                        FontSize="18"
@@ -82,7 +82,6 @@
                                         <Button Grid.Column="1"
                                                 Content="Logout"
                                                 Classes="textButton"
-                                                Foreground="LightGray"
                                                 IsVisible="{Binding !IsThisDevice}"
                                                 Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
                                                 CommandParameter="{Binding device_id}" />
