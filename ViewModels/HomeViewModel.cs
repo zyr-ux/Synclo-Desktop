@@ -60,13 +60,11 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
         Task.Run(async () =>
         {
-            await Task.Delay(500);
             await RefreshDataAsync(silent: true);
             if (ErrorMessage == null)
             {
                 _notificationService.ShowSuccess("Clipboard history refreshed.");
             }
-            await UpdateHomeStatusAsync();
         });
     }
 
@@ -105,15 +103,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     // Efficiently syncs the UI collection with new entries, handling insertions, updates, moves, and removals
     private void ApplyCollectionDiff(IReadOnlyList<ClipboardDbModel> newEntries)
     {
-        if (newEntries.Count > 0 && HistoryEntries.Count > 0)
-        {
-            if (newEntries[0].Id != HistoryEntries[0].Id)
-            {
-                HistoryEntries.Clear();
-                foreach (var entry in newEntries) HistoryEntries.Add(entry);
-                return;
-            }
-        }
+        // Logic that cleared list if top item differed has been removed for performance.
+        // We now rely on the diffing loop below to handle insertions/moves.
+
 
         var existing = HistoryEntries;
         

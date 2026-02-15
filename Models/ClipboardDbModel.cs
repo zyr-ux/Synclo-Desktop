@@ -7,7 +7,25 @@ namespace Synclo.Models;
 public partial class ClipboardDbModel : ObservableObject
 {
     public string Id { get; init; } = string.Empty;
-    public string Content { get; init; } = string.Empty;
+    private string _content = string.Empty;
+    public string Content 
+    { 
+        get => _content;
+        init
+        {
+            _content = value;
+            _previewText = ComputePreviewText(value);
+            _type = ComputeType(value);
+        }
+    }
+
+    // Cached properties
+    private readonly string _previewText = string.Empty;
+    public string PreviewText => _previewText;
+
+    private readonly ClipboardItemType _type = ClipboardItemType.Text;
+    public ClipboardItemType Type => _type;
+
     public string ContentHash { get; init; } = string.Empty;
     public string Ciphertext { get; init; } = string.Empty;
     public string Nonce { get; init; } = string.Empty;
@@ -54,38 +72,6 @@ public partial class ClipboardDbModel : ObservableObject
         Code
     }
 
-    public ClipboardItemType Type
-    {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(Content))
-                return ClipboardItemType.Text;
-
-            var trimmed = Content.Trim();
-
-            // Check for Link
-            if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) && 
-                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-            {
-                return ClipboardItemType.Link;
-            }
-            
-            // Check for Image (File path)
-            if (IsImageFile(trimmed))
-            {
-                return ClipboardItemType.Image;
-            }
-
-            // Check for Code (Heuristic)
-            if (IsCode(trimmed))
-            {
-                return ClipboardItemType.Code;
-            }
-
-            return ClipboardItemType.Text;
-        }
-    }
-
     public Material.Icons.MaterialIconKind IconKind => Type switch
     {
         ClipboardItemType.Text => Material.Icons.MaterialIconKind.FormatAlignLeft,
@@ -94,6 +80,35 @@ public partial class ClipboardDbModel : ObservableObject
         ClipboardItemType.Code => Material.Icons.MaterialIconKind.CodeBraces, // or CodeTags
         _ => Material.Icons.MaterialIconKind.Help
     };
+
+    private static ClipboardItemType ComputeType(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return ClipboardItemType.Text;
+
+        var trimmed = content.Trim();
+
+        // Check for Link
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) && 
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            return ClipboardItemType.Link;
+        }
+        
+        // Check for Image (File path)
+        if (IsImageFile(trimmed))
+        {
+            return ClipboardItemType.Image;
+        }
+
+        // Check for Code (Heuristic)
+        if (IsCode(trimmed))
+        {
+            return ClipboardItemType.Code;
+        }
+
+        return ClipboardItemType.Text;
+    }
 
     private static bool IsImageFile(string text)
     {
@@ -131,39 +146,36 @@ public partial class ClipboardDbModel : ObservableObject
         return score >= 3;
     }
 
-    public string PreviewText
+    private static string ComputePreviewText(string content)
     {
-        get
+        if (string.IsNullOrWhiteSpace(content))
+            return string.Empty;
+
+        Span<char> buffer = stackalloc char[content.Length];
+        int len = 0;
+        bool lastWasSpace = false;
+
+        foreach (var ch in content)
         {
-            if (string.IsNullOrWhiteSpace(Content))
-                return string.Empty;
-
-            Span<char> buffer = stackalloc char[Content.Length];
-            int len = 0;
-            bool lastWasSpace = false;
-
-            foreach (var ch in Content)
+            if (char.IsWhiteSpace(ch))
             {
-                if (char.IsWhiteSpace(ch))
-                {
-                    if (lastWasSpace)
-                        continue;
+                if (lastWasSpace)
+                    continue;
 
-                    buffer[len++] = ' ';
-                    lastWasSpace = true;
-                }
-                else
-                {
-                    buffer[len++] = ch;
-                    lastWasSpace = false;
-                }
+                buffer[len++] = ' ';
+                lastWasSpace = true;
             }
-
-            // Trim trailing space
-            if (len > 0 && buffer[len - 1] == ' ')
-                len--;
-
-            return new string(buffer[..len]);
+            else
+            {
+                buffer[len++] = ch;
+                lastWasSpace = false;
+            }
         }
+
+        // Trim trailing space
+        if (len > 0 && buffer[len - 1] == ' ')
+            len--;
+
+        return new string(buffer[..len]);
     }
 }
