@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Synclo"
+             xmlns:converters="using:Synclo.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="Synclo.App"
              RequestedThemeVariant="Dark"> <!-- change this before shipping -->
@@ -30,6 +31,8 @@
                 <ResourceInclude Source="avares://Synclo/Controls/TextBox.axaml" />
                 <ResourceInclude Source="avares://Synclo/Controls/NotificationCard.axaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <converters:ClipboardItemTypeToIconConverter x:Key="ClipboardItemTypeToIconConverter" />
 
             <FontFamily x:Key="Inconsolata-Bold">
                 avares://Synclo/Assets/Fonts/Inconsolata-Bold.ttf#Inconsolata

@@ -62,15 +62,6 @@ public partial class HistoryItemModel : ObservableObject
         Code
     }
 
-    public Material.Icons.MaterialIconKind IconKind => Type switch
-    {
-        ClipboardItemType.Text => Material.Icons.MaterialIconKind.FormatAlignLeft,
-        ClipboardItemType.Link => Material.Icons.MaterialIconKind.Link,
-        ClipboardItemType.Image => Material.Icons.MaterialIconKind.Image,
-        ClipboardItemType.Code => Material.Icons.MaterialIconKind.CodeBraces, // or CodeTags
-        _ => Material.Icons.MaterialIconKind.Help
-    };
-
     private static ClipboardItemType ComputeType(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
