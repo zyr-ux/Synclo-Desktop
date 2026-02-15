@@ -6,7 +6,7 @@
     <Color x:Key="SecondaryBackground">#b5b8b8</Color>
     <Color x:Key="ForegroundD">#dedede</Color>
     <Color x:Key="ForegroundL">#363c40</Color>
-    <SolidColorBrush x:Key="StatusOnline" Color="#008000" />
+    <SolidColorBrush x:Key="StatusOnline" Color="#2D991F" />
     <SolidColorBrush x:Key="StatusOffline" Color="#B00020" />
     <SolidColorBrush x:Key="StatusNoInternet" Color="#E65100" />
 
