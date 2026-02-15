@@ -11,20 +11,15 @@ public partial class ClipboardDbModel : ObservableObject
     public string Content 
     { 
         get => _content;
-        init
-        {
-            _content = value;
-            _previewText = ComputePreviewText(value);
-            _type = ComputeType(value);
-        }
+        init => _content = value;
     }
 
-    // Cached properties
-    private readonly string _previewText = string.Empty;
-    public string PreviewText => _previewText;
+    // Cached properties - Lazily computed to avoid heavy regex/parsing on instantiation
+    private string? _previewText;
+    public string PreviewText => _previewText ??= ComputePreviewText(_content);
 
-    private readonly ClipboardItemType _type = ClipboardItemType.Text;
-    public ClipboardItemType Type => _type;
+    private ClipboardItemType? _type;
+    public ClipboardItemType Type => _type ??= ComputeType(_content);
 
     public string ContentHash { get; init; } = string.Empty;
     public string Ciphertext { get; init; } = string.Empty;

@@ -85,11 +85,13 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 await Task.Delay(50, token);
                 if (token.IsCancellationRequested) return;
 
-                var loadCount = Math.Max(HistoryEntries.Count, PageSize);
-                var entries = await _clipboardSyncService.GetHistoryForUI(loadCount, 0);
+                // Optimization: Fetch only one page of updates instead of full history
+                // This keeps the UI responsive even with thousands of items.
+                // New items are inserted/merged at the top.
+                var entries = await _clipboardSyncService.GetHistoryForUI(PageSize, 0);
                 if (token.IsCancellationRequested) return;
 
-                ApplyCollectionDiff(entries);
+                MergeNewEntries(entries);
                 await UpdateHomeStatusAsync();
             }
             catch (OperationCanceledException) { }
@@ -101,64 +103,108 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     }
 
     // Efficiently syncs the UI collection with new entries, handling insertions, updates, moves, and removals
-    private void ApplyCollectionDiff(IReadOnlyList<ClipboardDbModel> newEntries)
+    // Merges new entries into the start of the list without clearing the rest
+    private void MergeNewEntries(IReadOnlyList<ClipboardDbModel> newEntries)
     {
-        // Logic that cleared list if top item differed has been removed for performance.
-        // We now rely on the diffing loop below to handle insertions/moves.
-
-
         var existing = HistoryEntries;
-        
-        for (int i = 0; i < newEntries.Count; i++)
+        int newIndex = 0;
+
+        // 1. Update/Insert loops
+        // We iterate through the new batch and overlay it onto the existing list
+        while (newIndex < newEntries.Count)
         {
-            var desired = newEntries[i];
-            
-            if (i >= existing.Count)
+            var desired = newEntries[newIndex];
+
+            // If we exceeded existing list bounds, just add the rest
+            if (newIndex >= existing.Count)
             {
                 existing.Add(desired);
+                newIndex++;
                 continue;
             }
 
-            var current = existing[i];
+            var current = existing[newIndex];
 
             if (current.Id == desired.Id)
             {
+                // IDs match, just check for updates
                 if (!AreEntriesEqual(current, desired))
                 {
-                    existing[i] = desired;
+                    existing[newIndex] = desired;
                 }
+                newIndex++;
             }
             else
             {
-                var foundIndex = -1;
-                for (int j = i + 1; j < existing.Count; j++)
+                // Mismatch. 
+                // Check if 'desired' (new item) exists later in the current list (Moved/Shifted down)
+                // OR if 'current' (old item) exists later in the new batch (Moved/Shifted up - unlikely for history)
+                
+                // Strategy: prioritizing the NEW batch as truth for this range.
+                // Does existing[newIndex] exist anywhere in the rest of newEntries?
+                bool currentIsStillInNewBatch = false;
+                for (int check = newIndex + 1; check < newEntries.Count; check++)
                 {
-                    if (existing[j].Id == desired.Id)
+                    if (newEntries[check].Id == current.Id)
                     {
-                        foundIndex = j;
+                        currentIsStillInNewBatch = true;
                         break;
                     }
                 }
 
-                if (foundIndex != -1)
+                if (currentIsStillInNewBatch)
                 {
-                    existing.Move(foundIndex, i);
-                    if (!AreEntriesEqual(existing[i], desired))
-                    {
-                        existing[i] = desired;
-                    }
+                    // The current item IS in the new batch, but later. 
+                    // This implies 'desired' is a NEW insert before it.
+                    existing.Insert(newIndex, desired);
+                    newIndex++;
                 }
                 else
                 {
-                    existing.Insert(i, desired);
+                    // The current item is NOT in the new batch.
+                    // THIS IS TRICKY: 
+                    // If we only fetched a partial page, we cannot validly say "It was deleted".
+                    // It might just be pushed out of the page.
+                    // BUT, if we assume the newEntries represents the TOP N items:
+                    // If 'current' is NOT in newEntries, does that mean it's deleted? Or pushed down?
+                    
+                    // Safe heuristics for "Top of List" updates:
+                    // If 'desired' is NOT found in existing list, it's an Insert.
+                    // If 'desired' IS found in existing list (index J), move it to newIndex.
+                    
+                    var indexInExisting = -1;
+                    for (int j = newIndex + 1; j < existing.Count; j++)
+                    {
+                        if (existing[j].Id == desired.Id)
+                        {
+                            indexInExisting = j;
+                            break;
+                        }
+                    }
+
+                    if (indexInExisting != -1)
+                    {
+                        // Found logic: It moved up.
+                        existing.Move(indexInExisting, newIndex);
+                        if (!AreEntriesEqual(existing[newIndex], desired))
+                        {
+                            existing[newIndex] = desired;
+                        }
+                        newIndex++;
+                    }
+                    else
+                    {
+                        // New item insert
+                        existing.Insert(newIndex, desired);
+                        newIndex++;
+                    }
                 }
             }
         }
-
-        while (existing.Count > newEntries.Count)
-        {
-            existing.RemoveAt(existing.Count - 1);
-        }
+        
+        // Note: We DO NOT truncate 'existing' list here. 
+        // We keep the infinite scroll buffer. 
+        // This solves "Inefficient List Updates" by not reloading the whole tail.
     }
 
     // Checks if two clipboard entries are equal based on key properties

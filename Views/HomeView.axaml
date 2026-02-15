@@ -56,90 +56,83 @@
                    IsVisible="{Binding HomeStatusMessageVisibility}"
                    IsHitTestVisible="False" />
 
-        <!-- ScrollViewer -->
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
+        <!-- ListBox handles its own scrolling (Virtualization enabled) -->
+        <ListBox Grid.Row="1"
+                 Classes="HistoryList"
+                 ItemsSource="{Binding HistoryEntries}">
+
             <Interaction.Behaviors>
-                <ia:VerticalScrollViewerAnimatedBehavior />
+                <!-- Infinite Scroll Behavior adapted for ListBox internal ScrollViewer -->
                 <behaviors:ScrollViewerInfiniteScrollBehavior Command="{Binding LoadMoreCommand}" />
+                <!-- Smooth Scrolling Behavior wrapper -->
+                <behaviors:ListBoxSmoothScrollBehavior />
             </Interaction.Behaviors>
 
-            <Border Padding="25,30,25,10">
-                <ItemsControl ItemsSource="{Binding HistoryEntries}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Spacing="10" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="models:ClipboardDbModel">
 
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="models:ClipboardDbModel">
+                    <Border Classes="HistoryItem">
 
-                            <Border Classes="HistoryItem">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
 
-                                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-
-                                    <Border Grid.Column="0"
-                                            Margin="0,0,15,0"
-                                            Padding="4"
-                                            VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="{Binding IconKind}"
-                                                                    Width="16"
-                                                                    Height="16"
-                                                                    Foreground="{DynamicResource Accent}" />
-                                    </Border>
-
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding PreviewText}"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,15,0"
-                                               Foreground="{DynamicResource Accent}"
-                                               FontSize="16"
-                                               FontFamily="{DynamicResource Inconsolata-Medium}"
-                                               TextTrimming="CharacterEllipsis" />
-
-                                    <TextBlock Grid.Column="2"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,30,0"
-                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
-                                               Foreground="{DynamicResource Accent}"
-                                               FontSize="14"
-                                               FontFamily="{DynamicResource Inconsolata-Medium}" />
-
-                                    <StackPanel Grid.Column="3"
-                                                Orientation="Horizontal"
-                                                Spacing="15">
-
-                                        <Button Classes="icon-button"
-                                                VerticalAlignment="Center"
-                                                Width="30" Height="30"
-                                                Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                                                CommandParameter="{Binding}">
-                                            <materialIcons:MaterialIcon Kind="ContentCopy"
-                                                                        Width="18"
-                                                                        Height="18"
-                                                                        Foreground="{DynamicResource Accent}" />
-                                        </Button>
-
-                                        <Button Classes="icon-button"
-                                                VerticalAlignment="Center"
-                                                Width="30" Height="30"
-                                                IsEnabled="{Binding !IsDeleting}"
-                                                Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
-                                                CommandParameter="{Binding}">
-                                            <materialIcons:MaterialIcon Kind="Close"
-                                                                        Width="20"
-                                                                        Height="20"
-                                                                        Foreground="{DynamicResource Accent}" />
-                                        </Button>
-                                    </StackPanel>
-                                </Grid>
+                            <Border Grid.Column="0"
+                                    Margin="0,0,15,0"
+                                    Padding="4"
+                                    VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="{Binding IconKind}"
+                                                            Width="16"
+                                                            Height="16"
+                                                            Foreground="{DynamicResource Accent}" />
                             </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Border>
-        </ScrollViewer>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding PreviewText}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,15,0"
+                                       Foreground="{DynamicResource Accent}"
+                                       FontSize="16"
+                                       FontFamily="{DynamicResource Inconsolata-Medium}"
+                                       TextTrimming="CharacterEllipsis" />
+
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,30,0"
+                                       Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
+                                       Foreground="{DynamicResource Accent}"
+                                       FontSize="14"
+                                       FontFamily="{DynamicResource Inconsolata-Medium}" />
+
+                            <StackPanel Grid.Column="3"
+                                        Orientation="Horizontal"
+                                        Spacing="15">
+
+                                <Button Classes="icon-button"
+                                        VerticalAlignment="Center"
+                                        Width="30" Height="30"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                        CommandParameter="{Binding}">
+                                    <materialIcons:MaterialIcon Kind="ContentCopy"
+                                                                Width="18"
+                                                                Height="18"
+                                                                Foreground="{DynamicResource Accent}" />
+                                </Button>
+
+                                <Button Classes="icon-button"
+                                        VerticalAlignment="Center"
+                                        Width="30" Height="30"
+                                        IsEnabled="{Binding !IsDeleting}"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                        CommandParameter="{Binding}">
+                                    <materialIcons:MaterialIcon Kind="Close"
+                                                                Width="20"
+                                                                Height="20"
+                                                                Foreground="{DynamicResource Accent}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </Grid>
 </UserControl>
