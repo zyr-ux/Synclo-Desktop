@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Synclo"
+             xmlns:converters="using:Synclo.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="Synclo.App"
              RequestedThemeVariant="Dark"> <!-- change this before shipping -->
@@ -13,11 +14,12 @@
     <Application.Styles>
         <FluentTheme />
         <materialIcons:MaterialIconStyles />
-        <StyleInclude Source="avares://Synclo/Styles/RadioButtonSidebar.axaml" />
+        <StyleInclude Source="avares://Synclo/Styles/Sidebar.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/TextButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/HistoryItem.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/CustomButton.axaml" />
         <StyleInclude Source="avares://Synclo/Styles/IconButton.axaml" />
+        <StyleInclude Source="avares://Synclo/Styles/IconButton.axaml" />
+        <StyleInclude Source="avares://Synclo/Styles/HistoryListBoxItem.axaml" />
     </Application.Styles>
 
     <Application.Resources>
@@ -30,6 +32,8 @@
                 <ResourceInclude Source="avares://Synclo/Controls/NotificationCard.axaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <converters:ClipboardItemTypeToIconConverter x:Key="ClipboardItemTypeToIconConverter" />
+
             <FontFamily x:Key="Inconsolata-Bold">
                 avares://Synclo/Assets/Fonts/Inconsolata-Bold.ttf#Inconsolata
             </FontFamily>
@@ -39,9 +43,9 @@
             </FontFamily>
 
         </ResourceDictionary>
-        
+
     </Application.Resources>
-    
+
     <TrayIcon.Icons>
         <TrayIcons>
             <TrayIcon Icon="avares://Synclo/Assets/avalonia-logo.ico"
@@ -59,5 +63,5 @@
         </TrayIcons>
     </TrayIcon.Icons>
 
-    
+
 </Application>

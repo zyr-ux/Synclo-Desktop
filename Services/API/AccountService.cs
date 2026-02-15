@@ -171,7 +171,8 @@ public sealed class AccountService : IAccountService
                 email = email,
                 auth_key = _cryptographyService.ToBase64(authKey),
                 device_id = _utils.GetOrCreateDeviceId(),
-                device_name = _utils.GetDeviceName()
+                device_name = _utils.GetDeviceName(),
+                os = _utils.GetClientOS()
             };
 
             using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/login")
@@ -258,7 +259,8 @@ public sealed class AccountService : IAccountService
                 salt = _cryptographyService.ToBase64(salt),
                 kdf_version = SupportedKdfVersion,
                 device_id = _utils.GetOrCreateDeviceId(),
-                device_name = _utils.GetDeviceName()
+                device_name = _utils.GetDeviceName(),
+                os = _utils.GetClientOS()
             };
 
             using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/register")

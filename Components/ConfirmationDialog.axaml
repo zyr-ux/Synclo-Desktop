@@ -12,7 +12,7 @@
         ShowInTaskbar="False">
 
     <Border Background="{DynamicResource PrimaryBackground}"
-            CornerRadius="20" 
+            CornerRadius="5" 
             BorderBrush="{DynamicResource Accent}" 
             BorderThickness="0"
             BoxShadow="0 10 20 0 #40000000, 0 -4 14 0 #22000000, 0 2 10 0 #20000000"

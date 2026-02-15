@@ -8,6 +8,7 @@ namespace Synclo.Services.Utilities;
 public interface IUtils
 {
     string GetDeviceName();
+    string GetClientOS();
     string GetOrCreateDeviceId();
     string ComputeHash(string content);
     DateTime TruncateToMilliseconds(DateTime dateTime);
@@ -25,6 +26,11 @@ public sealed class Utils(ISettingsService settingsService) : IUtils
             return Environment.MachineName;
 
         return "Unknown Device";
+    }
+
+    public string GetClientOS()
+    {
+        return RuntimeInformation.OSDescription;
     }
 
     public string GetOrCreateDeviceId()

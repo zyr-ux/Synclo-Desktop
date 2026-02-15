@@ -14,15 +14,15 @@ namespace Synclo.Services.ClipboardService;
 public interface IClipboardRepository
 {
     Task InitializeAsync();
-    Task<List<ClipboardDbModel>> GetAllAsync();
-    Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0);
-    Task<ClipboardDbModel?> GetByIdAsync(string id);
-    Task<ClipboardDbModel?> GetByHashAsync(string hash);
-    Task<Dictionary<string, ClipboardDbModel>> GetHashMapAsync(IEnumerable<string> hashes);
-    Task<Dictionary<string, ClipboardDbModel>> GetByIdsAsync(IEnumerable<string> ids);
-    Task<List<ClipboardDbModel>> GetUnsyncedAsync();
-    Task UpsertAsync(ClipboardDbModel entry);
-    Task UpsertAsync(IEnumerable<ClipboardDbModel> entries);
+    Task<List<HistoryItemModel>> GetAllAsync();
+    Task<List<HistoryItemModel>> GetAllAsync(int limit, int offset = 0);
+    Task<HistoryItemModel?> GetByIdAsync(string id);
+    Task<HistoryItemModel?> GetByHashAsync(string hash);
+    Task<Dictionary<string, HistoryItemModel>> GetHashMapAsync(IEnumerable<string> hashes);
+    Task<Dictionary<string, HistoryItemModel>> GetByIdsAsync(IEnumerable<string> ids);
+    Task<List<HistoryItemModel>> GetUnsyncedAsync();
+    Task UpsertAsync(HistoryItemModel entry);
+    Task UpsertAsync(IEnumerable<HistoryItemModel> entries);
     Task MarkAsSyncedAsync(string id);
     Task MarkDeletedAsync(string id);
     Task DeleteByIdAsync(string id);
@@ -112,13 +112,13 @@ CREATE INDEX IF NOT EXISTS idx_is_synced ON clipboard_entries(is_synced);
 
 
     // INTERFACE IMPLEMENTATION: Parameterless GetAllAsync
-    public Task<List<ClipboardDbModel>> GetAllAsync()
+    public Task<List<HistoryItemModel>> GetAllAsync()
     {
         // Default to a reasonable limit (e.g. 100) to satisfy the interface safely
         return GetAllAsync(DefaultHistoryLimit);
     }
 
-    public Task<List<ClipboardDbModel>> GetAllAsync(int limit, int offset = 0)
+    public Task<List<HistoryItemModel>> GetAllAsync(int limit, int offset = 0)
     {
         return _db.StartNew(async () =>
         {
@@ -139,7 +139,7 @@ LIMIT $limit OFFSET $offset
                 cmd.Parameters.AddWithValue("$limit", limit);
                 cmd.Parameters.AddWithValue("$offset", offset);
 
-                var list = new List<ClipboardDbModel>();
+                var list = new List<HistoryItemModel>();
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
                 while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(MapFromReader(reader));
 
@@ -153,7 +153,7 @@ LIMIT $limit OFFSET $offset
         }).Unwrap();
     }
 
-    public Task<ClipboardDbModel?> GetByIdAsync(string id)
+    public Task<HistoryItemModel?> GetByIdAsync(string id)
     {
         return _db.StartNew(async () =>
         {
@@ -178,7 +178,7 @@ LIMIT $limit OFFSET $offset
         }).Unwrap();
     }
 
-    public Task<ClipboardDbModel?> GetByHashAsync(string hash)
+    public Task<HistoryItemModel?> GetByHashAsync(string hash)
     {
         return _db.StartNew(async () =>
         {
@@ -203,7 +203,7 @@ LIMIT $limit OFFSET $offset
         }).Unwrap();
     }
 
-    public Task<List<ClipboardDbModel>> GetUnsyncedAsync()
+    public Task<List<HistoryItemModel>> GetUnsyncedAsync()
     {
         return _db.StartNew(async () =>
         {
@@ -221,7 +221,7 @@ WHERE is_synced = 0
 ORDER BY created_at ASC
 ";
 
-                var list = new List<ClipboardDbModel>();
+                var list = new List<HistoryItemModel>();
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
                 while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(MapFromReader(reader));
 
@@ -236,11 +236,11 @@ ORDER BY created_at ASC
     }
 
     // Issue #4 fix: Bulk hash fetch to avoid N+1 queries (Robust chunked implementation)
-    public Task<Dictionary<string, ClipboardDbModel>> GetHashMapAsync(IEnumerable<string> hashes)
+    public Task<Dictionary<string, HistoryItemModel>> GetHashMapAsync(IEnumerable<string> hashes)
     {
-        return _db.StartNew((Func<Task<Dictionary<string, ClipboardDbModel>>>)(async () =>
+        return _db.StartNew((Func<Task<Dictionary<string, HistoryItemModel>>>)(async () =>
         {
-            var result = new Dictionary<string, ClipboardDbModel>();
+            var result = new Dictionary<string, HistoryItemModel>();
             var uniqueHashes = hashes.Distinct().ToList();
             
             if (uniqueHashes.Count == 0) return result;
@@ -292,11 +292,11 @@ ORDER BY created_at ASC
         })).Unwrap();
     }
 
-    public Task<Dictionary<string, ClipboardDbModel>> GetByIdsAsync(IEnumerable<string> ids)
+    public Task<Dictionary<string, HistoryItemModel>> GetByIdsAsync(IEnumerable<string> ids)
     {
-        return _db.StartNew((Func<Task<Dictionary<string, ClipboardDbModel>>>)(async () =>
+        return _db.StartNew((Func<Task<Dictionary<string, HistoryItemModel>>>)(async () =>
         {
-            var result = new Dictionary<string, ClipboardDbModel>();
+            var result = new Dictionary<string, HistoryItemModel>();
             var uniqueIds = ids.Distinct().ToList();
             
             if (uniqueIds.Count == 0) return result;
@@ -352,7 +352,7 @@ ORDER BY created_at ASC
     /// <summary>
     ///     Insert or update a single clipboard entry (convenience method)
     /// </summary>
-    public Task UpsertAsync(ClipboardDbModel entry)
+    public Task UpsertAsync(HistoryItemModel entry)
     {
         if (entry == null)
             throw new ArgumentNullException(nameof(entry));
@@ -370,7 +370,7 @@ ORDER BY created_at ASC
     ///     Insert or update multiple clipboard entries with optimized batching.
     ///     Fires a single event after all changes complete.
     /// </summary>
-    public Task UpsertAsync(IEnumerable<ClipboardDbModel> entries)
+    public Task UpsertAsync(IEnumerable<HistoryItemModel> entries)
     {
         if (entries == null)
             throw new ArgumentNullException(nameof(entries));
@@ -660,7 +660,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
         }
     }
 
-    private static void AddParams(SqliteCommand cmd, ClipboardDbModel entry)
+    private static void AddParams(SqliteCommand cmd, HistoryItemModel entry)
     {
         cmd.Parameters.AddWithValue("$id", entry.Id);
         cmd.Parameters.AddWithValue("$content", entry.Content);
@@ -673,9 +673,9 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
         cmd.Parameters.AddWithValue("$deleted", entry.IsDeleted ? 1 : 0);
     }
 
-    private static ClipboardDbModel MapFromReader(SqliteDataReader reader)
+    private static HistoryItemModel MapFromReader(SqliteDataReader reader)
     {
-        return new ClipboardDbModel
+        return new HistoryItemModel
         {
             Id = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
             Content = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),

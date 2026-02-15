@@ -21,6 +21,13 @@ public enum NavigationPage
     Settings
 }
 
+public enum ConnectionStatus
+{
+    Online,
+    Offline,
+    NoInternet
+}
+
 public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IViewModelFactory _factory;
@@ -29,8 +36,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IApiService _apiService;
     private readonly IWebSocketService _webSocketService;
     [ObservableProperty] private ViewModelBase _currentViewModel;
-    [ObservableProperty] private string _statusText = string.Empty;
-    [ObservableProperty] private IBrush _statusColor = Brushes.Gray;
+    [ObservableProperty] private ConnectionStatus _connectionStatus = ConnectionStatus.Online;
     [ObservableProperty, 
     NotifyPropertyChangedFor(nameof(IsHomePage)), 
     NotifyPropertyChangedFor(nameof(IsAccountPage)), 
@@ -110,8 +116,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "No Internet";
-                StatusColor = Brushes.Orange;
+                ConnectionStatus = ConnectionStatus.NoInternet;
             });
             return;
         }
@@ -121,16 +126,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             await _apiService.Health();
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "Online";
-                StatusColor = Brushes.Lime;
+                ConnectionStatus = ConnectionStatus.Online;
             });
         }
         catch
         {
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "Offline";
-                StatusColor = Brushes.Red;
+                ConnectionStatus = ConnectionStatus.Offline;
             });
         }
     }

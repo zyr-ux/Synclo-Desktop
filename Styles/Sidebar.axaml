@@ -40,14 +40,14 @@
         <Setter Property="FontFamily" Value="{DynamicResource Inconsolata-Bold}" />
         <Setter Property="FontSize" Value="18" />
         <Setter Property="Height" Value="45" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Margin" Value="20 0 20 0" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Margin" Value="10 0 10 0" />
 
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
 
-        <Setter Property="Background" Value="{DynamicResource SidebarButtonBackground}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource ForegroundL}" />
     </Style>
 
@@ -58,8 +58,10 @@
     </Style>
 
     <!-- Hover -->
-    <Style Selector="RadioButton.sidebar:pointerover">
-        <Setter Property="Opacity" Value="0.8" />
+    <Style Selector="RadioButton.sidebar:pointerover:not(:checked)">
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.12" />
+        </Setter>
     </Style>
 
 </Styles>

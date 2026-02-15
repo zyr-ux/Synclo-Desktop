@@ -4,9 +4,10 @@
     <Color x:Key="Accent">#363b3e</Color>
     <Color x:Key="PrimaryBackground">#dedede</Color>
     <Color x:Key="SecondaryBackground">#b5b8b8</Color>
-    <Color x:Key="SidebarButtonBackground">#8a8a8a</Color>
     <Color x:Key="ForegroundD">#dedede</Color>
     <Color x:Key="ForegroundL">#363c40</Color>
-    <Color x:Key="Yellow">#ebc16e</Color>
+    <SolidColorBrush x:Key="StatusOnline" Color="#2D991F" />
+    <SolidColorBrush x:Key="StatusOffline" Color="#B00020" />
+    <SolidColorBrush x:Key="StatusNoInternet" Color="#E65100" />
 
 </ResourceDictionary>
