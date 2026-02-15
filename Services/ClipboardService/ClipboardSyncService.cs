@@ -31,8 +31,8 @@ internal abstract record ClipboardPipelineEvent
 public interface IClipboardSyncService : IDisposable
 {
     Task InitializeAsync();
-    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 0, int offset = 0);
-    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 0);
+    Task<List<HistoryItemModel>> GetHistoryForUI(int limit = 0, int offset = 0);
+    Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
@@ -216,7 +216,7 @@ public class ClipboardSyncService(
 
     public event Action? OnHistoryUpdated;
 
-    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 0, int offset = 0)
+    public async Task<List<HistoryItemModel>> GetHistoryForUI(int limit = 0, int offset = 0)
     {
         // Default to configured page size if 0
         if (limit <= 0) limit = DefaultSyncPageSize;
@@ -225,16 +225,16 @@ public class ClipboardSyncService(
         try
         {
             var entries = await _repository.GetAllAsync(limit, offset).ConfigureAwait(false);
-            return entries ?? new List<ClipboardDbModel>();
+            return entries ?? new List<HistoryItemModel>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load history for UI");
-            return new List<ClipboardDbModel>();
+            return new List<HistoryItemModel>();
         }
     }
 
-    public async Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 0)
+    public async Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0)
     {
         // Default to configured page size if 0
         if (limit <= 0) limit = DefaultSyncPageSize;
@@ -247,7 +247,7 @@ public class ClipboardSyncService(
             try
             {
                 // Return the result from the concurrent refresh
-                return await _repository.GetAllAsync(limit).ConfigureAwait(false) ?? new List<ClipboardDbModel>();
+                return await _repository.GetAllAsync(limit).ConfigureAwait(false) ?? new List<HistoryItemModel>();
             }
             finally
             {
@@ -271,13 +271,13 @@ public class ClipboardSyncService(
             }, "Refresh Sync");
 
             // Return empty list if no data (don't return null)
-            return localEntries ?? new List<ClipboardDbModel>();
+            return localEntries ?? new List<HistoryItemModel>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading clipboard history");
             _ = SyncInBackgroundAsync(); // Try to sync from server anyway
-            return new List<ClipboardDbModel>();
+            return new List<HistoryItemModel>();
         }
         finally
         {
@@ -487,7 +487,7 @@ public class ClipboardSyncService(
 
     private async Task ProcessSyncBatch(List<ClipboardEntry> entries, byte[] masterKey)
     {
-        var incomingBatch = new List<ClipboardDbModel>();
+        var incomingBatch = new List<HistoryItemModel>();
         var idsToDelete = new List<string>();
 
         // Pre-fetch IDs to check for duplicates/updates
@@ -551,7 +551,7 @@ public class ClipboardSyncService(
 
             serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
 
-            var dbEntry = new ClipboardDbModel
+            var dbEntry = new HistoryItemModel
             {
                 Id = entry.id,
                 Content = plaintext,
@@ -783,7 +783,7 @@ public class ClipboardSyncService(
             var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
 
             // Save to SQLite with encrypted data
-            var dbEntry = new ClipboardDbModel
+            var dbEntry = new HistoryItemModel
             {
                 Id = clientId,
                 Content = content,
@@ -809,7 +809,7 @@ public class ClipboardSyncService(
 
 
 
-    private Task SendExistingEntryAsync(ClipboardDbModel entry)
+    private Task SendExistingEntryAsync(HistoryItemModel entry)
     {
         // Skip if already synced
         if (entry.IsSynced) return Task.CompletedTask;
@@ -1059,7 +1059,7 @@ public class ClipboardSyncService(
             var serverTimestamp = entry.timestamp;
 
             // Save to SQLite
-            var dbEntry = new ClipboardDbModel
+            var dbEntry = new HistoryItemModel
             {
                 Id = entry.id,
                 Content = plaintext,

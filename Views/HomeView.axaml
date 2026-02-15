@@ -69,7 +69,7 @@
             </Interaction.Behaviors>
 
             <ListBox.ItemTemplate>
-                <DataTemplate DataType="models:ClipboardDbModel">
+                <DataTemplate DataType="models:HistoryItemModel">
                     <Border Classes="HistoryItem">
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                             <Border Grid.Column="0"

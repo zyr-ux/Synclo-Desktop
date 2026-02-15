@@ -29,7 +29,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private bool _isLoading;
-    [ObservableProperty] private ObservableCollection<ClipboardDbModel> _historyEntries = [];
+    [ObservableProperty] private ObservableCollection<HistoryItemModel> _historyEntries = [];
     [ObservableProperty] private string? _homeStatusMessage;
     [ObservableProperty] private bool _homeStatusMessageVisibility;
     
@@ -104,7 +104,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     // Efficiently syncs the UI collection with new entries, handling insertions, updates, moves, and removals
     // Merges new entries into the start of the list without clearing the rest
-    private void MergeNewEntries(IReadOnlyList<ClipboardDbModel> newEntries)
+    private void MergeNewEntries(IReadOnlyList<HistoryItemModel> newEntries)
     {
         var existing = HistoryEntries;
         int newIndex = 0;
@@ -208,7 +208,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     }
 
     // Checks if two clipboard entries are equal based on key properties
-    private static bool AreEntriesEqual(ClipboardDbModel a, ClipboardDbModel b)
+    private static bool AreEntriesEqual(HistoryItemModel a, HistoryItemModel b)
     {
         return a.Id == b.Id &&
                a.Content == b.Content &&
@@ -250,7 +250,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     // Copies the selected clipboard entry to the current clipboard
     [RelayCommand(AllowConcurrentExecutions = true)]
-    private async Task ItemClicked(ClipboardDbModel entry)
+    private async Task ItemClicked(HistoryItemModel entry)
     {
         if (string.IsNullOrEmpty(entry.Content)) return;
 
@@ -300,7 +300,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     
     // Deletes a clipboard entry and marks it as deleting
     [RelayCommand(AllowConcurrentExecutions = true)]
-    private async Task DeleteItemClicked(ClipboardDbModel entry)
+    private async Task DeleteItemClicked(HistoryItemModel entry)
     {
         if (entry.IsDeleting) return;
 

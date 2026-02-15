@@ -4,22 +4,17 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Synclo.Models;
 
-public partial class ClipboardDbModel : ObservableObject
+public partial class HistoryItemModel : ObservableObject
 {
     public string Id { get; init; } = string.Empty;
-    private string _content = string.Empty;
-    public string Content 
-    { 
-        get => _content;
-        init => _content = value;
-    }
+    public string Content { get; init; } = string.Empty;
 
     // Cached properties - Lazily computed to avoid heavy regex/parsing on instantiation
     private string? _previewText;
-    public string PreviewText => _previewText ??= ComputePreviewText(_content);
+    public string PreviewText => _previewText ??= ComputePreviewText(Content);
 
     private ClipboardItemType? _type;
-    public ClipboardItemType Type => _type ??= ComputeType(_content);
+    public ClipboardItemType Type => _type ??= ComputeType(Content);
 
     public string ContentHash { get; init; } = string.Empty;
     public string Ciphertext { get; init; } = string.Empty;
@@ -34,7 +29,7 @@ public partial class ClipboardDbModel : ObservableObject
     [ObservableProperty]
     private bool _isDeleting;
     
-    public ClipboardDbModel CopyWith(
+    public HistoryItemModel CopyWith(
         string? id = null,
         string? content = null,
         string? contentHash = null,
@@ -45,7 +40,7 @@ public partial class ClipboardDbModel : ObservableObject
         bool? isSynced = null,
         bool? isDeleted = null)
     {
-        return new ClipboardDbModel
+        return new HistoryItemModel
         {
             Id = id ?? this.Id,
             Content = content ?? this.Content,
