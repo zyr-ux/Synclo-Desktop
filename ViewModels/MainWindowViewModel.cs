@@ -36,7 +36,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IApiService _apiService;
     private readonly IWebSocketService _webSocketService;
     [ObservableProperty] private ViewModelBase _currentViewModel;
-    [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private ConnectionStatus _connectionStatus = ConnectionStatus.Online;
     [ObservableProperty, 
     NotifyPropertyChangedFor(nameof(IsHomePage)), 
@@ -117,7 +116,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "No Internet";
                 ConnectionStatus = ConnectionStatus.NoInternet;
             });
             return;
@@ -128,7 +126,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
             await _apiService.Health();
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "Online";
                 ConnectionStatus = ConnectionStatus.Online;
             });
         }
@@ -136,7 +133,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "Offline";
                 ConnectionStatus = ConnectionStatus.Offline;
             });
         }

@@ -35,19 +35,21 @@
                                Foreground="{DynamicResource ForegroundL}"
                                FontFamily="{DynamicResource Inconsolata-Medium}" />
 
-                    <TextBlock Text="{Binding StatusText}"
-                               FontSize="18"
+                    <TextBlock FontSize="18"
                                FontFamily="{DynamicResource Inconsolata-Medium}"
                                Tag="{Binding ConnectionStatus}">
                         <TextBlock.Styles>
                             <Style Selector="TextBlock[Tag=Online]">
                                 <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
+                                <Setter Property="Text" Value="Online" />
                             </Style>
                             <Style Selector="TextBlock[Tag=Offline]">
                                 <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
+                                <Setter Property="Text" Value="Offline" />
                             </Style>
                             <Style Selector="TextBlock[Tag=NoInternet]">
                                 <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
+                                <Setter Property="Text" Value="No Internet" />
                             </Style>
                         </TextBlock.Styles>
                     </TextBlock>
