@@ -9,8 +9,7 @@
              d:DesignHeight="450"
              x:Class="Synclo.Views.SettingsView"
              x:DataType="vm:SettingsViewModel"
-             Background="{DynamicResource PrimaryBackground}"
-             CornerRadius="10 0 0 10">
+             Background="{DynamicResource PrimaryBackground}">
 
     <!-- ScrollViewer is FLUSH to app edges -->
     <ScrollViewer VerticalScrollBarVisibility="Auto"

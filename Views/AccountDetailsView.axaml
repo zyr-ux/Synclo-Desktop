@@ -4,8 +4,7 @@
              xmlns:vm="using:Synclo.ViewModels"
              x:Class="Synclo.Views.AccountDetailsView"
              x:DataType="vm:AccountDetailsViewModel"
-             Background="{DynamicResource PrimaryBackground}"
-             CornerRadius="10 0 0 10">
+             Background="{DynamicResource PrimaryBackground}">
 
     <Grid>
         <!-- Page padding -->

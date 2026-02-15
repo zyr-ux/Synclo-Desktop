@@ -6,8 +6,7 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
              x:Class="Synclo.Views.LoginView"
              x:DataType="vm:LoginViewModel"
-             Background="{DynamicResource PrimaryBackground}"
-             CornerRadius="10 0 0 10">
+             Background="{DynamicResource PrimaryBackground}">
 
     <Grid HorizontalAlignment="Center"
           VerticalAlignment="Center"
