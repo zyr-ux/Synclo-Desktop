@@ -38,7 +38,19 @@
                     <TextBlock Text="{Binding StatusText}"
                                FontSize="18"
                                FontFamily="{DynamicResource Inconsolata-Medium}"
-                               Foreground="{Binding StatusColor}" />
+                               Tag="{Binding ConnectionStatus}">
+                        <TextBlock.Styles>
+                            <Style Selector="TextBlock[Tag=Online]">
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
+                            </Style>
+                            <Style Selector="TextBlock[Tag=Offline]">
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
+                            </Style>
+                            <Style Selector="TextBlock[Tag=NoInternet]">
+                                <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
+                            </Style>
+                        </TextBlock.Styles>
+                    </TextBlock>
                 </StackPanel>
 
                 <!-- Divider above status bar -->
