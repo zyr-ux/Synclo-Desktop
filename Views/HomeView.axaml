@@ -6,36 +6,44 @@
              xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="clr-namespace:Synclo.ViewModels"
              xmlns:models="clr-namespace:Synclo.Models"
+             xmlns:behaviors="clr-namespace:Synclo.Behaviors"
              mc:Ignorable="d"
              d:DesignWidth="800"
              d:DesignHeight="450"
              x:Class="Synclo.Views.HomeView"
-             x:DataType="vm:HomeViewModel">
+             x:DataType="vm:HomeViewModel"
+             Background="{DynamicResource PrimaryBackground}">
 
-     <!-- Root grid has NO margin -->
-    <Grid RowDefinitions="Auto,*"
-          Background="{DynamicResource PrimaryBackground}">
-
+    <!-- Root grid has NO margin -->
+    <Grid RowDefinitions="Auto,*">
         <!-- Header keeps padding -->
         <StackPanel Grid.Row="0"
-                    Orientation="Horizontal"
-                    Margin="30,30,30,0">
-            <TextBlock Text="History"
-                       FontSize="36"
-                       FontFamily="{DynamicResource Inconsolata-Bold}"
-                       Foreground="#FFCC66"/>
+                    Margin="30,30,30,0"
+                    Orientation="Vertical">
 
-            <Button Classes="icon-button"
-                    Margin="20 0 0 0"
-                    VerticalAlignment="Center"
-                    IsEnabled="{Binding !IsLoading}"
-                    Command="{Binding RefreshClipboardHistoryCommand}">
-                <materialIcons:MaterialIcon Kind="Refresh"
-                                            Width="26"
-                                            Height="26"/>
-            </Button>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="History"
+                           FontSize="36"
+                           FontFamily="{DynamicResource Inconsolata-Bold}"
+                           Foreground="{DynamicResource Accent}" />
+
+                <Button Classes="icon-button"
+                        Margin="20 0 0 0"
+                        VerticalAlignment="Center"
+                        IsEnabled="{Binding !IsLoading}"
+                        Command="{Binding RefreshClipboardHistoryCommand}">
+                    <materialIcons:MaterialIcon Kind="Refresh"
+                                                Width="26"
+                                                Height="26" />
+                </Button>
+            </StackPanel>
+
+            <Border Height="1"
+                    Background="{DynamicResource Accent}"
+                    Opacity="0.5"
+                    Margin="-5 14 -5 0" />
         </StackPanel>
-        
+
         <TextBlock Grid.Row="0"
                    Grid.RowSpan="2"
                    Text="{Binding HomeStatusMessage}"
@@ -45,77 +53,83 @@
                    FontSize="20"
                    FontFamily="{DynamicResource Inconsolata-Medium}"
                    Foreground="{DynamicResource Accent}"
-                   IsVisible="{Binding HomeStatusMessageVisibility}"
-                   IsHitTestVisible="False"/>
+                   IsVisible="{Binding HomeStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   IsHitTestVisible="False" />
 
-        <!-- ScrollViewer is FLUSH to the edge -->
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
+        <!-- ListBox handles its own scrolling (Virtualization enabled) -->
+        <ListBox Grid.Row="1"
+                 Classes="HistoryList"
+                 ItemsSource="{Binding HistoryEntries}">
+
             <Interaction.Behaviors>
-                <ia:VerticalScrollViewerAnimatedBehavior/>
+                <!-- Infinite Scroll Behavior adapted for ListBox internal ScrollViewer -->
+                <behaviors:ScrollViewerInfiniteScrollBehavior Command="{Binding LoadMoreCommand}" />
+                <!-- Smooth Scrolling Behavior wrapper -->
+                <behaviors:ListBoxSmoothScrollBehavior />
             </Interaction.Behaviors>
 
-            <!-- Content padding goes HERE -->
-            <Border Padding="30,30,30,10">
-                <ItemsControl ItemsSource="{Binding HistoryEntries}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Spacing="25"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="models:HistoryItemModel">
+                    <Border Classes="HistoryItem">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                            <Border Grid.Column="0"
+                                    Margin="0,0,15,0"
+                                    Padding="4"
+                                    VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="{Binding Type, Converter={StaticResource ClipboardItemTypeToIconConverter}}"
+                                                            Width="16"
+                                                            Height="16"
+                                                            Foreground="{DynamicResource Accent}" />
+                            </Border>
 
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="models:ClipboardDbModel">
-                            <StackPanel>
-                                <Grid ColumnDefinitions="*,Auto,140">
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding PreviewText}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,15,0"
+                                       Foreground="{DynamicResource Accent}"
+                                       FontSize="16"
+                                       FontFamily="{DynamicResource Inconsolata-Medium}"
+                                       TextTrimming="CharacterEllipsis" />
 
-                                    <Button Grid.Column="0"
-                                            Classes="textButton"
-                                            Padding="0"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Center"
-                                            Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                                            CommandParameter="{Binding}">
-                                        <TextBlock Text="{Binding PreviewText}"
-                                                   Foreground="{DynamicResource Accent}"
-                                                   FontSize="18"
-                                                   FontFamily="{DynamicResource Inconsolata-Medium}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Margin="0,0,20,0"/>
-                                    </Button>
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,30,0"
+                                       Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
+                                       Foreground="{DynamicResource Accent}"
+                                       FontSize="14"
+                                       FontFamily="{DynamicResource Inconsolata-Medium}" />
 
-                                    <Button Grid.Column="1"
-                                            Classes="icon-button"
-                                            Margin="0 0 10 0"
-                                            VerticalAlignment="Center"
-                                            IsEnabled="{Binding !IsDeleting}"
-                                            Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
-                                            CommandParameter="{Binding}">
-                                        <materialIcons:MaterialIcon Kind="Close"
-                                                                    Width="16"
-                                                                    Height="16"/>
-                                    </Button>
+                            <StackPanel Grid.Column="3"
+                                        Orientation="Horizontal"
+                                        Spacing="15">
 
-                                    <TextBlock Grid.Column="2"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Right"
-                                               Margin="0 0 4 0"
-                                               Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, h:mm tt}'}"
-                                               Foreground="{DynamicResource Accent}"
-                                               FontSize="16"
-                                               FontFamily="{DynamicResource Inconsolata-Medium}"/>
-                                </Grid>
+                                <Button Classes="icon-button"
+                                        VerticalAlignment="Center"
+                                        Width="30" Height="30"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                        CommandParameter="{Binding}">
+                                    <materialIcons:MaterialIcon Kind="ContentCopy"
+                                                                Width="18"
+                                                                Height="18"
+                                                                Foreground="{DynamicResource Accent}" />
+                                </Button>
 
-                                <Border Height="1"
-                                        Background="{DynamicResource Accent}"
-                                        Margin="0,8,0,0"
-                                        Opacity="0.5"/>
+                                <Button Classes="icon-button"
+                                        VerticalAlignment="Center"
+                                        Width="30" Height="30"
+                                        IsEnabled="{Binding !IsDeleting}"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                        CommandParameter="{Binding}">
+                                    <materialIcons:MaterialIcon Kind="Close"
+                                                                Width="20"
+                                                                Height="20"
+                                                                Foreground="{DynamicResource Accent}" />
+                                </Button>
                             </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Border>
-        </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </Grid>
 </UserControl>

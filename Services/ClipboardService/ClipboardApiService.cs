@@ -12,7 +12,7 @@ namespace Synclo.Services.ClipboardService;
 public interface IClipboardApiService
 {
     Task<string> GetLatestClipboardAsync();
-    Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20, bool includeDeleted = false);
+    Task<ClipboardSyncResponse> GetClipboardSyncAsync(DateTime? since = null, int limit = 1000, long offset = 0);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
     T Deserialize<T>(string json);
 }
@@ -60,7 +60,7 @@ public class ClipboardApiService(
         }
     }
 
-    public async Task<ClipboardHistoryResponse> GetClipboardHistoryAsync(int page = 1, int pageSize = 20, bool includeDeleted = false)
+    public async Task<ClipboardSyncResponse> GetClipboardSyncAsync(DateTime? since = null, int limit = 1000, long offset = 0)
     {
         try
         {
@@ -70,30 +70,41 @@ public class ClipboardApiService(
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
-            var response = await _api.GetAsync($"/api/clipboard/all?page={page}&limit={pageSize}&include_deleted={includeDeleted.ToString().ToLower()}", cts.Token);
+            
+            var query = $"/api/clipboard/sync?limit={limit}&offset={offset}";
+            if (since.HasValue)
+            {
+                // Format as ISO 8601
+                query += $"&since={since.Value.ToString("O")}";
+            }
+
+            var response = await _api.GetAsync(query, cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var historyResponse = _api.Deserialize<ClipboardHistoryResponse>(json);
+            var syncResponse = _api.Deserialize<ClipboardSyncResponse>(json);
 
-            foreach (var entry in historyResponse.history)
+            if (syncResponse?.entries != null)
             {
-                try
+                foreach (var entry in syncResponse.entries)
                 {
-                    entry.plaintext = DecryptClipboardEntry(entry, masterKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, $"Failed to decrypt entry {entry?.id ?? "unknown"}, skipping");
-                    entry.plaintext = null; // Mark as failed
+                    try
+                    {
+                        entry.plaintext = DecryptClipboardEntry(entry, masterKey);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, $"Failed to decrypt entry {entry?.id ?? "unknown"}, skipping");
+                        entry.plaintext = null; // Mark as failed
+                    }
                 }
             }
 
-            return historyResponse;
+            return syncResponse ?? new ClipboardSyncResponse();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get clipboard history");
+            _logger.LogError(ex, "Failed to get clipboard sync data");
             throw;
         }
     }

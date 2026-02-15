@@ -67,6 +67,6 @@ public partial class AccountViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _accountService.OnLogout -= OnLogoutAsync;
-        (_currentViewModel as IDisposable)?.Dispose();
+        (CurrentViewModel as IDisposable)?.Dispose();
     }
 }

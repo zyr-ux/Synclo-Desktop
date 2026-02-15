@@ -7,25 +7,34 @@ using Synclo.Services.Utilities;
 
 namespace Synclo.Services.ClipboardMonitor;
 
-public sealed class ClipboardMonitorMacOS : IClipboardMonitor, IDisposable
+public sealed class ClipboardMonitorMacOS(
+    IClipboardProvider clipboardProvider,
+    ILogger<ClipboardMonitorMacOS> logger,
+    IUtils utils)
+    : IClipboardMonitor, IDisposable
 {
-    private readonly IClipboardProvider _clipboardProvider;
-    private readonly ILogger<ClipboardMonitorMacOS> _logger;
-    private readonly IUtils _utils;
+    private readonly IClipboardProvider _clipboardProvider = clipboardProvider ?? throw new ArgumentNullException(nameof(clipboardProvider));
+    private readonly ILogger<ClipboardMonitorMacOS> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IUtils _utils = utils ?? throw new ArgumentNullException(nameof(utils));
+
+    private readonly object _startLock = new();
+    private readonly object _lock = new();
 
     private Thread? _monitorThread;
 
     private volatile bool _disposed;
+    private volatile bool _stopping;
     private int _generation;
 
     private nint _lastChangeCount;
     private string? _lastClipboardHash;
-
-    private readonly object _lock = new();
+    private TaskCompletionSource? _initTcs;
+    private volatile bool _startedSuccessfully;
 
     public event Action<string>? OnClipboardChanged;
+    public event Action<Exception?>? OnMonitorStopped;
 
-    public bool IsRunning => _monitorThread is { IsAlive: true };
+    public bool IsRunning => _monitorThread is { IsAlive: true } && _startedSuccessfully;
 
     static ClipboardMonitorMacOS()
     {
@@ -33,36 +42,34 @@ public sealed class ClipboardMonitorMacOS : IClipboardMonitor, IDisposable
         InitializeObjCHandles();
     }
 
-    public ClipboardMonitorMacOS(
-        IClipboardProvider clipboardProvider,
-        ILogger<ClipboardMonitorMacOS> logger,
-        IUtils utils)
-    {
-        _clipboardProvider = clipboardProvider ?? throw new ArgumentNullException(nameof(clipboardProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _utils = utils ?? throw new ArgumentNullException(nameof(utils));
-    }
-
     public Task StartAsync()
     {
-        var myGeneration = Interlocked.Increment(ref _generation);
-        _disposed = false;
-
-        _monitorThread = new Thread(() => MonitorLoop(myGeneration))
+        lock (_startLock)
         {
-            IsBackground = true,
-            Name = "SyncloClipboardMonitorMacOS"
-        };
+            if (_monitorThread is { IsAlive: true })
+                return _initTcs?.Task ?? Task.CompletedTask;
 
-        _monitorThread.Start();
-        return Task.CompletedTask;
+            _initTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _stopping = false;
+            _startedSuccessfully = false;
+
+            var myGeneration = Interlocked.Increment(ref _generation);
+
+            _monitorThread = new Thread(() => MonitorLoop(myGeneration))
+            {
+                IsBackground = true,
+                Name = "SyncloClipboardMonitorMacOS"
+            };
+
+            _monitorThread.Start();
+            return _initTcs.Task;
+        }
     }
 
     public Task StopAsync()
     {
-        _disposed = true;
+        _stopping = true;
         Interlocked.Increment(ref _generation);
-        _monitorThread = null;
         return Task.CompletedTask;
     }
 
@@ -70,18 +77,16 @@ public sealed class ClipboardMonitorMacOS : IClipboardMonitor, IDisposable
     {
         try
         {
+            // Fix: Perform I/O first, then update protected fields atomically
+            await _clipboardProvider.SetTextAsync(text);
             var hash = _utils.ComputeHash(text);
+            var changeCount = NSPasteboardChangeCount();
 
+            // Only lock briefly to update both fields atomically
             lock (_lock)
             {
                 _lastClipboardHash = hash;
-            }
-
-            await _clipboardProvider.SetTextAsync(text);
-
-            lock (_lock)
-            {
-                _lastChangeCount = NSPasteboardChangeCount();
+                _lastChangeCount = changeCount;
             }
         }
         catch (Exception ex)
@@ -93,12 +98,18 @@ public sealed class ClipboardMonitorMacOS : IClipboardMonitor, IDisposable
 
     private void MonitorLoop(int myGeneration)
     {
+        Exception? fatalError = null;
+
         try
         {
             lock (_lock)
             {
                 _lastChangeCount = NSPasteboardChangeCount();
             }
+
+            _startedSuccessfully = true;
+            _initTcs?.TrySetResult();
+            _initTcs = null;
 
             while (true)
             {
@@ -120,34 +131,74 @@ public sealed class ClipboardMonitorMacOS : IClipboardMonitor, IDisposable
                     _lastChangeCount = current;
                 }
 
-                _ = HandleClipboardUpdateAsync();
+                HandleClipboardUpdateSync(myGeneration);
             }
         }
         catch (Exception ex)
         {
+            fatalError = ex;
             _logger.LogError(ex, "macOS clipboard monitor loop failed");
+
+            if (_initTcs != null)
+            {
+                _initTcs.TrySetException(ex);
+                _initTcs = null;
+            }
+        }
+        finally
+        {
+            _startedSuccessfully = false;
+
+            if (!_stopping && !_disposed)
+                OnMonitorStopped?.Invoke(fatalError);
+
+            lock (_startLock)
+            {
+                _monitorThread = null;
+            }
         }
     }
 
-    private async Task HandleClipboardUpdateAsync()
+    private void HandleClipboardUpdateSync(int myGeneration)
     {
         try
         {
-            var text = await _clipboardProvider.GetTextAsync();
-            if (string.IsNullOrEmpty(text))
-                return;
-
-            var hash = _utils.ComputeHash(text);
-
-            lock (_lock)
+            for (int attempt = 0; attempt < 5; attempt++)
             {
-                if (hash == _lastClipboardHash)
+                if (_disposed || myGeneration != Volatile.Read(ref _generation))
                     return;
 
-                _lastClipboardHash = hash;
-            }
+                var before = NSPasteboardChangeCount();
 
-            OnClipboardChanged?.Invoke(text);
+                var text = GetClipboardTextSync();
+                if (string.IsNullOrEmpty(text))
+                    return;
+
+                var after = NSPasteboardChangeCount();
+                if (before != after)
+                {
+                    lock (_lock)
+                    {
+                        _lastChangeCount = after;
+                    }
+
+                    continue;
+                }
+
+                var hash = _utils.ComputeHash(text);
+
+                lock (_lock)
+                {
+                    if (hash == _lastClipboardHash)
+                        return;
+
+                    _lastClipboardHash = hash;
+                }
+
+                var captured = text;
+                Task.Run(() => OnClipboardChanged?.Invoke(captured));
+                return;
+            }
         }
         catch (Exception ex)
         {
@@ -155,12 +206,34 @@ public sealed class ClipboardMonitorMacOS : IClipboardMonitor, IDisposable
         }
     }
 
+    private string? GetClipboardTextSync()
+    {
+        if (_clipboardProvider is ISynchronousClipboardProvider synchronousClipboardProvider)
+            return synchronousClipboardProvider.GetText();
+
+        return _clipboardProvider.GetTextAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+    }
+
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        if (_disposed) return;
+        _disposed = true;
+        _stopping = true;
+        Interlocked.Increment(ref _generation);
 
-        StopAsync().Wait();
+        try
+        {
+            if (_monitorThread is { IsAlive: true })
+                _monitorThread.Join(millisecondsTimeout: 1000);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to stop macOS clipboard monitor thread");
+        }
+        finally
+        {
+            _monitorThread = null;
+        }
     }
 
     #region Objective-C bridge (cached)

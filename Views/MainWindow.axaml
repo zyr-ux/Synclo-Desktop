@@ -9,17 +9,21 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Synclo"
-        Width="950" Height="600"
+        Width="1000" Height="600"
         WindowStartupLocation="CenterScreen"
         MinWidth="200"
-        MinHeight="350">
-    
-    <Grid ColumnDefinitions="200,*">
+        MinHeight="350"
+        Background="{DynamicResource PrimaryBackground}">
+
+    <Grid ColumnDefinitions="250,*">
 
         <!-- Sidebar -->
         <Border Grid.Column="0"
-                Background="{DynamicResource SecondaryBackground}"
-                Padding="0 20 0 10">
+                Padding="0 10 0 10"
+                Margin="10"
+                CornerRadius="10"
+                BoxShadow="0 1 3 0 #30000000, 0 4 5 0 #15000000"
+                Background="{DynamicResource SecondaryBackground}">
 
             <DockPanel LastChildFill="True">
 
@@ -31,25 +35,51 @@
                             Margin="20 0 0 10">
 
                     <TextBlock Text="Status:"
-                               FontSize="16"
+                               FontSize="18"
                                Foreground="{DynamicResource ForegroundL}"
-                               FontFamily="{DynamicResource Inconsolata-Bold}"/>
+                               FontFamily="{DynamicResource Inconsolata-Medium}" />
 
-                    <TextBlock Text="{Binding StatusText}"
-                               FontSize="16"
-                               FontFamily="{DynamicResource Inconsolata-Bold}"
-                               Foreground="{Binding StatusColor}"/>
+                    <TextBlock FontSize="18"
+                               FontFamily="{DynamicResource Inconsolata-Medium}"
+                               Tag="{Binding ConnectionStatus}">
+                        <TextBlock.Styles>
+                            <Style Selector="TextBlock[Tag=Online]">
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
+                                <Setter Property="Text" Value="Online" />
+                            </Style>
+                            <Style Selector="TextBlock[Tag=Offline]">
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
+                                <Setter Property="Text" Value="Offline" />
+                            </Style>
+                            <Style Selector="TextBlock[Tag=NoInternet]">
+                                <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
+                                <Setter Property="Text" Value="No Internet" />
+                            </Style>
+                        </TextBlock.Styles>
+                    </TextBlock>
                 </StackPanel>
 
+                <!-- Divider above status bar -->
+                <Border DockPanel.Dock="Bottom"
+                        Height="1"
+                        Background="{DynamicResource Accent}"
+                        Opacity="0.5"
+                        Margin="10 0 10 20" />
+
                 <!-- Sidebar content -->
-                <StackPanel Spacing="20">
+                <StackPanel Spacing="10" Orientation="Vertical">
 
                     <TextBlock Text="Synclo"
-                               Foreground="{DynamicResource ForegroundL}"
+                               Foreground="{DynamicResource Accent}"
                                FontSize="43"
                                FontFamily="{DynamicResource Inconsolata-Bold}"
                                HorizontalAlignment="Left"
-                               Margin="20,10,0,30" />
+                               Margin="20,10,20,0" />
+                    
+                    <Border Height="1"
+                            Background="{DynamicResource Accent}"
+                            Opacity="0.5"
+                            Margin="10 0 10 20" />
 
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
@@ -70,7 +100,7 @@
                                  HorizontalContentAlignment="Left"
                                  Padding="16 0">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <avalonia:MaterialIcon Kind="AccountCircle" Width="18" Height="18" />
+                            <avalonia:MaterialIcon Kind="Account" Width="18" Height="18" />
                             <TextBlock Text="Account" />
                         </StackPanel>
                     </RadioButton>
@@ -87,7 +117,6 @@
                         </StackPanel>
                     </RadioButton>
                 </StackPanel>
-
             </DockPanel>
         </Border>
 

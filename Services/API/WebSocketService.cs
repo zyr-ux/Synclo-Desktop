@@ -20,7 +20,7 @@ public interface IWebSocketService : IDisposable
     event Action? OnConnected;
     event Action? OnDisconnected;
     event Action<string>? OnError;
-    event Action? OnDeviceDeleted;
+    event Action<string?>? OnDeviceDeleted;
 }
 
 public sealed class WebSocketService : IWebSocketService
@@ -51,7 +51,7 @@ public sealed class WebSocketService : IWebSocketService
     public event Action? OnConnected;
     public event Action? OnDisconnected;
     public event Action<string>? OnError;
-    public event Action? OnDeviceDeleted;
+    public event Action<string?>? OnDeviceDeleted;
 
     private void OnTokenRefreshed(string token)
     {
@@ -250,7 +250,12 @@ public sealed class WebSocketService : IWebSocketService
                     
                     case "device_deleted":
                         // Device was deleted remotely - trigger logout
-                        OnDeviceDeleted?.Invoke();
+                        // Try to extract device_id to see WHO was deleted
+                        var deviceId = doc.RootElement.TryGetProperty("device_id", out var idProp)
+                            ? idProp.GetString()
+                            : null;
+                            
+                        OnDeviceDeleted?.Invoke(deviceId);
                         return true;
                 }
             }
@@ -308,8 +313,9 @@ public sealed class WebSocketService : IWebSocketService
 
             if (code == 4003)
             {
-                // Device deleted remotely - trigger logout
-                OnDeviceDeleted?.Invoke();
+                // Device deleted remotely - connection closed by server
+                // Note: The "device_deleted" message handler already triggered OnDeviceDeleted
+                // This close status is just the server closing the connection afterward
                 return;
             }
 

@@ -1,0 +1,95 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    
+    <Design.PreviewWith>
+        <Border Padding="20">
+            
+        </Border>
+    </Design.PreviewWith>
+    
+    
+    <!-- Scope to ListBox with class "HistoryList" -->
+    <Style Selector="ListBox.HistoryList">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="25,30,25,10"/>
+        <Setter Property="SelectionMode" Value="Single"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+    </Style>
+    
+    <!-- ListBoxItem styles -->
+    <Style Selector="ListBox.HistoryList ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,10"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter Name="PART_ContentPresenter"
+                                  Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  CornerRadius="{TemplateBinding CornerRadius}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Content="{TemplateBinding Content}"
+                                  Padding="{TemplateBinding Padding}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- Remove hover/focus/selection visuals -->
+    <Style Selector="ListBox.HistoryList ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:focus /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:selected:focus /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:selected:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- Merged from ItemCard.axaml -->
+    <Style Selector="Border.HistoryItem">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="15,10" />
+        <Setter Property="Cursor" Value="Hand" />
+
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.06" />
+        </Setter>
+
+        <Setter Property="BorderBrush">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.2" />
+        </Setter>
+
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15" />
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.HistoryItem:pointerover">
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.12" />
+        </Setter>
+
+        <Setter Property="BorderBrush">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.5" />
+        </Setter>
+    </Style>
+
+</Styles>

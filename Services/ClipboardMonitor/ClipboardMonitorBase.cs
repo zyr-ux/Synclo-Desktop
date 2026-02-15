@@ -17,7 +17,13 @@ public interface IClipboardProvider
     Task SetTextAsync(string text);
 }
 
-public class AvaloniaClipboardProvider : IClipboardProvider
+public interface ISynchronousClipboardProvider
+{
+    string? GetText();
+    void SetText(string text);
+}
+
+public class AvaloniaClipboardProvider : IClipboardProvider, ISynchronousClipboardProvider
 {
     private Window? _hostWindow;
 
@@ -48,12 +54,14 @@ public class AvaloniaClipboardProvider : IClipboardProvider
         if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
             return null;
 
-        return await Dispatcher.UIThread
-            .InvokeAsync(() =>
-            {
-                var clipboard = GetClipboard(desktop);
-                return clipboard?.TryGetTextAsync() ?? Task.FromResult<string?>(null);
-            });
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var clipboard = GetClipboard(desktop);
+            if (clipboard is null)
+                return null;
+
+            return await clipboard.TryGetTextAsync();
+        });
     }
 
     public async Task SetTextAsync(string text)
@@ -61,12 +69,63 @@ public class AvaloniaClipboardProvider : IClipboardProvider
         if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
             return;
 
-        await Dispatcher.UIThread
-            .InvokeAsync(() =>
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var clipboard = GetClipboard(desktop);
+            if (clipboard is null)
+                return;
+
+            await clipboard.SetTextAsync(text);
+        });
+    }
+
+    public string? GetText()
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return null;
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            var clipboard = GetClipboard(desktop);
+            return clipboard?.TryGetTextAsync().GetAwaiter().GetResult();
+        }
+
+        return Dispatcher.UIThread
+            .InvokeAsync(async () =>
             {
                 var clipboard = GetClipboard(desktop);
-                return clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
-            });
+                if (clipboard is null)
+                    return null;
+
+                return await clipboard.TryGetTextAsync();
+            })
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    public void SetText(string text)
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            var clipboard = GetClipboard(desktop);
+            clipboard?.SetTextAsync(text).GetAwaiter().GetResult();
+            return;
+        }
+
+        Dispatcher.UIThread
+            .InvokeAsync(async () =>
+            {
+                var clipboard = GetClipboard(desktop);
+                if (clipboard is null)
+                    return;
+
+                await clipboard.SetTextAsync(text);
+            })
+            .GetAwaiter()
+            .GetResult();
     }
 }
 
@@ -159,10 +218,28 @@ public abstract class ClipboardMonitorBase(
 
         try
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
+            var cts = _cts;
+            var monitoringTask = _monitoringTask;
+
             _cts = null;
             _monitoringTask = null;
+
+            if (cts is null)
+                return;
+
+            cts.Cancel();
+
+            if (monitoringTask is null)
+            {
+                cts.Dispose();
+                return;
+            }
+
+            _ = monitoringTask.ContinueWith(
+                _ => cts.Dispose(),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
         }
         catch (Exception ex)
         {
@@ -215,7 +292,14 @@ public abstract class ClipboardMonitorBase(
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during clipboard monitoring");
-                await Task.Delay(1000, cancellationToken);
+                try
+                {
+                    await Task.Delay(1000, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
     }

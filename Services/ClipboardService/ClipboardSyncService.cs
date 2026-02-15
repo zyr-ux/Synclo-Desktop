@@ -31,8 +31,8 @@ internal abstract record ClipboardPipelineEvent
 public interface IClipboardSyncService : IDisposable
 {
     Task InitializeAsync();
-    Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100);
-    Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100);
+    Task<List<HistoryItemModel>> GetHistoryForUI(int limit = 0, int offset = 0);
+    Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
@@ -52,10 +52,8 @@ public class ClipboardSyncService(
     ILogger<ClipboardSyncService> logger
 ) : IDisposable, IClipboardSyncService
 {
-    private const int DebounceDelayMs = 500;
-    private const int InactivityThresholdDays = 14;
-    private const int DefaultHistoryLimit = 100;
-    private const int DefaultSyncPageSize = 50;
+    private const int DebounceDelayMs = 50;
+    private int DefaultSyncPageSize => _settingsService.Settings.sync_page_size;
     private const int ShutdownTimeoutSeconds = 5;
 
 
@@ -121,8 +119,8 @@ public class ClipboardSyncService(
     private const int MaxQueuedClipboardEvents = 100;
     
     // Suppression guard to prevent feedback loop (Bug #1 fix)
-    // Using SemaphoreSlim instead of volatile bool for proper async synchronization
-    private readonly SemaphoreSlim _remoteUpdateLock = new(1, 1);
+    // Using volatile bool for fast lock-free checks
+    private volatile bool _isProcessingRemoteUpdate;
     
     // Consumer task tracking for graceful shutdown (Bug #8 fix)
     private Task? _consumerTask;
@@ -134,7 +132,6 @@ public class ClipboardSyncService(
     private byte[]? _cachedMasterKey;
     private readonly SemaphoreSlim _masterKeyLock = new(1, 1);
 
-    private CancellationTokenSource? _debounceCts;
     private bool _disposed;
     private volatile bool _isInitialized;
 
@@ -152,22 +149,6 @@ public class ClipboardSyncService(
 
             try
             {
-                // Cold start check: wipe DB if inactive for too long
-                if (_settingsService.Settings.last_sync.HasValue)
-                {
-                    var inactivityDuration = DateTime.UtcNow - _settingsService.Settings.last_sync.Value;
-                    if (inactivityDuration.TotalDays > InactivityThresholdDays)
-                    {
-                        await _repository.ClearAllAsync();
-                        _notificationService.ShowInfo(
-                            $"For your security, clipboard history was cleared after {(int)inactivityDuration.TotalDays} days of inactivity. " +
-                            "Refreshing from server...");
-                        // Refresh history from server in background
-                        RunBackgroundTask(async ct => await RefreshFromServerAsync(DefaultSyncPageSize),
-                            "Cold Start Refresh");
-                    }
-                }
-
                 // Cleanup tombstones on startup (keep DB clean)
                 await _repository.PurgeTombstonesAsync();
 
@@ -175,8 +156,17 @@ public class ClipboardSyncService(
                 var existingEntries = await _repository.GetAllAsync(1);
                 if (existingEntries.Count == 0)
                 {
-                    _logger.LogInformation("Database is empty, triggering automatic background refresh");
-                    RunBackgroundTask(async ct => await SyncInBackgroundAsync(), "Auto-Refresh on Empty DB");
+                    _logger.LogInformation("Database is empty, resetting last_sync to force full refresh");
+                    // Force a fresh sync by clearing the timestamp
+                    _settingsService.Settings.last_sync = null;
+                    _settingsService.Save();
+
+                    RunBackgroundTask(async ct => 
+                    {
+                        await SyncInBackgroundAsync();
+                        // Notify UI to refresh after sync completes
+                        OnHistoryUpdated?.Invoke();
+                    }, "Auto-Refresh on Empty DB");
                 }
 
                 // Subscribe to events
@@ -185,6 +175,7 @@ public class ClipboardSyncService(
                 _webSocketService.OnConnected += OnWebSocketConnected;
                 _webSocketService.OnDisconnected += OnWebSocketDisconnected;
                 _webSocketService.OnError += OnWebSocketError;
+                _accountService.OnLogin += OnAccountLoggedIn;
                 _accountService.OnLogout += OnAccountLoggedOut;
                 _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
 
@@ -225,22 +216,29 @@ public class ClipboardSyncService(
 
     public event Action? OnHistoryUpdated;
 
-    public async Task<List<ClipboardDbModel>> GetHistoryForUI(int limit = 100)
+    public async Task<List<HistoryItemModel>> GetHistoryForUI(int limit = 0, int offset = 0)
     {
+        // Default to configured page size if 0
+        if (limit <= 0) limit = DefaultSyncPageSize;
+
+
         try
         {
-            var entries = await _repository.GetAllAsync(limit).ConfigureAwait(false);
-            return entries ?? new List<ClipboardDbModel>();
+            var entries = await _repository.GetAllAsync(limit, offset).ConfigureAwait(false);
+            return entries ?? new List<HistoryItemModel>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load history for UI");
-            return new List<ClipboardDbModel>();
+            return new List<HistoryItemModel>();
         }
     }
 
-    public async Task<IReadOnlyList<ClipboardDbModel>> RefreshFromServerAsync(int limit = 100)
+    public async Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0)
     {
+        // Default to configured page size if 0
+        if (limit <= 0) limit = DefaultSyncPageSize;
+
         // Deduplication: Prevent concurrent refreshes
         if (!await _refreshLock.WaitAsync(0).ConfigureAwait(false))
         {
@@ -249,7 +247,7 @@ public class ClipboardSyncService(
             try
             {
                 // Return the result from the concurrent refresh
-                return await _repository.GetAllAsync(limit).ConfigureAwait(false) ?? new List<ClipboardDbModel>();
+                return await _repository.GetAllAsync(limit).ConfigureAwait(false) ?? new List<HistoryItemModel>();
             }
             finally
             {
@@ -273,13 +271,13 @@ public class ClipboardSyncService(
             }, "Refresh Sync");
 
             // Return empty list if no data (don't return null)
-            return localEntries ?? new List<ClipboardDbModel>();
+            return localEntries ?? new List<HistoryItemModel>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading clipboard history");
             _ = SyncInBackgroundAsync(); // Try to sync from server anyway
-            return new List<ClipboardDbModel>();
+            return new List<HistoryItemModel>();
         }
         finally
         {
@@ -377,16 +375,13 @@ public class ClipboardSyncService(
             _webSocketService.OnConnected -= OnWebSocketConnected;
             _webSocketService.OnDisconnected -= OnWebSocketDisconnected;
             _webSocketService.OnError -= OnWebSocketError;
+            _accountService.OnLogin -= OnAccountLoggedIn;
             _accountService.OnLogout -= OnAccountLoggedOut;
-
-            _debounceCts?.Cancel();
-            _debounceCts?.Dispose();
 
             _refreshLock.Dispose();
             // _ackLock.Dispose(); // Removed
             _initLock.Dispose();
             _masterKeyLock.Dispose();
-            _remoteUpdateLock.Dispose();
 
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();
@@ -413,122 +408,76 @@ public class ClipboardSyncService(
             // Optimize: Decode key once outside the loop
             var masterKey = Convert.FromBase64String(masterKeyBase64);
 
-            var historyResponse = await _clipboardApiService.GetClipboardHistoryAsync(1, DefaultSyncPageSize, includeDeleted: true)
-                .ConfigureAwait(false);
+            // Delta Sync Logic
+            DateTime? since = _settingsService.Settings.last_sync;
+            long currentOffset = 0;
+            bool hasMore = true;
+            int totalSynced = 0;
+            
+            // Track the max updated_at seen in this sync session to update last_sync at the end
+            DateTime? maxUpdatedAt = since;
 
-            if (historyResponse?.history == null || historyResponse.history.Count == 0)
+            try 
             {
-                _settingsService.Settings.last_sync = DateTime.UtcNow;
-                _settingsService.Save();
-                return;
-            }
-
-            var incomingBatch = new List<ClipboardDbModel>();
-            var idsToDelete = new List<string>();
-
-            // Pre-fetch IDs to check for duplicates/updates
-            var incomingIds = historyResponse.history.Select(e => e.id).ToList();
-            var existingEntriesById = await _repository.GetByIdsAsync(incomingIds);
-
-            foreach (var entry in historyResponse.history)
-            {
-                if (entry == null || string.IsNullOrEmpty(entry.id)) continue;
-
-                // 1. Handle Deletes (Tombstones)
-                if (entry.is_deleted)
+                while (hasMore)
                 {
-                    // Only bother deleting if we actually have it
-                    if (existingEntriesById.ContainsKey(entry.id))
+                    if (_shutdownCts.IsCancellationRequested) break;
+
+                    var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
+                        since: since,
+                        limit: DefaultSyncPageSize,
+                        offset: currentOffset
+                    ).ConfigureAwait(false);
+
+                    if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
                     {
-                        idsToDelete.Add(entry.id);
+                        break;
                     }
-                    continue;
+
+                    await ProcessSyncBatch(syncResponse.entries, masterKey);
+
+                    // Track max updated_at for next sync
+                    foreach (var entry in syncResponse.entries)
+                    {
+                        if (entry.updated_at > (maxUpdatedAt ?? DateTime.MinValue))
+                        {
+                            maxUpdatedAt = entry.updated_at;
+                        }
+                    }
+
+                    currentOffset = syncResponse.next_offset;
+                    hasMore = syncResponse.has_more;
+                    totalSynced += syncResponse.entries.Count;
+                    
+                    _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
                 }
 
-                // 2. Handle Encryption (Crucial Step missing in previous version)
-                string plaintext;
-                if (string.IsNullOrEmpty(entry.ciphertext) || string.IsNullOrEmpty(entry.nonce))
+                // Update last_sync only if we successfully synced everything
+                if (maxUpdatedAt > since || (since == null && maxUpdatedAt != null))
                 {
-                    // Fallback if server somehow sends unencrypted data or corrupt data
-                    if (string.IsNullOrEmpty(entry.plaintext)) continue;
-                    plaintext = entry.plaintext;
+                     _settingsService.Settings.last_sync = maxUpdatedAt;
+                     _settingsService.Save();
                 }
-                else
-                {
-                    try
-                    {
-                        plaintext = _cryptographyService.DecryptClipboard(
-                            _cryptographyService.FromBase64(entry.ciphertext),
-                            _cryptographyService.FromBase64(entry.nonce),
-                            masterKey);
-                    }
-                    catch
-                    {
-                        // Handle decryption failure (Ghost Entry)
-                        var safeHash = _utils.ComputeHash(entry.ciphertext);
-                        plaintext = $"Encrypted Content Unavailable [{safeHash}-{entry.id}]";
-                    }
-                }
-
-                var contentHash = _utils.ComputeHash(plaintext);
                 
-                // Check against ID map
-                existingEntriesById.TryGetValue(entry.id, out var existingById);
-
-                // Deduplication Logic:
-                // If we have the entry by ID, and the content hash matches, it's a true duplicate. Skip.
-                if (existingById != null && existingById.ContentHash == contentHash)
-                    continue;
-
-                // Normalize Timestamp
-                var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Unspecified
-                    ? DateTime.SpecifyKind(entry.timestamp, DateTimeKind.Utc) // Treating Unspecified as UTC
-                    : entry.timestamp.ToUniversalTime();
-
-                serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
-
-                var dbEntry = new ClipboardDbModel
+                if (totalSynced > 0)
                 {
-                    Id = entry.id,
-                    Content = plaintext,
-                    ContentHash = contentHash,
-                    Ciphertext = entry.ciphertext ?? string.Empty,
-                    Nonce = entry.nonce ?? string.Empty,
-                    BlobVersion = entry.blob_version,
-                    CreatedAt = serverTimestamp,
-                    IsSynced = true // It came from server, so it is synced
-                };
-
-                incomingBatch.Add(dbEntry);
-
-                // If we have an entry with this ID but content/timestamp differed, we need to overwrite it.
-                // SQLite Upsert usually handles this via ID, but explicit delete ensures clean state.
-                if (existingById != null)
-                    idsToDelete.Add(entry.id);
+                    _logger.LogInformation($"Sync completed: {totalSynced} total entries synced. New last_sync: {maxUpdatedAt}");
+                }
             }
-
-            // Database Transaction - REMOVED WRAPPER TO PREVENT DEADLOCK
-            // Executing sequentially instead of atomic transaction prevents reentrancy deadlock 
-            // on the exclusive TaskScheduler.
-            if (idsToDelete.Count > 0 || incomingBatch.Count > 0)
+            catch (HttpRequestException ex) when (ex.Message.Contains("410") || ex.StatusCode == System.Net.HttpStatusCode.Gone)
             {
-                foreach (var id in idsToDelete)
-                {
-                    var isTombstone = historyResponse.history.FirstOrDefault(x => x.id == id)?.is_deleted ?? false;
-                    if (isTombstone)
-                        await _repository.MarkDeletedAsync(id).ConfigureAwait(false);
-                    else
-                        await _repository.DeleteByIdAsync(id).ConfigureAwait(false); 
-                }
-
-                if (incomingBatch.Count > 0)
-                {
-                    await _repository.UpsertAsync(incomingBatch).ConfigureAwait(false);
-                }
+                _logger.LogWarning("Sync state expired (410 Gone). Wiping local database and performing fresh sync.");
+                
+                // Hard Reset
+                await _repository.ClearAllAsync();
+                _settingsService.Settings.last_sync = null;
+                _settingsService.Save();
+                
+                // Trigger fresh sync immediately
+                // We use a recursive call here, but ensure we don't infinite loop by clearing last_sync first
+                // The 'since' variable in the NEW call will be null.
+                await SyncInBackgroundAsync(); 
             }
-
-            _settingsService.Settings.last_sync = DateTime.UtcNow;
-            _settingsService.Save();
         }
         catch (Exception ex)
         {
@@ -536,25 +485,122 @@ public class ClipboardSyncService(
         }
     }
 
+    private async Task ProcessSyncBatch(List<ClipboardEntry> entries, byte[] masterKey)
+    {
+        var incomingBatch = new List<HistoryItemModel>();
+        var idsToDelete = new List<string>();
+
+        // Pre-fetch IDs to check for duplicates/updates
+        var incomingIds = entries.Select(e => e.id).ToList();
+        var existingEntriesById = await _repository.GetByIdsAsync(incomingIds);
+
+        foreach (var entry in entries)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.id)) continue;
+
+            // 1. Handle Deletes (Tombstones)
+            if (entry.is_deleted)
+            {
+                // Only bother deleting if we actually have it
+                if (existingEntriesById.ContainsKey(entry.id))
+                {
+                    idsToDelete.Add(entry.id);
+                }
+                continue;
+            }
+
+            // 2. Handle Encryption (Crucial Step missing in previous version)
+            string plaintext;
+            if (string.IsNullOrEmpty(entry.ciphertext) || string.IsNullOrEmpty(entry.nonce))
+            {
+                // Fallback if server somehow sends unencrypted data or corrupt data
+                if (string.IsNullOrEmpty(entry.plaintext)) continue;
+                plaintext = entry.plaintext;
+            }
+            else
+            {
+                try
+                {
+                    plaintext = _cryptographyService.DecryptClipboard(
+                        _cryptographyService.FromBase64(entry.ciphertext),
+                        _cryptographyService.FromBase64(entry.nonce),
+                        masterKey);
+                }
+                catch
+                {
+                    // Handle decryption failure (Ghost Entry)
+                    var safeHash = _utils.ComputeHash(entry.ciphertext);
+                    plaintext = $"Encrypted Content Unavailable [{safeHash}-{entry.id}]";
+                }
+            }
+
+            var contentHash = _utils.ComputeHash(plaintext);
+            
+            // Check against ID map
+            existingEntriesById.TryGetValue(entry.id, out var existingById);
+
+            // Deduplication Logic:
+            // If we have the entry by ID, and the content hash matches, it's a true duplicate. Skip.
+            if (existingById != null && existingById.ContentHash == contentHash)
+                continue;
+
+            // Normalize Timestamp
+            var serverTimestamp = entry.timestamp.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(entry.timestamp, DateTimeKind.Utc) // Treating Unspecified as UTC
+                : entry.timestamp.ToUniversalTime();
+
+            serverTimestamp = _utils.TruncateToMilliseconds(serverTimestamp);
+
+            var dbEntry = new HistoryItemModel
+            {
+                Id = entry.id,
+                Content = plaintext,
+                ContentHash = contentHash,
+                Ciphertext = entry.ciphertext ?? string.Empty,
+                Nonce = entry.nonce ?? string.Empty,
+                BlobVersion = entry.blob_version,
+                CreatedAt = serverTimestamp,
+                IsSynced = true // It came from server, so it is synced
+            };
+
+            incomingBatch.Add(dbEntry);
+
+            // If we have an entry with this ID but content/timestamp differed, we need to overwrite it.
+            // SQLite Upsert usually handles this via ID, but explicit delete ensures clean state.
+            if (existingById != null)
+                idsToDelete.Add(entry.id);
+        }
+
+        // Database Transaction - REMOVED WRAPPER TO PREVENT DEADLOCK
+        // Executing sequentially instead of atomic transaction prevents reentrancy deadlock 
+        // on the exclusive TaskScheduler.
+        if (idsToDelete.Count > 0 || incomingBatch.Count > 0)
+        {
+            foreach (var id in idsToDelete)
+            {
+                var isTombstone = entries.FirstOrDefault(x => x.id == id)?.is_deleted ?? false;
+                if (isTombstone)
+                    await _repository.MarkDeletedAsync(id).ConfigureAwait(false);
+                else
+                    await _repository.DeleteByIdAsync(id).ConfigureAwait(false); 
+            }
+
+            if (incomingBatch.Count > 0)
+            {
+                await _repository.UpsertAsync(incomingBatch).ConfigureAwait(false);
+            }
+        }
+    }
+
     private void OnClipboardChanged(string content)
     {
         if (_shutdownCts.IsCancellationRequested) return;
 
-        // Bug #3 fix: Wrap semaphore usage in try/finally to prevent leaks
-        var lockAcquired = false;
-        try
+        // Bug #1 fix: Check suppression guard (lock-free check)
+        if (_isProcessingRemoteUpdate)
         {
-            // Bug #1 fix: Check suppression guard
-            lockAcquired = _remoteUpdateLock.Wait(0);
-            if (!lockAcquired)
-            {
-                _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
-                return;
-            }
-        }
-        finally
-        {
-            if (lockAcquired) _remoteUpdateLock.Release();
+            _logger.LogDebug("Ignoring clipboard change from remote update (suppression guard active)");
+            return;
         }
 
         _logger.LogDebug($"OnClipboardChanged fired with content length: {content?.Length ?? 0}");
@@ -565,20 +611,16 @@ public class ClipboardSyncService(
             return;
         }
 
-        // Fix 1: Move debounce logic here to prevent race conditions
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = new CancellationTokenSource();
-        var token = _debounceCts.Token;
-
+        // Allow each clipboard change to process independently with a small delay
+        // to filter out OS-level duplicate events for the SAME content
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(DebounceDelayMs, token);
-                if (token.IsCancellationRequested) return;
+                // Small delay to debounce OS-level duplicate events
+                await Task.Delay(DebounceDelayMs);
 
-                // Bug #2 fix: Check shutdown token again after delay
+                // Bug #2 fix: Check shutdown token after delay
                 if (_shutdownCts.IsCancellationRequested) return;
 
                 // Issue #1 fix: Write local content to unified channel
@@ -590,7 +632,7 @@ public class ClipboardSyncService(
                      // Defensive check before writing
                     if (!_clipboardChannel.Writer.TryWrite(evt)) // Fast check
                     {
-                        await _clipboardChannel.Writer.WriteAsync(evt, token);
+                        await _clipboardChannel.Writer.WriteAsync(evt, _shutdownCts.Token);
                     }
                 }
                 catch (ChannelClosedException)
@@ -598,13 +640,9 @@ public class ClipboardSyncService(
                     _logger.LogWarning("Attempted to write to closed clipboard channel");
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // Debounced
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in clipboard debounce task");
+                _logger.LogError(ex, "Error in clipboard processing task");
             }
         });
     }
@@ -745,7 +783,7 @@ public class ClipboardSyncService(
             var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
 
             // Save to SQLite with encrypted data
-            var dbEntry = new ClipboardDbModel
+            var dbEntry = new HistoryItemModel
             {
                 Id = clientId,
                 Content = content,
@@ -771,7 +809,7 @@ public class ClipboardSyncService(
 
 
 
-    private Task SendExistingEntryAsync(ClipboardDbModel entry)
+    private Task SendExistingEntryAsync(HistoryItemModel entry)
     {
         // Skip if already synced
         if (entry.IsSynced) return Task.CompletedTask;
@@ -1021,7 +1059,7 @@ public class ClipboardSyncService(
             var serverTimestamp = entry.timestamp;
 
             // Save to SQLite
-            var dbEntry = new ClipboardDbModel
+            var dbEntry = new HistoryItemModel
             {
                 Id = entry.id,
                 Content = plaintext,
@@ -1041,8 +1079,8 @@ public class ClipboardSyncService(
             }
             await _repository.UpsertAsync(dbEntry).ConfigureAwait(false);
 
-            // Bug #1 fix: Set suppression guard before writing to OS clipboard using semaphore
-            await _remoteUpdateLock.WaitAsync();
+            // Bug #1 fix: Set suppression flag before writing to OS clipboard
+            _isProcessingRemoteUpdate = true;
             try
             {
                 // Bug #1.1 fix: Dispatch to UI thread to prevent STA crash
@@ -1053,7 +1091,7 @@ public class ClipboardSyncService(
             }
             finally
             {
-                _remoteUpdateLock.Release();
+                _isProcessingRemoteUpdate = false;
             }
         }
         catch (Exception ex)
@@ -1135,12 +1173,28 @@ public class ClipboardSyncService(
         }, cts);
     }
 
+    private async Task OnAccountLoggedIn()
+    {
+        _logger.LogInformation("User logged in, triggering automatic refresh from server");
+        
+        // Trigger background refresh to fetch clipboard history from server
+        RunBackgroundTask(async ct => 
+        {
+            await SyncInBackgroundAsync();
+            // Notify UI to refresh after sync completes
+            OnHistoryUpdated?.Invoke();
+        }, "Auto-Refresh on Login");
+    }
+
     private async Task OnAccountLoggedOut()
     {
         ClearMasterKeyCache();
         
         // Wipe local database completely on logout/failure to ensure fresh state on next login
         await _repository.ClearAllAsync();
+        
+        _settingsService.Settings.last_sync = null;
+        _settingsService.Save();
         
         // Disconnect WebSocket
         await _webSocketService.DisconnectAsync();
