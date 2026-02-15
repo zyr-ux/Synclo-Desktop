@@ -53,7 +53,7 @@
                    FontSize="20"
                    FontFamily="{DynamicResource Inconsolata-Medium}"
                    Foreground="{DynamicResource Accent}"
-                   IsVisible="{Binding HomeStatusMessageVisibility}"
+                   IsVisible="{Binding HomeStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    IsHitTestVisible="False" />
 
         <!-- ListBox handles its own scrolling (Virtualization enabled) -->
@@ -76,7 +76,7 @@
                                     Margin="0,0,15,0"
                                     Padding="4"
                                     VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="{Binding IconKind}"
+                                <materialIcons:MaterialIcon Kind="{Binding Type, Converter={StaticResource ClipboardItemTypeToIconConverter}}"
                                                             Width="16"
                                                             Height="16"
                                                             Foreground="{DynamicResource Accent}" />

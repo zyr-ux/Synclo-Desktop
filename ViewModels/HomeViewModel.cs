@@ -31,7 +31,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private ObservableCollection<HistoryItemModel> _historyEntries = [];
     [ObservableProperty] private string? _homeStatusMessage;
-    [ObservableProperty] private bool _homeStatusMessageVisibility;
     
     private int PageSize => _settingsService.Settings.sync_page_size;
     private bool _isLoadingMore;
@@ -327,14 +326,12 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             {
                 case false:
                     HomeStatusMessage = "You are not logged in. Pls log in to use Synclo!";
-                    HomeStatusMessageVisibility = true;
                     break;
                 case true when HistoryEntries.Count == 0:
                     HomeStatusMessage = "Looks like this is empty! Copy something rn!";
-                    HomeStatusMessageVisibility = true;
                     break;
                 default:
-                    HomeStatusMessageVisibility = false;
+                    HomeStatusMessage = null;
                     break;
             }
         });
