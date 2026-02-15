@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Collections;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -29,7 +30,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private bool _isLoading;
-    [ObservableProperty] private ObservableCollection<HistoryItemModel> _historyEntries = [];
+    [ObservableProperty] private AvaloniaList<HistoryItemModel> _historyEntries = new();
     [ObservableProperty] private string? _homeStatusMessage;
     
     private int PageSize => _settingsService.Settings.sync_page_size;
@@ -108,8 +109,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         var existing = HistoryEntries;
         int newIndex = 0;
 
-        // 1. Update/Insert loops
-        // We iterate through the new batch and overlay it onto the existing list
         while (newIndex < newEntries.Count)
         {
             var desired = newEntries[newIndex];
@@ -117,9 +116,13 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             // If we exceeded existing list bounds, just add the rest
             if (newIndex >= existing.Count)
             {
-                existing.Add(desired);
-                newIndex++;
-                continue;
+                // Optimization: use AddRange for the remainder
+                // We convert to list/array to avoid multiple enumerations if needed, though Skip is fine here
+                var remaining = new List<HistoryItemModel>();
+                for (int i = newIndex; i < newEntries.Count; i++) remaining.Add(newEntries[i]);
+                
+                existing.AddRange(remaining);
+                break;
             }
 
             var current = existing[newIndex];
@@ -135,75 +138,45 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                // Mismatch. 
-                // Check if 'desired' (new item) exists later in the current list (Moved/Shifted down)
-                // OR if 'current' (old item) exists later in the new batch (Moved/Shifted up - unlikely for history)
+                // Mismatch.
+                // Robust Strategy: Ensure 'desired' is at 'newIndex'.
+                // 1. Is 'desired' already in the list (moved)? -> Move it here.
+                // 2. Is it new? -> Insert it here.
                 
-                // Strategy: prioritizing the NEW batch as truth for this range.
-                // Does existing[newIndex] exist anywhere in the rest of newEntries?
-                bool currentIsStillInNewBatch = false;
-                for (int check = newIndex + 1; check < newEntries.Count; check++)
+                var indexInExisting = -1;
+                
+                // Optimization: Scan forward to find if the item moved up.
+                // We limit the scan if needed, but for correctness we scan.
+                // (Performance note: scanning 'existing' is O(N), but done at most M times where M=PageSize)
+                for (int j = newIndex + 1; j < existing.Count; j++)
                 {
-                    if (newEntries[check].Id == current.Id)
+                    if (existing[j].Id == desired.Id)
                     {
-                        currentIsStillInNewBatch = true;
+                        indexInExisting = j;
                         break;
                     }
                 }
 
-                if (currentIsStillInNewBatch)
+                if (indexInExisting != -1)
                 {
-                    // The current item IS in the new batch, but later. 
-                    // This implies 'desired' is a NEW insert before it.
-                    existing.Insert(newIndex, desired);
-                    newIndex++;
+                    // It was found later, so it moved up (or current moved down)
+                    existing.Move(indexInExisting, newIndex);
+                    
+                    // Check for content updates after move
+                    if (!AreEntriesEqual(existing[newIndex], desired))
+                    {
+                        existing[newIndex] = desired;
+                    }
                 }
                 else
                 {
-                    // The current item is NOT in the new batch.
-                    // THIS IS TRICKY: 
-                    // If we only fetched a partial page, we cannot validly say "It was deleted".
-                    // It might just be pushed out of the page.
-                    // BUT, if we assume the newEntries represents the TOP N items:
-                    // If 'current' is NOT in newEntries, does that mean it's deleted? Or pushed down?
-                    
-                    // Safe heuristics for "Top of List" updates:
-                    // If 'desired' is NOT found in existing list, it's an Insert.
-                    // If 'desired' IS found in existing list (index J), move it to newIndex.
-                    
-                    var indexInExisting = -1;
-                    for (int j = newIndex + 1; j < existing.Count; j++)
-                    {
-                        if (existing[j].Id == desired.Id)
-                        {
-                            indexInExisting = j;
-                            break;
-                        }
-                    }
-
-                    if (indexInExisting != -1)
-                    {
-                        // Found logic: It moved up.
-                        existing.Move(indexInExisting, newIndex);
-                        if (!AreEntriesEqual(existing[newIndex], desired))
-                        {
-                            existing[newIndex] = desired;
-                        }
-                        newIndex++;
-                    }
-                    else
-                    {
-                        // New item insert
-                        existing.Insert(newIndex, desired);
-                        newIndex++;
-                    }
+                    // Not found, so it's a new item
+                    existing.Insert(newIndex, desired);
                 }
+                
+                newIndex++;
             }
         }
-        
-        // Note: We DO NOT truncate 'existing' list here. 
-        // We keep the infinite scroll buffer. 
-        // This solves "Inefficient List Updates" by not reloading the whole tail.
     }
 
     // Checks if two clipboard entries are equal based on key properties
@@ -278,12 +251,21 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
             if (newEntries.Count > 0)
             {
+                // Optimization: Use HashSet to filter duplicates O(N) instead of O(N*M)
+                var existingIds = new HashSet<string>(HistoryEntries.Select(x => x.Id));
+                var toAdd = new List<HistoryItemModel>();
+
                 foreach (var entry in newEntries)
                 {
-                    if (!HistoryEntries.Any(x => x.Id == entry.Id))
+                    if (existingIds.Add(entry.Id)) // Returns true if added (so it was new)
                     {
-                        HistoryEntries.Add(entry);
+                        toAdd.Add(entry);
                     }
+                }
+                
+                if (toAdd.Count > 0)
+                {
+                    HistoryEntries.AddRange(toAdd);
                 }
             }
         }

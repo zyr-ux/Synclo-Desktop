@@ -116,12 +116,30 @@ public partial class HistoryItemModel : ObservableObject
         if (text.Contains("if (") || text.Contains("for (") || text.Contains("while (")) score += 1; // C-style
         if (text.Contains("=>")) score += 1; // Arrows
 
-        // Specific to detailed code blocks
-        var lines = text.Split('\n');
-        if (lines.Length > 2)
+        // Specific to detailed code blocks - checking indentation without splitting
+        // We look for lines starting with spaces or tabs
+        var span = text.AsSpan();
+        int lineStart = 0;
+        int indentationMatches = 0;
+        
+        while (lineStart < span.Length)
         {
-            // Indentation check
-            if (lines.Any(l => l.StartsWith("    ") || l.StartsWith("\t"))) score += 1;
+            var lineEnd = span.Slice(lineStart).IndexOf('\n');
+            var lineLength = lineEnd == -1 ? span.Length - lineStart : lineEnd;
+            var line = span.Slice(lineStart, lineLength);
+            
+            if (line.Length > 0 && (line[0] == ' ' || line[0] == '\t'))
+            {
+               indentationMatches++;
+               if (indentationMatches >= 2)
+               {
+                   score += 1;
+                   break;
+               }
+            }
+            
+            if (lineEnd == -1) break;
+            lineStart += lineEnd + 1;
         }
 
         return score >= 3;
