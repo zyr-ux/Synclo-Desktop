@@ -2,9 +2,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="using:Synclo.ViewModels"
+             xmlns:converters="using:Synclo.Converters"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="Synclo.Views.AccountDetailsView"
              x:DataType="vm:AccountDetailsViewModel"
              Background="{DynamicResource PrimaryBackground}">
+
+    <UserControl.Resources>
+        <converters:OSToIconConverter x:Key="OsToIconConverter" />
+    </UserControl.Resources>
 
     <Grid>
         <!-- Page padding -->
@@ -67,7 +73,15 @@
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="*,Auto">
                                         <StackPanel Orientation="Horizontal"
+                                                    Spacing="10"
                                                     VerticalAlignment="Center">
+                                            
+                                            <!-- OS Icon -->
+                                            <materialIcons:MaterialIcon Kind="{Binding os, Converter={StaticResource OsToIconConverter}}"
+                                                                        Width="18"
+                                                                        Height="18"
+                                                                        Foreground="{DynamicResource Accent}" />
+                                            
                                             <TextBlock Text="{Binding device_name}"
                                                        FontSize="18"
                                                        Foreground="{DynamicResource ForegroundL}"
