@@ -1,4 +1,4 @@
-# Synclo-Desktop
+# Synclo
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
 [![Framework](https://img.shields.io/badge/framework-.NET%2010.0-blue.svg)](https://dotnet.microsoft.com/)
