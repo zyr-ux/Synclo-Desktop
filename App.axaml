@@ -14,12 +14,11 @@
     <Application.Styles>
         <FluentTheme />
         <materialIcons:MaterialIconStyles />
-        <StyleInclude Source="avares://Synclo/Styles/Sidebar.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/TextButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/CustomButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/IconButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/IconButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Styles/HistoryListBoxItem.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/Sidebar.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/TextButton.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/CustomButton.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/IconButton.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/HistoryListBoxItem.axaml" />
     </Application.Styles>
 
     <Application.Resources>
@@ -27,9 +26,9 @@
 
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://Synclo/Themes/ThemePalettes.axaml" />
-                <ResourceInclude Source="avares://Synclo/Controls/Combobox.axaml" />
-                <ResourceInclude Source="avares://Synclo/Controls/TextBox.axaml" />
-                <ResourceInclude Source="avares://Synclo/Controls/NotificationCard.axaml" />
+                <ResourceInclude Source="avares://Synclo/Components/Combobox.axaml" />
+                <ResourceInclude Source="avares://Synclo/Components/TextBox.axaml" />
+                <ResourceInclude Source="avares://Synclo/Components/NotificationCard.axaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <converters:ClipboardItemTypeToIconConverter x:Key="ClipboardItemTypeToIconConverter" />
