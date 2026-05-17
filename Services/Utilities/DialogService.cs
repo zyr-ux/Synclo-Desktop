@@ -2,20 +2,21 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Synclo.Components;
 
-namespace Synclo.Components;
+namespace Synclo.Services.Utilities;
 
-public class DialogService : DialogService.IDialogService
+public interface IDialogService
 {
-    public interface IDialogService
-    {
-        Task<bool> ShowConfirmationAsync(
-            string title,
-            string message = "Are you sure you want to proceed with this action?",
-            string confirmText = "Yes",
-            string cancelText = "No");
-    }
+    Task<bool> ShowConfirmationAsync(
+        string title,
+        string message = "Are you sure you want to proceed with this action?",
+        string confirmText = "Yes",
+        string cancelText = "No");
+}
 
+public class DialogService : IDialogService
+{
     public async Task<bool> ShowConfirmationAsync(
         string title,
         string message,

@@ -11,6 +11,7 @@ using Synclo.Factory;
 using Synclo.Models;
 using Synclo.Services;
 using Synclo.Services.API;
+using Synclo.Services.Utilities;
 
 namespace Synclo.ViewModels;
 
@@ -20,7 +21,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
     private readonly IDeviceService _deviceService;
     private readonly IViewModelFactory _factory;
     private readonly INotificationService _notificationService;
-    private readonly DialogService.IDialogService _dialogService;
+    private readonly IDialogService _dialogService;
 
     [ObservableProperty] private string _username = string.Empty;
     [ObservableProperty] private bool _isBusy;
@@ -34,7 +35,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
         IDeviceService deviceService,
         IViewModelFactory factory,
         INotificationService notificationService,
-        DialogService.IDialogService dialogService)
+        IDialogService dialogService)
     {
         _factory = factory;
         _accountService = accountService;

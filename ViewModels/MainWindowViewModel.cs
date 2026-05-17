@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Security;
@@ -11,6 +11,7 @@ using CommunityToolkit.Mvvm.Input;
 using Synclo.Factory;
 using Synclo.Services;
 using Synclo.Services.API;
+using Synclo.Services.Utilities;
 
 namespace Synclo.ViewModels;
 

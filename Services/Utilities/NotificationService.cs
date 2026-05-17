@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Controls.Notifications;
 
-namespace Synclo.Services;
+namespace Synclo.Services.Utilities;
 
 public interface INotificationService
 {
@@ -21,7 +21,7 @@ public sealed class NotificationService : INotificationService
         _manager = manager;
     }
 
-    private void Show(string message,string? title,NotificationType type)
+    private void Show(string message, string? title, NotificationType type)
     {
         if (_manager is null)
             return;
@@ -35,7 +35,7 @@ public sealed class NotificationService : INotificationService
             _ => TimeSpan.FromSeconds(3)
         };
 
-        _manager.Show(new Notification(title ?? type.ToString(),message,type,timeout));
+        _manager.Show(new Notification(title ?? type.ToString(), message, type, timeout));
     }
 
     // Backward-compatible convenience wrappers

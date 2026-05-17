@@ -62,7 +62,7 @@ public class App : Application
         collection.AddSingleton<ICryptographyService, CryptographyService>();
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<INotificationService, NotificationService>();
-        collection.AddSingleton<DialogService.IDialogService, DialogService>();
+        collection.AddSingleton<IDialogService, DialogService>();
         collection.AddSingleton<IThemeService, ThemeService>();
         collection.AddSingleton<IApplicationControlService, ApplicationControlService>();
         collection.AddSingleton<IUtils, Utils>();
