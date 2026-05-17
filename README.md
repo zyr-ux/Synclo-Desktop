@@ -4,13 +4,13 @@
 [![Framework](https://img.shields.io/badge/framework-.NET%2010.0-blue.svg)](https://dotnet.microsoft.com/)
 [![UI Library](https://img.shields.io/badge/UI-Avalonia%2011.3-orange.svg)](https://avaloniaui.net/)
 [![Database](https://img.shields.io/badge/database-SQLite-blue.svg)](https://sqlite.org/)
-[![License](https://img.shields.io/badge/license-GPL-green.svg)](#)
+[![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)](LICENSE)
 
 **Synclo** is a secure, real-time, cross-platform desktop clipboard synchronization utility built using **Avalonia UI** and **.NET 10**. It runs quietly in the background, automatically syncing copied text and clipboard history across all your logged-in devices. Engineering highlights include **end-to-end client-side encryption**, **fully platform-native OS services** (for clipboard monitoring, secure storage, and boot autostart), and a **highly optimized SQLite database pipeline** that isolates I/O tasks to avoid database locking.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 - **⚡ Real-Time WebSocket Synchronization**: Utilizes high-performance WebSockets (`IWebSocketService`) for instantaneous clipboard propagation across connected client devices.
 - **🔒 End-to-End Cryptography**: Implements military-grade client-side encryption. The remote servers never see your plaintext data or master password.
@@ -26,7 +26,7 @@
 
 ---
 
-## 🔒 Security Design Overview
+## Security Design Overview
 
 Synclo is architected on a **Zero-Knowledge** model. Your credentials and synced content are secured through multiple cryptographic layers:
 
@@ -45,7 +45,7 @@ Synclo is architected on a **Zero-Knowledge** model. Your credentials and synced
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -84,7 +84,7 @@ Synclo is architected on a **Zero-Knowledge** model. Your credentials and synced
 
 ---
 
-## 🛡️ License
+## License
 
-This project is licensed under the MIT License. Feel free to use, modify, and distribute according to the license terms.
+This project is licensed under the GPL-3.0 License. Feel free to use, modify, and distribute according to the license terms.
 
