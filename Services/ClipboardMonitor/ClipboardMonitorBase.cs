@@ -283,7 +283,7 @@ public abstract class ClipboardMonitorBase(
                 _lastClipboardHash = currentHash;
 
                 var text = clipboardText;
-                Task.Run(() => OnClipboardChanged?.Invoke(text));
+                _ = Task.Run(() => OnClipboardChanged?.Invoke(text));
             }
             catch (OperationCanceledException)
             {

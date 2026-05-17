@@ -71,10 +71,14 @@ public sealed class DeviceService(IApiService api, ISettingsService settings, IS
         {
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             var data = await JsonSerializer.DeserializeAsync<List<DeviceModel>>(fs, _options);
+            if (data == null) return [];
             var currentDeviceId = settings.Settings.device_id;
             foreach (var device in data)
             {
-                device.IsThisDevice = device.device_id == currentDeviceId;
+                if (device != null)
+                {
+                    device.IsThisDevice = device.device_id == currentDeviceId;
+                }
             }
             return data;
         }

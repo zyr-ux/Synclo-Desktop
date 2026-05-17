@@ -18,10 +18,10 @@ namespace Synclo.Factory
             => services.GetRequiredService<T>();
 
         public T Create<T, TArg>(TArg arg) where T : ViewModelBase
-            => ActivatorUtilities.CreateInstance<T>(services, arg);
+            => ActivatorUtilities.CreateInstance<T>(services, arg!);
 
         public T Create<T, TArg1, TArg2>(TArg1 arg1, TArg2 arg2)
             where T : ViewModelBase
-            => ActivatorUtilities.CreateInstance<T>(services, arg1, arg2);
+            => ActivatorUtilities.CreateInstance<T>(services, arg1!, arg2!);
     }
 }

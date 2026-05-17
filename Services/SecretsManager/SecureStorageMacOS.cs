@@ -8,6 +8,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Synclo.Services.SecretsManager;
 
+[System.Runtime.Versioning.SupportedOSPlatform("macos")]
 public sealed class SecureStorageMacOS : ISecureStorage
 {
     private const string ServiceName = "SyncloService";
@@ -250,9 +251,14 @@ public sealed class SecureStorageMacOS : ISecureStorage
         throw new InvalidOperationException($"macOS Keychain {operation} failed: {detail} (Status: {status})");
     }
 
-    private sealed class SafeCFHandle(IntPtr handle) : SafeHandleZeroOrMinusOneIsInvalid(true)
+    private sealed class SafeCFHandle : SafeHandleZeroOrMinusOneIsInvalid
     {
         public IntPtr Handle => handle;
+
+        public SafeCFHandle(IntPtr handle) : base(true)
+        {
+            SetHandle(handle);
+        }
 
         protected override bool ReleaseHandle()
         {

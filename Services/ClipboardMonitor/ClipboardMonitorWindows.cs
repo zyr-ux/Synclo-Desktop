@@ -7,6 +7,7 @@ using Synclo.Services.Utilities;
 
 namespace Synclo.Services.ClipboardMonitor;
 
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class ClipboardMonitorWindows(
     IClipboardProvider clipboardProvider,
     ILogger<ClipboardMonitorWindows> logger,

@@ -7,7 +7,7 @@ namespace Synclo.Models;
 /// </summary>
 public class SessionInfo
 {
-    public string device_id { get; set; }
+    public string device_id { get; set; } = string.Empty;
     public DateTime expiry { get; set; }
 }
 

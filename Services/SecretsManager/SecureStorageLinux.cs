@@ -10,6 +10,7 @@ using Tmds.DBus;
 
 namespace Synclo.Services.SecretsManager;
 
+[System.Runtime.Versioning.SupportedOSPlatform("linux")]
 public sealed class SecureStorageLinux : ISecureStorage, IDisposable
 {
     private const string ServiceName = "org.freedesktop.secrets";
@@ -300,13 +301,12 @@ public sealed class SecureStorageLinux : ISecureStorage, IDisposable
         var id = File.Exists("/etc/machine-id") ? File.ReadAllText("/etc/machine-id").Trim() : Environment.MachineName;
         var masterSeed = $"{id}:{Environment.UserName}:synclo-v1";
         var salt = Encoding.UTF8.GetBytes("synclo-linux-2025-salt");
-        using var kdf = new Rfc2898DeriveBytes(masterSeed, salt, 100000, HashAlgorithmName.SHA512);
-        return kdf.GetBytes(32);
+        return Rfc2898DeriveBytes.Pbkdf2(masterSeed, salt, 100000, HashAlgorithmName.SHA512, 32);
     }
 
     private string Encrypt(string plainText)
     {
-        using var aes = new AesGcm(_fallbackKey);
+        using var aes = new AesGcm(_fallbackKey, 16);
         var nonce = new byte[12];
         RandomNumberGenerator.Fill(nonce);
         var plainBytes = Encoding.UTF8.GetBytes(plainText);
@@ -323,7 +323,7 @@ public sealed class SecureStorageLinux : ISecureStorage, IDisposable
     private string Decrypt(string cipherText)
     {
         var data = Convert.FromBase64String(cipherText);
-        using var aes = new AesGcm(_fallbackKey);
+        using var aes = new AesGcm(_fallbackKey, 16);
         var plainBytes = new byte[data.Length - 28];
         aes.Decrypt(data.AsSpan(0, 12), data.AsSpan(28), data.AsSpan(12, 16), plainBytes);
         return Encoding.UTF8.GetString(plainBytes);

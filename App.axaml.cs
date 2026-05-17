@@ -75,10 +75,10 @@ public class App : Application
             var clipboardProvider = sp.GetRequiredService<IClipboardProvider>();
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var utils = sp.GetRequiredService<IUtils>();
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsWindows())
                 return new ClipboardMonitorWindows(clipboardProvider,
                     loggerFactory.CreateLogger<ClipboardMonitorWindows>(), utils);
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (OperatingSystem.IsMacOS())
                 return new ClipboardMonitorMacOS(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorMacOS>(),
                     utils);
             return new ClipboardMonitorLinux(clipboardProvider, loggerFactory.CreateLogger<ClipboardMonitorLinux>(),
@@ -87,9 +87,9 @@ public class App : Application
         collection.AddSingleton<IClipboardSyncService, ClipboardSyncService>();
         collection.AddSingleton<IStartupManager>(_ =>
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsWindows())
                 return new StartupManagerWindows();
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (OperatingSystem.IsMacOS())
                 return new StartupManagerMacOS();
             return new StartupManagerLinux();
         });
@@ -97,11 +97,13 @@ public class App : Application
         // Startup subsystem
         collection.AddSingleton<ISecureStorage>(_ =>
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsWindows())
                 return new SecureStorageWindows();
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (OperatingSystem.IsMacOS())
                 return new SecureStorageMacOS();
-            return new SecureStorageLinux();
+            if (OperatingSystem.IsLinux())
+                return new SecureStorageLinux();
+            throw new PlatformNotSupportedException("Unsupported operating system");
         });
 
         // Single instance manager (must be registered before building provider)

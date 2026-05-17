@@ -9,6 +9,7 @@ namespace Synclo.Services.Startup;
 /// Windows implementation of startup manager using Registry.
 /// Manages autostart via HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class StartupManagerWindows : IStartupManager
 {
     private const string RegistryKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";

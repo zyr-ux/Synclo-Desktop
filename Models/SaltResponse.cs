@@ -5,7 +5,7 @@ namespace Synclo.Models;
 /// </summary>
 public class SaltResponse
 {
-    public string salt { get; set; }
+    public string salt { get; set; } = string.Empty;
     public int kdf_version { get; set; }
 }
 

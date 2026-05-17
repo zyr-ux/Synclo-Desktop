@@ -88,13 +88,14 @@ public class ClipboardApiService(
             {
                 foreach (var entry in syncResponse.entries)
                 {
+                    if (entry == null) continue;
                     try
                     {
                         entry.plaintext = DecryptClipboardEntry(entry, masterKey);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, $"Failed to decrypt entry {entry?.id ?? "unknown"}, skipping");
+                        _logger.LogWarning(ex, $"Failed to decrypt entry {entry.id ?? "unknown"}, skipping");
                         entry.plaintext = null; // Mark as failed
                     }
                 }

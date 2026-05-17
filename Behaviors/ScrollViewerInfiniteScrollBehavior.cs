@@ -19,7 +19,6 @@ public class ScrollViewerInfiniteScrollBehavior : Behavior<Control>
     }
 
     private ScrollViewer? _scroller;
-    private IDisposable? _scrollSubscription;
 
     protected override void OnAttached()
     {
