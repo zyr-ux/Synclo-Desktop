@@ -26,21 +26,46 @@
 
 ---
 
-## Security Design Overview
+## 🔒 Truly Secure: How Synclo Protects Your Data (End-to-End Architecture)
 
-Synclo is architected on a **Zero-Knowledge** model. Your credentials and synced content are secured through multiple cryptographic layers:
+Synclo is designed from the ground up on a **Zero-Knowledge Model**. This means that **only you** can access your synchronized clipboard data. Neither the developers of Synclo, the servers routing your sync, nor any third-party interceptors can ever read your clipboard history. 
+
+Here is how Synclo guarantees your absolute privacy and seamless security in an easy-to-understand way:
+
+### 1. Locked Before It Leaves (Client-Side Encryption)
+The exact millisecond you copy text or image references on Device A, Synclo encrypts it *on your device* before it ever travels over the network.
+- **The Server is Blind**: The remote servers only receive, store, and route unreadable encrypted "envelopes". They do not possess the key to unlock them.
+- **Safe in Transit**: Even if someone intercepts your network traffic, all they see is random, undecipherable gibberish. Only your authorized devices hold the key to open the envelope.
+
+### 2. Your Password Never Leaves Your Device
+When you log in, your master password is never sent to the internet. Instead:
+- **The Mathematical Handshake**: Your device performs advanced mathematical computations locally to generate a secure "Authentication Badge" (used solely to log you in) and a separate, local "Wrapping Key" (used to securely lock your actual decryption keys).
+- **Zero Trust**: Because the server never knows your password or your wrapping key, it is physically impossible for the server (or a compromised server database) to decrypt your clipboard data.
+
+### 3. Fort Knox for Your Keys (Hardware-Level Protection)
+Your actual decryption keys are never stored in standard, vulnerable text or configuration files. Synclo integrates directly with your operating system's native, enterprise-grade secure vaults:
+- 🪟 **Windows**: Secured in the **Windows Credential Manager** (using hardware-backed DPAPI).
+- 🍏 **macOS**: Secured in the **macOS Keychain** (using Apple's native security framework).
+- 🐧 **Linux**: Secured in the **DBus Secret Service** (or a machine-specific hardware-encrypted fallback).
+
+---
+
+<details>
+<summary>🛠️ Technical Cryptographic Implementation Details (For Developers & Cryptographers)</summary>
+
+Synclo's cryptographic architecture is powered by standard, industry-vetted protocols:
 
 1. **Key Derivation (KDF)**:
-   - Powered by **Argon2id** (`Konscious.Security.Cryptography.Argon2`).
-   - Derives a base key from the user password and a unique salt.
-   - Leverages **HKDF-SHA256** to bifurcate the base key into two distinct keys:
+   - **Argon2id** (`Konscious.Security.Cryptography.Argon2`): Derives a base key from the user password and a unique local salt, providing state-of-the-art protection against hardware-accelerated dictionary attacks (GPU/ASIC cracking).
+   - **HKDF-SHA256**: Bifurcates the base key into two distinct cryptographically independent keys to prevent key reuse vulnerabilities:
      - `authKey`: Used to authenticate with the API (the raw password is never sent online).
-     - `wrappingKey`: Used to secure the Master Key.
+     - `wrappingKey`: Used strictly client-side to secure the Master Key.
 2. **Master Key Architecture**:
-   - A cryptographically secure random 32-byte key is generated locally.
+   - A cryptographically secure random 32-byte (256-bit) Master Key is generated locally.
    - All clipboard entries are encrypted/decrypted client-side using this key with **AES-256-GCM** (authenticated encryption with associated data of `clipboard_v1`).
    - The master key itself is wrapped/encrypted with the `wrappingKey` using **AES-256-GCM** before being backed up to the server.
-   - The master key is stored locally inside the OS's native secure vaults (Credential Manager on Windows, Keychain on macOS, Secret Service/Keyring on Linux).
+   - The master key is stored locally inside the OS's native secure vaults (Credential Manager on Windows, Keychain on macOS, Secret Service/Keyring on Linux) and wiped from RAM using `CryptographicOperations.ZeroMemory()` upon logout or key rotation.
+</details>
 
 
 ---
