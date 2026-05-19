@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Synclo.ViewModels;
 
@@ -6,22 +7,76 @@ namespace Synclo.Factory
 {
     public interface IViewModelFactory
     {
-        T Create<T>() where T : ViewModelBase;
-        T Create<T, TArg>(TArg arg) where T : ViewModelBase;
-        T Create<T, TArg1, TArg2>(TArg1 arg1, TArg2 arg2) where T : ViewModelBase;
+        T Create<T>(params object?[] args) where T : ViewModelBase;
+        void Release(ViewModelBase? viewModel);
     }
 
-
-    public sealed class ViewModelFactory(IServiceProvider services) : IViewModelFactory
+    public sealed class ViewModelFactory(IServiceProvider rootProvider) : IViewModelFactory
     {
-        public T Create<T>() where T : ViewModelBase
-            => services.GetRequiredService<T>();
+        private readonly ConcurrentDictionary<ViewModelBase, IServiceScope> _scopes = new();
 
-        public T Create<T, TArg>(TArg arg) where T : ViewModelBase
-            => ActivatorUtilities.CreateInstance<T>(services, arg!);
-
-        public T Create<T, TArg1, TArg2>(TArg1 arg1, TArg2 arg2)
+        public T Create<T>(params object?[] args)
             where T : ViewModelBase
-            => ActivatorUtilities.CreateInstance<T>(services, arg1!, arg2!);
+        {
+            var scope = rootProvider.CreateScope();
+
+            try
+            {
+                var vm = ActivatorUtilities.CreateInstance<T>(
+                    scope.ServiceProvider,
+                    (object[])args!)!;
+
+                _scopes.TryAdd(vm, scope);
+
+                return vm;
+            }
+            catch
+            {
+                scope.Dispose();
+                throw;
+            }
+        }
+
+        public void Release(ViewModelBase? viewModel)
+        {
+            if (viewModel is null)
+                return;
+
+            if (_scopes.TryRemove(viewModel, out var scope))
+            {
+                try
+                {
+                    if (viewModel is IDisposable disposable)
+                    {
+                        try { disposable.Dispose(); } catch { }
+                    }
+
+                    try
+                    {
+                        scope.Dispose();
+                    }
+                    catch
+                    {
+                        
+                    }
+                }
+                catch
+                {
+                    // Never throw during cleanup.
+                }
+            }
+            else if (viewModel is IDisposable disposable)
+            {
+                // Fallback for unmanaged/manual ViewModels not created by this factory.
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch
+                {
+                    
+                }
+            }
+        }
     }
 }

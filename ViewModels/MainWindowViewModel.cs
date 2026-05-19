@@ -4,12 +4,10 @@ using System.Net.NetworkInformation;
 using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Synclo.Factory;
-using Synclo.Services;
 using Synclo.Services.API;
 using Synclo.Services.Utilities;
 
@@ -171,6 +169,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ShowHome()
     {
         CurrentPage = NavigationPage.Home;
+        _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<HomeViewModel>();
     }
 
@@ -178,6 +177,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ShowSettings()
     {
         CurrentPage = NavigationPage.Settings;
+        _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<SettingsViewModel>();
     }
 
@@ -185,6 +185,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ShowAccount()
     {
         CurrentPage = NavigationPage.Account;
+        _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<AccountViewModel>();
     }
     
@@ -193,7 +194,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         _cts.Cancel();
         _timer.Dispose();
         _cts.Dispose();
-
-        (CurrentViewModel as IDisposable)?.Dispose();
+        _factory.Release(CurrentViewModel);
     }
 }

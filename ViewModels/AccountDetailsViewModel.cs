@@ -137,7 +137,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
             Avalonia.Application.Current?.ApplicationLifetime
                 as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
 
-        var viewModel = _factory.Create<ResetPasswordDialogViewModel, Action<bool?>>(res => dialog.Close(res));
+        var viewModel = _factory.Create<ResetPasswordDialogViewModel>((Action<bool?>)(res => dialog.Close(res)));
         dialog.DataContext = viewModel;
         
         var result = await dialog.ShowDialog<bool?>(desktop?.MainWindow!);
