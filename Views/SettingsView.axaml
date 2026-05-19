@@ -146,7 +146,7 @@
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource ForegroundL}" />
 
-                                <TextBlock Text="Whether the app should automatically launch when you log in."
+                                <TextBlock Text="Whether the app should automatically launch when you log in"
                                            FontFamily="{StaticResource Inconsolata-Medium}"
                                            FontSize="16"
                                            Margin="0,4,0,0"
