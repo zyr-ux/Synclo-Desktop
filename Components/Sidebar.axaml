@@ -60,7 +60,7 @@
     <!-- Hover -->
     <Style Selector="RadioButton.sidebar:pointerover:not(:checked)">
         <Setter Property="Background">
-            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.12" />
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.1" />
         </Setter>
     </Style>
 
