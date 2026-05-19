@@ -109,7 +109,7 @@
                                   Margin="0,0,10,0"
                                   HorizontalAlignment="Right"
                                   VerticalAlignment="Center"
-                                  Foreground="{DynamicResource PrimaryBackground}"
+                                  Foreground="{DynamicResource Accent}"
                                   Data="M1939 486L2029 576L1024 1581L19 576L109 486L1024 1401L1939 486Z" />
 
                         <Popup Name="PART_Popup"
@@ -145,22 +145,22 @@
         <Style Selector="^">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0 0 0 1" />
-            <Setter Property="Foreground" Value="{DynamicResource ForegroundD}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundL}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
             <Setter Property="CornerRadius" Value="0" />
         </Style>
 
         <!--  PointerOver State  -->
         <Style Selector="^:pointerover /template/ Border#Background">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
             <Setter Property="BorderThickness" Value="0 0 0 1" />
         </Style>
 
         <!--  Pressed State  -->
         <Style Selector="^:pressed /template/ Border#Background">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
             <Setter Property="BorderThickness" Value="0 0 0 1" />
         </Style>
 
@@ -189,7 +189,7 @@
 
             <Style Selector="^ /template/ Border#Background">
                 <Setter Property="Background" Value="Transparent" />
-                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBackground}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
                 <Setter Property="BorderThickness" Value="0 0 0 1" />
             </Style>
 

@@ -15,110 +15,153 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
 
-        <!-- All padding lives here -->
+        
         <Border Padding="20">
-            <StackPanel Orientation="Vertical"
-                        Spacing="20">
+            <StackPanel Orientation="Vertical" Spacing="20">
 
-                <!-- Theme -->
-                <Border Background="{DynamicResource Accent}"
-                        CornerRadius="8"
-                        Padding="16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <materialIcons:MaterialIcon
-                            Kind="PaletteOutline"
-                            Width="36"
-                            Height="36"
-                            Margin="0,0,16,0"
-                            VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundD}" />
+                <!-- Theme Selector -->
+                <Grid>
+                    <!-- background -->
+                    <Border Background="{DynamicResource SystemBaseHighColor}"
+                            CornerRadius="8"
+                            Opacity="0.05" />
+                    
+                    <!-- content -->
+                    <Border Padding="16"
+                            Background="Transparent">
+        
+                        <Grid ColumnDefinitions="Auto,*,Auto">
 
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Theme"
-                                       FontFamily="{StaticResource Inconsolata-Bold}"
-                                       FontSize="24"
-                                       Foreground="{DynamicResource ForegroundD}" />
-                            <TextBlock Text="Select theme to apply"
-                                       FontFamily="{StaticResource Inconsolata-Medium}"
-                                       FontSize="16"
-                                       Margin="0,4,0,0"
-                                       Foreground="{DynamicResource ForegroundD}" />
-                        </StackPanel>
+                            <materialIcons:MaterialIcon
+                                Kind="PaletteOutline"
+                                Width="36"
+                                Height="36"
+                                Margin="0,0,16,0"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource ForegroundL}" />
 
-                        <ComboBox Grid.Column="2"
-                                  Width="160"
-                                  VerticalAlignment="Center"
-                                  HorizontalContentAlignment="Left"
-                                  Padding="2"
-                                  FontFamily="{DynamicResource Inconsolata-Medium}"
-                                  ItemsSource="{Binding AvailableThemes}"
-                                  SelectedItem="{Binding SelectedTheme}" />
-                    </Grid>
-                </Border>
-                
-                <!-- Close Behavior -->
-                <Border Background="{DynamicResource Accent}"
-                        CornerRadius="8"
-                        Padding="16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <materialIcons:MaterialIcon
-                            Kind="CloseCircleOutline"
-                            Width="36"
-                            Height="36"
-                            Margin="0,0,16,0"
-                            VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundD}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Theme"
+                                           FontFamily="{StaticResource Inconsolata-Bold}"
+                                           FontSize="24"
+                                           Foreground="{DynamicResource ForegroundL}" />
 
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Close Behaviour"
-                                       FontFamily="{StaticResource Inconsolata-Bold}"
-                                       FontSize="24"
-                                       Foreground="{DynamicResource ForegroundD}" />
-                            <TextBlock Text="What happens when you close the window?"
-                                       FontFamily="{StaticResource Inconsolata-Medium}"
-                                       FontSize="16"
-                                       Margin="0,4,0,0"
-                                       Foreground="{DynamicResource ForegroundD}"
-                                       Opacity="0.7"/>
-                        </StackPanel>
+                                <TextBlock Text="Select theme to apply"
+                                           FontFamily="{StaticResource Inconsolata-Medium}"
+                                           FontSize="16"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource ForegroundL}"
+                                           Opacity="0.7"/>
+                            </StackPanel>
 
-                        <ComboBox Grid.Column="2"
-                                  Width="250"
-                                  VerticalAlignment="Center"
-                                  HorizontalContentAlignment="Left"
-                                  Padding="2"
-                                  FontFamily="{DynamicResource Inconsolata-Medium}"
-                                  ItemsSource="{Binding AvailableCloseBehaviors}"
-                                  SelectedItem="{Binding SelectedCloseBehavior}" />
-                    </Grid>
-                </Border>
-                
-                <!-- Start on boot -->
-                <Border Background="Transparent"
-                        CornerRadius="8"
-                        Padding="16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <materialIcons:MaterialIcon
-                            Kind="Laptop"
-                            Width="36"
-                            Height="36"
-                            Margin="0,0,16,0"
-                            VerticalAlignment="Center"
-                            Foreground="{DynamicResource ForegroundL}" />
-
-                        <TextBlock Grid.Column="1"
-                                   Text="Launch on System Startup"
-                                   FontFamily="{StaticResource Inconsolata-Bold}"
-                                   FontSize="24"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource ForegroundL}" />
-
-                        <ToggleSwitch Grid.Column="2"
-                                      IsChecked="{Binding IsStartOnBootEnabled}"
+                            <ComboBox Grid.Column="2"
+                                      Width="160"
                                       VerticalAlignment="Center"
-                                      Foreground="{DynamicResource ForegroundL}" />
-                    </Grid>
-                </Border>
+                                      HorizontalContentAlignment="Left"
+                                      Padding="2"
+                                      FontFamily="{DynamicResource Inconsolata-Medium}"
+                                      ItemsSource="{Binding AvailableThemes}"
+                                      SelectedItem="{Binding SelectedTheme}" />
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Close Behavior Selector -->
+                <Grid>
+                    
+                    <!-- background -->
+                    <Border Background="{DynamicResource SystemBaseHighColor}"
+                            CornerRadius="8"
+                            Opacity="0.05" />
+                    
+                    <!-- content -->
+                    <Border Padding="16"
+                            Background="Transparent">
+
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+
+                            <materialIcons:MaterialIcon
+                                Kind="CloseCircleOutline"
+                                Width="36"
+                                Height="36"
+                                Margin="0,0,16,0"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource ForegroundL}" />
+
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center">
+
+                                <TextBlock Text="Close Behaviour"
+                                           FontFamily="{StaticResource Inconsolata-Bold}"
+                                           FontSize="24"
+                                           Foreground="{DynamicResource ForegroundL}" />
+
+                                <TextBlock Text="What happens when you close the window?"
+                                           FontFamily="{StaticResource Inconsolata-Medium}"
+                                           FontSize="16"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource ForegroundL}"
+                                           Opacity="0.7" />
+                            </StackPanel>
+
+                            <ComboBox Grid.Column="2"
+                                      Width="250"
+                                      VerticalAlignment="Center"
+                                      HorizontalContentAlignment="Left"
+                                      Padding="2"
+                                      FontFamily="{DynamicResource Inconsolata-Medium}"
+                                      ItemsSource="{Binding AvailableCloseBehaviors}"
+                                      SelectedItem="{Binding SelectedCloseBehavior}" />
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Start on boot Toggle -->
+                <Grid>
+                    <!-- background -->
+                    <Border Background="{DynamicResource SystemBaseHighColor}"
+                            CornerRadius="8"
+                            Opacity="0.05" />
+
+                    <!-- content -->
+                    <Border Padding="16"
+                            Background="Transparent">
+
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+
+                            <materialIcons:MaterialIcon
+                                Kind="Laptop"
+                                Width="36"
+                                Height="36"
+                                Margin="0,0,16,0"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource ForegroundL}" />
+
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center">
+
+                                <TextBlock Text="Launch at Startup"
+                                           FontFamily="{StaticResource Inconsolata-Bold}"
+                                           FontSize="24"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource ForegroundL}" />
+
+                                <TextBlock Text="If the app should automatically launch when you log in."
+                                           FontFamily="{StaticResource Inconsolata-Medium}"
+                                           FontSize="16"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource ForegroundL}"
+                                           Opacity="0.7"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding IsStartOnBootEnabled}"
+                                          VerticalAlignment="Center"
+                                          Foreground="{DynamicResource ForegroundL}" />
+                        </Grid>
+                    </Border>
+                </Grid>
 
             </StackPanel>
         </Border>
