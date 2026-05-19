@@ -38,7 +38,7 @@ public sealed class AccountService : IAccountService
     private readonly INotificationService _notificationService;
     
     // Flag to immediately reflect logout state before secure storage is cleared
-    private volatile bool _isLoggingOut = false;
+    private volatile bool _isLoggingOut;
 
     public AccountService(
         IApiService api,
@@ -175,10 +175,8 @@ public sealed class AccountService : IAccountService
                 os = _utils.GetClientOS()
             };
 
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/login")
-            {
-                Content = _api.Serialize(req)
-            };
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/login");
+            httpReq.Content = _api.Serialize(req);
             using var res = await _http.SendAsync(httpReq, ct);
             var content = await res.Content.ReadAsStringAsync(ct);
 
@@ -220,7 +218,22 @@ public sealed class AccountService : IAccountService
             _settings.Save();
 
             // Notify subscribers (e.g., ClipboardSyncService) of successful login
-            if (OnLogin != null) await OnLogin.Invoke();
+            if (OnLogin != null)
+            {
+                var invocationList = OnLogin.GetInvocationList();
+                foreach (var d in invocationList)
+                {
+                    try
+                    {
+                        var handler = (Func<Task>)d;
+                        await handler();
+                    }
+                    catch
+                    {
+                        // Swallow subscriber exceptions to avoid failing login flow
+                    }
+                }
+            }
             
             // Connect WebSocket for real-time sync
             _ = _webSocketService.ConnectAsync();
@@ -303,7 +316,22 @@ public sealed class AccountService : IAccountService
             _settings.Save();
 
             // Notify subscribers (e.g., ClipboardSyncService) of successful registration
-            if (OnLogin != null) await OnLogin.Invoke();
+            if (OnLogin != null)
+            {
+                var invocationList = OnLogin.GetInvocationList();
+                foreach (var d in invocationList)
+                {
+                    try
+                    {
+                        var handler = (Func<Task>)d;
+                        await handler();
+                    }
+                    catch
+                    {
+                        // Swallow subscriber exceptions to avoid failing registration flow
+                    }
+                }
+            }
             
             // Connect WebSocket for real-time sync
             _ = _webSocketService.ConnectAsync();
@@ -388,19 +416,37 @@ public sealed class AccountService : IAccountService
 
     public async Task LogoutAsync()
     {
-        // Set flag immediately to make IsAuthenticatedAsync() return false
-        _isLoggingOut = true;
         
         if (OnLogout != null)
         {
-            await OnLogout.Invoke();
+            var invocationList = OnLogout.GetInvocationList();
+            foreach (var d in invocationList)
+            {
+                try
+                {
+                    var handler = (Func<Task>)d;
+                    await handler();
+                }
+                catch
+                {
+                    // Swallow subscriber exceptions to avoid failing logout flow
+                }
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(_settings.Settings.device_id) && await IsAuthenticatedAsync())
+        var deviceId = _settings.Settings.device_id;
+        if (!string.IsNullOrWhiteSpace(deviceId))
         {
-            try { await _deviceService.DeleteDeviceAsync(_settings.Settings.device_id); }
-            catch { }
+            try
+            {
+                await _deviceService.DeleteDeviceAsync(deviceId);
+            }
+            catch
+            {
+                 /* Swallow errors to ensure logout proceeds */
+            }
         }
+        _isLoggingOut = true;
 
         // Fix: Explicitly disconnect WebSocket to fail-safe against orphaned connections
         await _webSocketService.DisconnectAsync();
