@@ -273,7 +273,6 @@ public sealed class WebSocketService : IWebSocketService
         if (_disposed) return;
 
         await DisconnectInternal();
-        OnDisconnected?.Invoke();
 
         if (_manualDisconnect) return;
 

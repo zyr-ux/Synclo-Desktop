@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -135,6 +136,8 @@ public class ClipboardSyncService(
     private bool _disposed;
     private volatile bool _isInitialized;
 
+    private void HandleRepositoryDataChanged() => OnHistoryUpdated?.Invoke();
+
 
     public async Task InitializeAsync()
     {
@@ -177,7 +180,7 @@ public class ClipboardSyncService(
                 _webSocketService.OnError += OnWebSocketError;
                 _accountService.OnLogin += OnAccountLoggedIn;
                 _accountService.OnLogout += OnAccountLoggedOut;
-                _repository.OnDataChanged += () => OnHistoryUpdated?.Invoke();
+                _repository.OnDataChanged += HandleRepositoryDataChanged;
 
                 _logger.LogInformation("Event subscriptions completed");
 
@@ -318,23 +321,14 @@ public class ClipboardSyncService(
         try
         {
             _logger.LogInformation("Starting graceful shutdown...");
+
+            // Stop source events first so no new clipboard entries are queued.
+            await _monitor.StopAsync().ConfigureAwait(false);
             
             // Stop accepting new clipboard events
             _clipboardChannel.Writer.Complete();
             _logger.LogInformation("Clipboard channel writer completed");
-            
-            // Cancel shutdown token to signal consumer to stop
-            _shutdownCts.Cancel();
-            
-            // Bug #1.2 fix: Wait for pending uploads to complete
-            if (!_pendingUploads.IsEmpty)
-            {
-                _logger.LogInformation($"Waiting for {_pendingUploads.Count} pending uploads to complete...");
-                var pendingTasks = _pendingUploads.Values.ToList();
-                var uploadTimeout = TimeSpan.FromSeconds(10); // Generous timeout for uploads
-                await Task.WhenAny(Task.WhenAll(pendingTasks), Task.Delay(uploadTimeout));
-            }
-            
+
             // Bug #8 fix: Await consumer task with timeout
             if (_consumerTask != null)
             {
@@ -348,11 +342,17 @@ public class ClipboardSyncService(
                 else
                 {
                     _logger.LogWarning($"Consumer task did not complete within {ShutdownTimeoutSeconds}s timeout");
+                    _shutdownCts.Cancel();
                 }
             }
-
-            // Stop clipboard monitor
-            await _monitor.StopAsync().ConfigureAwait(false);
+            
+            if (!_pendingUploads.IsEmpty)
+            {
+                _logger.LogInformation($"Waiting for {_pendingUploads.Count} pending uploads to complete...");
+                var pendingTasks = _pendingUploads.Values.ToList();
+                var uploadTimeout = TimeSpan.FromSeconds(10);
+                await Task.WhenAny(Task.WhenAll(pendingTasks), Task.Delay(uploadTimeout));
+            }
 
             _logger.LogInformation("ClipboardSyncService shutdown completed");
         }
@@ -377,6 +377,9 @@ public class ClipboardSyncService(
             _webSocketService.OnError -= OnWebSocketError;
             _accountService.OnLogin -= OnAccountLoggedIn;
             _accountService.OnLogout -= OnAccountLoggedOut;
+            _repository.OnDataChanged -= HandleRepositoryDataChanged;
+
+            ClearMasterKeyCache();
 
             _refreshLock.Dispose();
             // _ackLock.Dispose(); // Removed
@@ -416,67 +419,79 @@ public class ClipboardSyncService(
             
             // Track the max updated_at seen in this sync session to update last_sync at the end
             DateTime? maxUpdatedAt = since;
+            var resetAttempted = false;
 
-            try 
+            while (true)
             {
-                while (hasMore)
+                try 
                 {
-                    if (_shutdownCts.IsCancellationRequested) break;
-
-                    var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
-                        since: since,
-                        limit: DefaultSyncPageSize,
-                        offset: currentOffset
-                    ).ConfigureAwait(false);
-
-                    if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
+                    while (hasMore)
                     {
+                        if (_shutdownCts.IsCancellationRequested) break;
+
+                        var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
+                            since: since,
+                            limit: DefaultSyncPageSize,
+                            offset: currentOffset
+                        ).ConfigureAwait(false);
+
+                        if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
+                        {
+                            break;
+                        }
+
+                        await ProcessSyncBatch(syncResponse.entries, masterKey);
+
+                        // Track max updated_at for next sync
+                        foreach (var entry in syncResponse.entries)
+                        {
+                            if (entry.updated_at > (maxUpdatedAt ?? DateTime.MinValue))
+                            {
+                                maxUpdatedAt = entry.updated_at;
+                            }
+                        }
+
+                        currentOffset = syncResponse.next_offset;
+                        hasMore = syncResponse.has_more;
+                        totalSynced += syncResponse.entries.Count;
+                        
+                        _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
+                    }
+
+                    // Update last_sync only if we successfully synced everything
+                    if (maxUpdatedAt > since || (since == null && maxUpdatedAt != null))
+                    {
+                         _settingsService.Settings.last_sync = maxUpdatedAt;
+                         _settingsService.Save();
+                    }
+                    
+                    if (totalSynced > 0)
+                    {
+                        _logger.LogInformation($"Sync completed: {totalSynced} total entries synced. New last_sync: {maxUpdatedAt}");
+                    }
+
+                    break;
+                }
+                catch (HttpRequestException ex) when (ex.Message.Contains("410") || ex.StatusCode == System.Net.HttpStatusCode.Gone)
+                {
+                    if (resetAttempted)
+                    {
+                        _logger.LogError("Sync state expired repeatedly (410 Gone) after reset. Aborting sync attempt.");
                         break;
                     }
 
-                    await ProcessSyncBatch(syncResponse.entries, masterKey);
+                    _logger.LogWarning("Sync state expired (410 Gone). Wiping local database and performing fresh sync.");
+                    await _repository.ClearAllAsync();
+                    _settingsService.Settings.last_sync = null;
+                    _settingsService.Save();
 
-                    // Track max updated_at for next sync
-                    foreach (var entry in syncResponse.entries)
-                    {
-                        if (entry.updated_at > (maxUpdatedAt ?? DateTime.MinValue))
-                        {
-                            maxUpdatedAt = entry.updated_at;
-                        }
-                    }
-
-                    currentOffset = syncResponse.next_offset;
-                    hasMore = syncResponse.has_more;
-                    totalSynced += syncResponse.entries.Count;
-                    
-                    _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
+                    resetAttempted = true;
+                    since = null;
+                    currentOffset = 0;
+                    hasMore = true;
+                    totalSynced = 0;
+                    maxUpdatedAt = null;
                 }
-
-                // Update last_sync only if we successfully synced everything
-                if (maxUpdatedAt > since || (since == null && maxUpdatedAt != null))
-                {
-                     _settingsService.Settings.last_sync = maxUpdatedAt;
-                     _settingsService.Save();
-                }
-                
-                if (totalSynced > 0)
-                {
-                    _logger.LogInformation($"Sync completed: {totalSynced} total entries synced. New last_sync: {maxUpdatedAt}");
-                }
-            }
-            catch (HttpRequestException ex) when (ex.Message.Contains("410") || ex.StatusCode == System.Net.HttpStatusCode.Gone)
-            {
-                _logger.LogWarning("Sync state expired (410 Gone). Wiping local database and performing fresh sync.");
-                
-                // Hard Reset
-                await _repository.ClearAllAsync();
-                _settingsService.Settings.last_sync = null;
-                _settingsService.Save();
-                
-                // Trigger fresh sync immediately
-                // We use a recursive call here, but ensure we don't infinite loop by clearing last_sync first
-                // The 'since' variable in the NEW call will be null.
-                await SyncInBackgroundAsync(); 
             }
         }
         catch (Exception ex)
@@ -732,6 +747,10 @@ public class ClipboardSyncService(
         _masterKeyLock.Wait();
         try
         {
+            if (_cachedMasterKey != null)
+            {
+                CryptographicOperations.ZeroMemory(_cachedMasterKey);
+            }
             _cachedMasterKey = null;
             _logger.LogDebug("Master key cache cleared");
         }
