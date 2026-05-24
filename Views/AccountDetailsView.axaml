@@ -5,8 +5,7 @@
              xmlns:converters="using:Synclo.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="Synclo.Views.AccountDetailsView"
-             x:DataType="vm:AccountDetailsViewModel"
-             Background="{DynamicResource PrimaryBackground}">
+             x:DataType="vm:AccountDetailsViewModel">
 
     <UserControl.Resources>
         <converters:OSToIconConverter x:Key="OsToIconConverter" />

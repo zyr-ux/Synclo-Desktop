@@ -5,8 +5,7 @@
              xmlns:vm="using:Synclo.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
              x:Class="Synclo.Views.LoginView"
-             x:DataType="vm:LoginViewModel"
-             Background="{DynamicResource PrimaryBackground}">
+             x:DataType="vm:LoginViewModel">
 
     <Grid HorizontalAlignment="Center"
           VerticalAlignment="Center"

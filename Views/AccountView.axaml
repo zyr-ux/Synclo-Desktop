@@ -6,8 +6,7 @@
              xmlns:views="using:Synclo.Views"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
              x:Class="Synclo.Views.AccountView"
-             x:DataType="vm:AccountViewModel"
-             Background="{DynamicResource PrimaryBackground}">
+             x:DataType="vm:AccountViewModel">
 
     <UserControl.DataTemplates>
         <DataTemplate DataType="vm:LoginViewModel">

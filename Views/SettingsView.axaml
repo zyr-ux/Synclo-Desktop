@@ -8,8 +8,7 @@
              d:DesignWidth="800"
              d:DesignHeight="450"
              x:Class="Synclo.Views.SettingsView"
-             x:DataType="vm:SettingsViewModel"
-             Background="{DynamicResource PrimaryBackground}">
+             x:DataType="vm:SettingsViewModel">
 
     <!-- ScrollViewer is FLUSH to app edges -->
     <ScrollViewer VerticalScrollBarVisibility="Auto"
