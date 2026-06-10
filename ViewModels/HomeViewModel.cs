@@ -107,6 +107,15 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private void MergeNewEntries(IReadOnlyList<HistoryItemModel> newEntries)
     {
         var existing = HistoryEntries;
+        int oldPageBoundary = Math.Min(PageSize, existing.Count);
+        var newIdSet = new HashSet<string>(newEntries.Select(e => e.Id));
+        var removedIds = new HashSet<string>();
+        for (int i = 0; i < oldPageBoundary; i++)
+        {
+            if (!newIdSet.Contains(existing[i].Id))
+                removedIds.Add(existing[i].Id);
+        }
+
         int newIndex = 0;
 
         while (newIndex < newEntries.Count)
@@ -175,6 +184,15 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 }
                 
                 newIndex++;
+            }
+        }
+
+        if (removedIds.Count > 0)
+        {
+            for (int i = existing.Count - 1; i >= newEntries.Count; i--)
+            {
+                if (removedIds.Contains(existing[i].Id))
+                    existing.RemoveAt(i);
             }
         }
     }
