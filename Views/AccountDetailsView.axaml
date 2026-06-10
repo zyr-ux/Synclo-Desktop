@@ -22,7 +22,7 @@
                     <StackPanel
                         Orientation="Horizontal"
                         Spacing="10">
-                        <TextBlock Text="Logged in as:"
+                        <TextBlock Text="Welcome,"
                                    FontSize="36"
                                    Foreground="{DynamicResource Accent}"
                                    FontFamily="{DynamicResource Inconsolata-Bold}" />
