@@ -51,12 +51,12 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         _settingsService = settingsService;
 
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
-        _accountService.OnLogin += async () => await UpdateHomeStatusAsync();
-        _accountService.OnLogout += async () =>
+        _accountService.OnLogin += () => Dispatcher.UIThread.InvokeAsync(UpdateHomeStatusAsync);
+        _accountService.OnLogout += () => Dispatcher.UIThread.InvokeAsync(async () =>
         {
             HistoryEntries.Clear();
             await UpdateHomeStatusAsync();
-        };
+        });
 
         Task.Run(async () =>
         {
@@ -107,15 +107,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private void MergeNewEntries(IReadOnlyList<HistoryItemModel> newEntries)
     {
         var existing = HistoryEntries;
-        int oldPageBoundary = Math.Min(PageSize, existing.Count);
-        var newIdSet = new HashSet<string>(newEntries.Select(e => e.Id));
-        var removedIds = new HashSet<string>();
-        for (int i = 0; i < oldPageBoundary; i++)
-        {
-            if (!newIdSet.Contains(existing[i].Id))
-                removedIds.Add(existing[i].Id);
-        }
-
         int newIndex = 0;
 
         while (newIndex < newEntries.Count)
@@ -187,13 +178,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             }
         }
 
-        if (removedIds.Count > 0)
+        while (existing.Count > newEntries.Count)
         {
-            for (int i = existing.Count - 1; i >= newEntries.Count; i--)
-            {
-                if (removedIds.Contains(existing[i].Id))
-                    existing.RemoveAt(i);
-            }
+            existing.RemoveAt(existing.Count - 1);
         }
     }
 
@@ -318,23 +305,20 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     // Updates the home page status message based on login state and history entries
     private async Task UpdateHomeStatusAsync()
     {
-        await Dispatcher.UIThread.InvokeAsync(async () =>
-        {
-            _isLoggedIn = await _accountService.IsAuthenticatedAsync();
+        _isLoggedIn = await _accountService.IsAuthenticatedAsync();
 
-            switch (_isLoggedIn)
-            {
-                case false:
-                    HomeStatusMessage = "You are not logged in. Pls log in to use Synclo!";
-                    break;
-                case true when HistoryEntries.Count == 0:
-                    HomeStatusMessage = "Looks like this is empty! Copy something rn!";
-                    break;
-                default:
-                    HomeStatusMessage = null;
-                    break;
-            }
-        });
+        switch (_isLoggedIn)
+        {
+            case false:
+                HomeStatusMessage = "You are not logged in. Pls log in to use Synclo!";
+                break;
+            case true when HistoryEntries.Count == 0:
+                HomeStatusMessage = "Looks like this is empty! Copy something rn!";
+                break;
+            default:
+                HomeStatusMessage = null;
+                break;
+        }
     }
 
     // Cleans up resources and unregisters event handlers
