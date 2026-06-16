@@ -3,7 +3,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-             xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="clr-namespace:Synclo.ViewModels"
              xmlns:models="clr-namespace:Synclo.Models"
              xmlns:behaviors="clr-namespace:Synclo.Behaviors"
@@ -63,8 +62,6 @@
             <Interaction.Behaviors>
                 <!-- Infinite Scroll Behavior adapted for ListBox internal ScrollViewer -->
                 <behaviors:ScrollViewerInfiniteScrollBehavior Command="{Binding LoadMoreCommand}" />
-                <!-- Smooth Scrolling Behavior wrapper -->
-                <behaviors:ListBoxSmoothScrollBehavior />
             </Interaction.Behaviors>
 
             <ListBox.ItemTemplate>

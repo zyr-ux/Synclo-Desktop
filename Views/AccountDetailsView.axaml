@@ -1,6 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="using:Synclo.ViewModels"
              xmlns:converters="using:Synclo.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
@@ -57,9 +56,6 @@
                     <ScrollViewer MaxHeight="250"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <Interaction.Behaviors>
-                            <ia:VerticalScrollViewerAnimatedBehavior />
-                        </Interaction.Behaviors>
 
                         <ItemsControl ItemsSource="{Binding Devices}">
                             <ItemsControl.ItemsPanel>

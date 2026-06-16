@@ -1,16 +1,12 @@
 using System;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Notifications;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
-using Synclo.Services;
 using Synclo.Services.ClipboardMonitor;
-using Synclo.Services.ClipboardService;
 using Synclo.Services.Utilities;
 using Synclo.Themes;
 using Synclo.ViewModels;
@@ -20,9 +16,9 @@ namespace Synclo;
 
 public class App : Application
 {
-    private IServiceProvider? _services;
-    private MainWindow? _mainWindow;
     private IApplicationControlService? _appControl;
+    private MainWindow? _mainWindow;
+    private IServiceProvider? _services;
 
     public override void Initialize()
     {
@@ -60,7 +56,7 @@ public class App : Application
         instanceManager.SignalReceived += () => _appControl.ShowMainWindow();
 
         // 6. Handle Tray Icon Visibility
-        settingsService.SettingsChanged += s => 
+        settingsService.SettingsChanged += s =>
         {
             Dispatcher.UIThread.InvokeAsync(() => UpdateTrayIconVisibility(s.minimize_to_tray));
         };
@@ -69,7 +65,6 @@ public class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            DisableAvaloniaDataAnnotationValidation();
 
             var mainVm = _services.GetRequiredService<MainWindowViewModel>();
             _mainWindow = new MainWindow { DataContext = mainVm };
@@ -87,15 +82,14 @@ public class App : Application
 
             // Set host window on ClipboardProvider
             if (_services.GetService<IClipboardProvider>() is AvaloniaClipboardProvider provider)
-            {
                 provider.SetHostWindow(_mainWindow);
-            }
 
             // Determine autostart hidden window states
             var isAutostart = desktop.Args?.Contains("--autostart") ?? false;
             if (isAutostart)
             {
-                var startHidden = settingsService.Settings.background_sync_enabled || settingsService.Settings.minimize_to_tray;
+                var startHidden = settingsService.Settings.background_sync_enabled ||
+                                  settingsService.Settings.minimize_to_tray;
                 if (!startHidden) desktop.MainWindow = _mainWindow;
             }
             else
@@ -135,28 +129,26 @@ public class App : Application
         }
     }
 
-    private void OnExitClicked(object? sender, EventArgs e) => _appControl?.Shutdown();
-    private void OnShowHideClicked(object? sender, EventArgs e) => _appControl?.ToggleMainWindow();
-    private void OnSettingsClicked(object? sender, EventArgs e) => _appControl?.ShowSettings();
+    private void OnExitClicked(object? sender, EventArgs e)
+    {
+        _appControl?.Shutdown();
+    }
+
+    private void OnShowHideClicked(object? sender, EventArgs e)
+    {
+        _appControl?.ToggleMainWindow();
+    }
+
+    private void OnSettingsClicked(object? sender, EventArgs e)
+    {
+        _appControl?.ShowSettings();
+    }
 
     private void UpdateTrayIconVisibility(bool isVisible)
     {
         var icons = TrayIcon.GetIcons(this);
         if (icons == null) return;
 
-        foreach (var icon in icons)
-        {
-            icon.IsVisible = isVisible;
-        }
-    }
-
-    private void DisableAvaloniaDataAnnotationValidation()
-    {
-        var dataValidationPluginsToRemove = BindingPlugins.DataValidators
-            .OfType<DataAnnotationsValidationPlugin>()
-            .ToArray();
-
-        foreach (var plugin in dataValidationPluginsToRemove)
-            BindingPlugins.DataValidators.Remove(plugin);
+        foreach (var icon in icons) icon.IsVisible = isVisible;
     }
 }

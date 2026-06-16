@@ -7,12 +7,27 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://Synclo/Themes/LightTheme.axaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!--This fixes the avalonia title bar buttons hover and pressed background. fix found from this GitHub issues page https://github.com/AvaloniaUI/Avalonia/issues/14596 -->
+            <SolidColorBrush
+                x:Key="CaptionButtonBackground"
+                Color="{DynamicResource SystemBaseLowColor}" />
+            <SolidColorBrush
+                x:Key="CaptionButtonBorderBrush"
+                Color="{DynamicResource SystemBaseMediumLowColor}" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://Synclo/Themes/DarkTheme.axaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <SolidColorBrush
+                x:Key="CaptionButtonBackground"
+                Color="{DynamicResource SystemBaseLowColor}" />
+            <SolidColorBrush
+                x:Key="CaptionButtonBorderBrush"
+                Color="{DynamicResource SystemBaseMediumLowColor}" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>
