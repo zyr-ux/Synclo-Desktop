@@ -68,6 +68,7 @@ public class App : Application
 
             var mainVm = _services.GetRequiredService<MainWindowViewModel>();
             _mainWindow = new MainWindow { DataContext = mainVm };
+            themeService.ApplyMica(settingsService.Settings.is_mica_enabled, _mainWindow);
             _mainWindow.Initialize(_appControl);
             _appControl.SetWindow(_mainWindow);
 

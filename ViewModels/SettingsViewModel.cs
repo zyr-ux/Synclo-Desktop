@@ -23,6 +23,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
     [ObservableProperty] private bool _isStartOnBootEnabled;
+    [ObservableProperty] private bool _isMicaEnabled;
+    
+    public bool IsMicaToggleVisible => OperatingSystem.IsWindows() && Environment.OSVersion.Version.Build >= 22000;
     
     public List<string> AvailableThemes { get; } = ["System", "Light", "Dark"];
     
@@ -42,12 +45,20 @@ public partial class SettingsViewModel : ViewModelBase
         _startupManager = startupManager;
         
         SelectedTheme = _settings.Settings.Theme;
+        IsMicaEnabled = _settings.Settings.is_mica_enabled;
         
         // Load start on boot status
         _ = LoadStartOnBootStatusAsync();
         
         // Load other settings
         InitializeCloseBehavior();
+    }
+
+    partial void OnIsMicaEnabledChanged(bool value)
+    {
+        _settings.Settings.is_mica_enabled = value;
+        _settings.Save();
+        _themeService.ApplyMica(value);
     }
 
     private async Task LoadStartOnBootStatusAsync()
@@ -65,6 +76,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnSelectedThemeChanged(string value)
     {
         _themeService.ApplyTheme(value);
+        _themeService.ApplyMica(_isMicaEnabled);
         _settings.Settings.Theme = value;
         _settings.Save();
     }

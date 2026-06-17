@@ -13,8 +13,7 @@
         WindowStartupLocation="CenterScreen"
         MinWidth="200"
         MinHeight="350"
-        TransparencyLevelHint="Mica"
-        Background="Transparent"
+        Background="{DynamicResource PrimaryBackground}"
         ExtendClientAreaToDecorationsHint="True"
         SystemDecorations="Full">
 
@@ -121,10 +120,11 @@
         </Border>
 
         <!-- Main content -->
-        <Border Grid.Column="1"
+        <Border x:Name="ContentBorder"
+                Grid.Column="1"
                 Margin="0,40,0,0"
                 CornerRadius="10 0 0 0"
-                Background="#10FFFFFF"
+                Background="{DynamicResource SecondaryBackground}"
                 ClipToBounds="True"
                 BorderBrush="{DynamicResource Border}"
                 BorderThickness="1">

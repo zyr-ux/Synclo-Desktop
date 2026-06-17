@@ -12,5 +12,7 @@
     <SolidColorBrush x:Key="Border" 
                      Color="{DynamicResource SystemBaseHighColor}" 
                      Opacity="0.06" />
+    <SolidColorBrush x:Key="MicaWindowBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="MicaContentBackground" Color="White" Opacity="0.06" />
 
 </ResourceDictionary>

@@ -171,6 +171,57 @@
                         </Grid>
                     </Border>
                 </Grid>
+ 
+                <!-- Mica Toggle (Windows 11 only) -->
+                <Grid IsVisible="{Binding IsMicaToggleVisible}">
+                    <!-- background -->
+                    <Border Background="{DynamicResource SystemBaseHighColor}"
+                            CornerRadius="8"
+                            Opacity="0.05" />
+
+                    <!-- content -->
+                    <Border Padding="16"
+                            Background="Transparent"
+                            BorderBrush="{DynamicResource Border}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+
+                            <materialIcons:MaterialIcon
+                                Kind="Blur"
+                                Width="36"
+                                Height="36"
+                                Margin="0,0,16,0"
+                                VerticalAlignment="Center"
+                                Foreground="{DynamicResource Foreground}" />
+
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center">
+
+                                <TextBlock Text="Mica Backdrop"
+                                           FontFamily="{StaticResource Inconsolata-Bold}"
+                                           FontSize="24"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Foreground}" />
+
+                                <TextBlock Text="Enable Windows 11 Mica translucent window effect"
+                                           FontFamily="{StaticResource Inconsolata-Medium}"
+                                           FontSize="16"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource Foreground}"
+                                           Opacity="0.7"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding IsMicaEnabled}"
+                                          VerticalAlignment="Center"
+                                          FontFamily="{StaticResource Inconsolata-Medium}"
+                                          Foreground="{DynamicResource Foreground}" />
+                        </Grid>
+                    </Border>
+                </Grid>
 
             </StackPanel>
         </Border>
