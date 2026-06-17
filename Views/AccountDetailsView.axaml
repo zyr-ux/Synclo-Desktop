@@ -56,7 +56,10 @@
 
                     <!-- content -->
                     <Border Padding="20"
-                            Background="Transparent">
+                            Background="Transparent"
+                            BorderBrush="{DynamicResource Border}"
+                            BorderThickness="1"
+                            CornerRadius="5">
 
                         <!-- ONLY scrollable area -->
                         <ScrollViewer MaxHeight="250"

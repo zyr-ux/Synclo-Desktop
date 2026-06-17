@@ -9,6 +9,8 @@
     <SolidColorBrush x:Key="StatusOnline" Color="#00FF00" />
     <SolidColorBrush x:Key="StatusOffline" Color="#FF5252" />
     <SolidColorBrush x:Key="StatusNoInternet" Color="#FFB74D" />
-    <SolidColorBrush x:Key="Border" Color="#191A1C" />
+    <SolidColorBrush x:Key="Border" 
+                     Color="{DynamicResource SystemBaseHighColor}" 
+                     Opacity="0.06" />
 
 </ResourceDictionary>
