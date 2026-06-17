@@ -13,8 +13,8 @@
 
     <Border Background="{DynamicResource PrimaryBackground}"
             CornerRadius="5" 
-            BorderBrush="{DynamicResource Accent}" 
-            BorderThickness="0"
+            BorderBrush="{DynamicResource Border}" 
+            BorderThickness="1"
             BoxShadow="0 10 20 0 #40000000, 0 -4 14 0 #22000000, 0 2 10 0 #20000000"
             Padding="15"
             Margin="20">
@@ -23,7 +23,8 @@
             <TextBlock Grid.Row="0" 
                        Name="TitleText"
                        Text="Confirm Action" 
-                       FontSize="28" 
+                       FontSize="28"
+                       TextAlignment="Center"
                        FontFamily="{DynamicResource Inconsolata-Bold}" 
                        Foreground="{DynamicResource Foreground}"/>
 

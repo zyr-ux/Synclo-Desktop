@@ -34,8 +34,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IAccountService _accountService;
     private readonly IApiService _apiService;
     private readonly IWebSocketService _webSocketService;
+    private readonly IDialogService _dialogService;
+    
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private ConnectionStatus _connectionStatus = ConnectionStatus.Online;
+    [ObservableProperty] private bool _isDialogOpen;
     [ObservableProperty, 
     NotifyPropertyChangedFor(nameof(IsHomePage)), 
     NotifyPropertyChangedFor(nameof(IsAccountPage)), 
@@ -56,16 +59,27 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         INotificationService notificationService,
         IAccountService accountService,
         IApiService apiService,
-        IWebSocketService webSocketService)
+        IWebSocketService webSocketService,
+        IDialogService dialogService)
     {
         _factory = factory;
         _notificationService = notificationService;
         _accountService = accountService;
         _apiService = apiService;
         _webSocketService = webSocketService;
+        _dialogService = dialogService;
+        
+        IsDialogOpen = _dialogService.IsDialogOpen;
+        _dialogService.IsDialogOpenChanged += OnIsDialogOpenChanged;
+
         CurrentViewModel = _factory.Create<HomeViewModel>();
         CurrentPage = NavigationPage.Home;
         _ = Task.Run(CheckStatus);
+    }
+
+    private void OnIsDialogOpenChanged(object? sender, bool isOpen)
+    {
+        Dispatcher.UIThread.Post(() => IsDialogOpen = isOpen);
     }
 
     public async Task InitializeApplicationAsync()
@@ -194,6 +208,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         _cts.Cancel();
         _timer.Dispose();
         _cts.Dispose();
+        _dialogService.IsDialogOpenChanged -= OnIsDialogOpenChanged;
         _factory.Release(CurrentViewModel);
     }
 }

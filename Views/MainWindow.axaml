@@ -130,5 +130,24 @@
                 BorderThickness="1">
             <ContentControl Content="{Binding CurrentViewModel}" />
         </Border>
+
+        <!-- Dialog Overlay for Dimming/Fade Effect -->
+        <Panel Grid.Column="0" Grid.ColumnSpan="2"
+               Background="#000000"
+               IsHitTestVisible="{Binding IsDialogOpen}">
+            <Panel.Styles>
+                <Style Selector="Panel">
+                    <Setter Property="Opacity" Value="0.0" />
+                </Style>
+                <Style Selector="Panel[IsHitTestVisible=True]">
+                    <Setter Property="Opacity" Value="0.45" />
+                </Style>
+            </Panel.Styles>
+            <Panel.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="SineEaseInOut" />
+                </Transitions>
+            </Panel.Transitions>
+        </Panel>
     </Grid>
 </Window>

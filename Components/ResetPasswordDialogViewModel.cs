@@ -11,12 +11,12 @@ namespace Synclo.Components;
 
 public partial class ResetPasswordDialogViewModel(IAccountService accountService, Action<bool?> close) : ViewModelBase
 {
-    [ObservableProperty] private string _currentPassword = string.Empty;
-    [ObservableProperty] private string _newPassword = string.Empty;
-    [ObservableProperty] private string _confirmPassword = string.Empty;
-    [ObservableProperty] private string _errorMessage = string.Empty;
-    [ObservableProperty] private string _statusMessage = string.Empty;
-    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] public partial string CurrentPassword { get; set; } = string.Empty;
+    [ObservableProperty] public partial string NewPassword { get; set; } = string.Empty;
+    [ObservableProperty] public partial string ConfirmPassword { get; set; } = string.Empty;
+    [ObservableProperty] public partial string ErrorMessage { get; set; } = string.Empty;
+    [ObservableProperty] public partial string StatusMessage { get; set; } = string.Empty;
+    [ObservableProperty] public partial bool IsBusy { get; set; }
 
     [RelayCommand]
     private void Cancel()
