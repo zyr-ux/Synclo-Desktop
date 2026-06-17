@@ -10,219 +10,187 @@
              x:Class="Synclo.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
-    <!-- ScrollViewer is FLUSH to app edges -->
+    
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
 
-        
-        <Border Padding="20">
-            <StackPanel Orientation="Vertical" Spacing="20">
+        <Border Padding="24,16,24,16">
+            <StackPanel Orientation="Vertical" Spacing="10">
+                
+                <!-- APPEARANCE GROUP -->
+                <Border> 
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Appearance"
+                                   FontFamily="{StaticResource Inconsolata-Bold}"
+                                   FontSize="18"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Margin="0,8,0,4" />
 
-                <!-- Theme Selector -->
-                <Grid>
-                    <!-- background -->
-                    <Border Background="{DynamicResource SystemBaseHighColor}"
-                            CornerRadius="8"
-                            Opacity="0.05"/>
-                    
-                    <!-- content -->
-                    <Border Padding="16"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-        
-                        <Grid ColumnDefinitions="Auto,*,Auto">
+                        <!-- Theme Selector -->
+                        <Border Classes="SettingsItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
 
-                            <materialIcons:MaterialIcon
-                                Kind="PaletteOutline"
-                                Width="36"
-                                Height="36"
-                                Margin="0,0,16,0"
-                                VerticalAlignment="Center"
-                                Foreground="{DynamicResource Foreground}" />
+                                <materialIcons:MaterialIcon
+                                    Kind="PaletteOutline"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Foreground}" />
 
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Theme"
-                                           FontFamily="{StaticResource Inconsolata-Bold}"
-                                           FontSize="24"
-                                           Foreground="{DynamicResource Foreground}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Theme"
+                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontSize="16"
+                                               Foreground="{DynamicResource Foreground}" />
 
-                                <TextBlock Text="Select theme to apply"
-                                           FontFamily="{StaticResource Inconsolata-Medium}"
-                                           FontSize="16"
-                                           Margin="0,4,0,0"
-                                           Foreground="{DynamicResource Foreground}"
-                                           Opacity="0.7"/>
-                            </StackPanel>
+                                    <TextBlock Text="Select theme to apply"
+                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontSize="13"
+                                               Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Foreground}"
+                                               Opacity="0.7"/>
+                                </StackPanel>
 
-                            <ComboBox Grid.Column="2"
-                                      Width="160"
-                                      VerticalAlignment="Center"
-                                      HorizontalContentAlignment="Left"
-                                      Padding="2"
-                                      FontFamily="{DynamicResource Inconsolata-Medium}"
-                                      ItemsSource="{Binding AvailableThemes}"
-                                      SelectedItem="{Binding SelectedTheme}" />
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- Close Behavior Selector -->
-                <Grid>
-                    
-                    <!-- background -->
-                    <Border Background="{DynamicResource SystemBaseHighColor}"
-                            CornerRadius="8"
-                            Opacity="0.05" />
-                    
-                    <!-- content -->
-                    <Border Padding="16"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-
-                            <materialIcons:MaterialIcon
-                                Kind="CloseCircleOutline"
-                                Width="36"
-                                Height="36"
-                                Margin="0,0,16,0"
-                                VerticalAlignment="Center"
-                                Foreground="{DynamicResource Foreground}" />
-
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
-
-                                <TextBlock Text="Close Behaviour"
-                                           FontFamily="{StaticResource Inconsolata-Bold}"
-                                           FontSize="24"
-                                           Foreground="{DynamicResource Foreground}" />
-
-                                <TextBlock Text="What happens when you close the window?"
-                                           FontFamily="{StaticResource Inconsolata-Medium}"
-                                           FontSize="16"
-                                           Margin="0,4,0,0"
-                                           Foreground="{DynamicResource Foreground}"
-                                           Opacity="0.7" />
-                            </StackPanel>
-
-                            <ComboBox Grid.Column="2"
-                                      Width="250"
-                                      VerticalAlignment="Center"
-                                      HorizontalContentAlignment="Left"
-                                      Padding="2"
-                                      FontFamily="{DynamicResource Inconsolata-Medium}"
-                                      ItemsSource="{Binding AvailableCloseBehaviors}"
-                                      SelectedItem="{Binding SelectedCloseBehavior}" />
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- Start on boot Toggle -->
-                <Grid>
-                    <!-- background -->
-                    <Border Background="{DynamicResource SystemBaseHighColor}"
-                            CornerRadius="8"
-                            Opacity="0.05" />
-
-                    <!-- content -->
-                    <Border Padding="16"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-
-                            <materialIcons:MaterialIcon
-                                Kind="Laptop"
-                                Width="36"
-                                Height="36"
-                                Margin="0,0,16,0"
-                                VerticalAlignment="Center"
-                                Foreground="{DynamicResource Foreground}" />
-
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
-
-                                <TextBlock Text="Launch at Startup"
-                                           FontFamily="{StaticResource Inconsolata-Bold}"
-                                           FontSize="24"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource Foreground}" />
-
-                                <TextBlock Text="Whether the app should automatically launch when you log in"
-                                           FontFamily="{StaticResource Inconsolata-Medium}"
-                                           FontSize="16"
-                                           Margin="0,4,0,0"
-                                           Foreground="{DynamicResource Foreground}"
-                                           Opacity="0.7"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
-
-                            <ToggleSwitch Grid.Column="2"
-                                          IsChecked="{Binding IsStartOnBootEnabled}"
+                                <ComboBox Grid.Column="2"
+                                          Width="160"
                                           VerticalAlignment="Center"
-                                          FontFamily="{StaticResource Inconsolata-Medium}"
-                                          Foreground="{DynamicResource Foreground}" />
-                        </Grid>
-                    </Border>
-                </Grid>
- 
-                <!-- Mica Toggle (Windows 11 only) -->
-                <Grid IsVisible="{Binding IsMicaToggleVisible}">
-                    <!-- background -->
-                    <Border Background="{DynamicResource SystemBaseHighColor}"
-                            CornerRadius="8"
-                            Opacity="0.05" />
+                                          HorizontalContentAlignment="Left"
+                                          Padding="2"
+                                          FontFamily="{DynamicResource Inconsolata-Medium}"
+                                          ItemsSource="{Binding AvailableThemes}"
+                                          SelectedItem="{Binding SelectedTheme}" />
+                            </Grid>
+                        </Border>
 
-                    <!-- content -->
-                    <Border Padding="16"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1"
-                            CornerRadius="8">
+                        <!-- Mica Toggle (Windows 11 only) -->
+                        <Border Classes="SettingsItem" 
+                                IsVisible="{Binding IsMicaToggleVisible}">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
 
-                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                <materialIcons:MaterialIcon
+                                    Kind="Blur"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Foreground}" />
 
-                            <materialIcons:MaterialIcon
-                                Kind="Blur"
-                                Width="36"
-                                Height="36"
-                                Margin="0,0,16,0"
-                                VerticalAlignment="Center"
-                                Foreground="{DynamicResource Foreground}" />
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center">
 
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
+                                    <TextBlock Text="Mica Backdrop"
+                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontSize="16"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Foreground}" />
 
-                                <TextBlock Text="Mica Backdrop"
-                                           FontFamily="{StaticResource Inconsolata-Bold}"
-                                           FontSize="24"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource Foreground}" />
+                                    <TextBlock Text="Enable Windows 11 Mica translucent window effect"
+                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontSize="13"
+                                               Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Foreground}"
+                                               Opacity="0.7"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
 
-                                <TextBlock Text="Enable Windows 11 Mica translucent window effect"
-                                           FontFamily="{StaticResource Inconsolata-Medium}"
-                                           FontSize="16"
-                                           Margin="0,4,0,0"
-                                           Foreground="{DynamicResource Foreground}"
-                                           Opacity="0.7"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
+                                <ToggleSwitch Grid.Column="2"
+                                              IsChecked="{Binding IsMicaEnabled}"
+                                              VerticalAlignment="Center"
+                                              FontFamily="{DynamicResource Inconsolata-Medium}"
+                                              Foreground="{DynamicResource Foreground}" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
 
-                            <ToggleSwitch Grid.Column="2"
-                                          IsChecked="{Binding IsMicaEnabled}"
+                <!-- GENERAL GROUP -->
+                <Border> 
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="General"
+                                   FontFamily="{StaticResource Inconsolata-Bold}"
+                                   FontSize="18"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Margin="0,20,0,4" />
+
+                        <!-- Close Behavior Selector -->
+                        <Border Classes="SettingsItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+
+                                <materialIcons:MaterialIcon
+                                    Kind="CloseCircleOutline"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Foreground}" />
+
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center">
+
+                                    <TextBlock Text="Close Behaviour"
+                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontSize="16"
+                                               Foreground="{DynamicResource Foreground}" />
+
+                                    <TextBlock Text="What happens when you close the window?"
+                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontSize="13"
+                                               Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Foreground}"
+                                               Opacity="0.7" />
+                                </StackPanel>
+
+                                <ComboBox Grid.Column="2"
+                                          Width="250"
                                           VerticalAlignment="Center"
-                                          FontFamily="{StaticResource Inconsolata-Medium}"
-                                          Foreground="{DynamicResource Foreground}" />
-                        </Grid>
-                    </Border>
-                </Grid>
+                                          HorizontalContentAlignment="Left"
+                                          Padding="2"
+                                          FontFamily="{DynamicResource Inconsolata-Medium}"
+                                          ItemsSource="{Binding AvailableCloseBehaviors}"
+                                          SelectedItem="{Binding SelectedCloseBehavior}" />
+                            </Grid>
+                        </Border>
 
+                        <!-- Start on boot Toggle -->
+                        <Border Classes="SettingsItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+
+                                <materialIcons:MaterialIcon
+                                    Kind="RocketLaunchOutline"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Foreground}" />
+
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center">
+
+                                    <TextBlock Text="Launch at Startup"
+                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontSize="16"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Foreground}" />
+
+                                    <TextBlock Text="Whether the app should automatically launch when you log in"
+                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontSize="13"
+                                               Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Foreground}"
+                                               Opacity="0.7"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="2"
+                                              IsChecked="{Binding IsStartOnBootEnabled}"
+                                              VerticalAlignment="Center"
+                                              FontFamily="{DynamicResource Inconsolata-Medium}"
+                                              Foreground="{DynamicResource Foreground}" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
     </ScrollViewer>
