@@ -145,7 +145,7 @@
         <Style Selector="^">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0 0 0 1" />
-            <Setter Property="Foreground" Value="{DynamicResource ForegroundL}" />
+            <Setter Property="Foreground" Value="{DynamicResource Foreground}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
             <Setter Property="CornerRadius" Value="0" />
         </Style>

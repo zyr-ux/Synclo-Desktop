@@ -76,7 +76,8 @@ public class App : Application
             var notificationManager = new WindowNotificationManager(_mainWindow)
             {
                 Position = NotificationPosition.TopRight,
-                MaxItems = 3
+                MaxItems = 3,
+                Margin = new Thickness(0, 40, 0, 0)
             };
             notificationService.SetManager(notificationManager);
 

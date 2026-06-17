@@ -23,7 +23,7 @@
                 <TextBlock Text="History"
                            FontSize="36"
                            FontFamily="{DynamicResource Inconsolata-Bold}"
-                           Foreground="{DynamicResource Accent}" />
+                           Foreground="{DynamicResource Foreground}" />
 
                 <Button Classes="icon-button"
                         Margin="20 0 0 0"
@@ -50,7 +50,7 @@
                    TextAlignment="Center"
                    FontSize="20"
                    FontFamily="{DynamicResource Inconsolata-Medium}"
-                   Foreground="{DynamicResource Accent}"
+                   Foreground="{DynamicResource Foreground}"
                    IsVisible="{Binding HomeStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    IsHitTestVisible="False" />
 
@@ -62,6 +62,8 @@
             <Interaction.Behaviors>
                 <!-- Infinite Scroll Behavior adapted for ListBox internal ScrollViewer -->
                 <behaviors:ScrollViewerInfiniteScrollBehavior Command="{Binding LoadMoreCommand}" />
+                <!-- Smooth Scrolling Behavior wrapper -->
+                <behaviors:ListBoxSmoothScrollBehavior />
             </Interaction.Behaviors>
 
             <ListBox.ItemTemplate>
@@ -75,14 +77,14 @@
                                 <materialIcons:MaterialIcon Kind="{Binding Type, Converter={StaticResource ClipboardItemTypeToIconConverter}}"
                                                             Width="16"
                                                             Height="16"
-                                                            Foreground="{DynamicResource Accent}" />
+                                                            Foreground="{DynamicResource Foreground}" />
                             </Border>
 
                             <TextBlock Grid.Column="1"
                                        Text="{Binding PreviewText}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,15,0"
-                                       Foreground="{DynamicResource Accent}"
+                                       Foreground="{DynamicResource Foreground}"
                                        FontSize="16"
                                        FontFamily="{DynamicResource Inconsolata-Medium}"
                                        TextTrimming="CharacterEllipsis" />
@@ -91,7 +93,7 @@
                                        VerticalAlignment="Center"
                                        Margin="0,0,30,0"
                                        Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
-                                       Foreground="{DynamicResource Accent}"
+                                       Foreground="{DynamicResource Foreground}"
                                        FontSize="14"
                                        FontFamily="{DynamicResource Inconsolata-Medium}" />
 
@@ -107,7 +109,7 @@
                                     <materialIcons:MaterialIcon Kind="ContentCopy"
                                                                 Width="18"
                                                                 Height="18"
-                                                                Foreground="{DynamicResource Accent}" />
+                                                                Foreground="{DynamicResource Foreground}" />
                                 </Button>
 
                                 <Button Classes="icon-button"
@@ -119,7 +121,7 @@
                                     <materialIcons:MaterialIcon Kind="Close"
                                                                 Width="20"
                                                                 Height="20"
-                                                                Foreground="{DynamicResource Accent}" />
+                                                                Foreground="{DynamicResource Foreground}" />
                                 </Button>
                             </StackPanel>
                         </Grid>

@@ -2,12 +2,13 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Color x:Key="Accent">#c9c4c1</Color>
-    <Color x:Key="PrimaryBackground">#1c1c1c</Color>
-    <Color x:Key="SecondaryBackground">#252525</Color>
+    <Color x:Key="PrimaryBackground">#202020</Color>
+    <Color x:Key="SecondaryBackground">#272727</Color>
     <Color x:Key="ForegroundD">#212121</Color>
-    <Color x:Key="ForegroundL">#c9c3bf</Color>
+    <Color x:Key="Foreground">White</Color>
     <SolidColorBrush x:Key="StatusOnline" Color="#00FF00" />
     <SolidColorBrush x:Key="StatusOffline" Color="#FF5252" />
     <SolidColorBrush x:Key="StatusNoInternet" Color="#FFB74D" />
+    <SolidColorBrush x:Key="Border" Color="#191A1C" />
 
 </ResourceDictionary>

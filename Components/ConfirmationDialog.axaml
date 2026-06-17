@@ -25,12 +25,12 @@
                        Text="Confirm Action" 
                        FontSize="28" 
                        FontFamily="{DynamicResource Inconsolata-Bold}" 
-                       Foreground="{DynamicResource ForegroundL}"/>
+                       Foreground="{DynamicResource Foreground}"/>
 
             <TextBlock Grid.Row="1" 
                        Name="MessageText"
                        Text="Are you sure you want to proceed with this action?" 
-                       Foreground="{DynamicResource ForegroundL}" 
+                       Foreground="{DynamicResource Foreground}" 
                        TextWrapping="Wrap"
                        TextAlignment="Left"
                        FontSize="16"

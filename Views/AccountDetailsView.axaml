@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              xmlns:vm="using:Synclo.ViewModels"
              xmlns:converters="using:Synclo.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
@@ -47,59 +48,68 @@
                            Margin="0,0,0,20" />
 
                 <!-- Devices card -->
-                <Border Grid.Row="2"
-                        Background="{DynamicResource SecondaryBackground}"
-                        CornerRadius="5"
-                        Padding="20">
+                <Grid Grid.Row="2">
+                    <!-- background -->
+                    <Border Background="{DynamicResource SystemBaseHighColor}"
+                            CornerRadius="5"
+                            Opacity="0.05" />
 
-                    <!-- ONLY scrollable area -->
-                    <ScrollViewer MaxHeight="250"
-                                  VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
+                    <!-- content -->
+                    <Border Padding="20"
+                            Background="Transparent">
 
-                        <ItemsControl ItemsSource="{Binding Devices}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="15" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
+                        <!-- ONLY scrollable area -->
+                        <ScrollViewer MaxHeight="250"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <Interaction.Behaviors>
+                                <ia:VerticalScrollViewerAnimatedBehavior />
+                            </Interaction.Behaviors>
 
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Orientation="Horizontal"
-                                                    Spacing="10"
-                                                    VerticalAlignment="Center">
-                                            
-                                            <!-- OS Icon -->
-                                            <materialIcons:MaterialIcon Kind="{Binding os, Converter={StaticResource OsToIconConverter}}"
-                                                                        Width="18"
-                                                                        Height="18"
-                                                                        Foreground="{DynamicResource Accent}" />
-                                            
-                                            <TextBlock Text="{Binding device_name}"
-                                                       FontSize="18"
-                                                       Foreground="{DynamicResource ForegroundL}"
-                                                       FontFamily="{DynamicResource Inconsolata-Bold}" />
-                                            <TextBlock Text=" - this device"
-                                                       FontSize="18"
-                                                       Foreground="#666666"
-                                                       IsVisible="{Binding IsThisDevice}"
-                                                       FontFamily="{DynamicResource Inconsolata-Bold}" />
-                                        </StackPanel>
+                            <ItemsControl ItemsSource="{Binding Devices}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="15" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
 
-                                        <Button Grid.Column="1"
-                                                Content="Logout"
-                                                Classes="textButton"
-                                                IsVisible="{Binding !IsThisDevice}"
-                                                Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
-                                                CommandParameter="{Binding device_id}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Border>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="10"
+                                                        VerticalAlignment="Center">
+                                                
+                                                <!-- OS Icon -->
+                                                <materialIcons:MaterialIcon Kind="{Binding os, Converter={StaticResource OsToIconConverter}}"
+                                                                            Width="18"
+                                                                            Height="18"
+                                                                            Foreground="{DynamicResource Foreground}" />
+                                                
+                                                <TextBlock Text="{Binding device_name}"
+                                                           FontSize="18"
+                                                           Foreground="{DynamicResource Foreground}"
+                                                           FontFamily="{DynamicResource Inconsolata-Bold}" />
+                                                <TextBlock Text=" - this device"
+                                                           FontSize="18"
+                                                           Foreground="#666666"
+                                                           IsVisible="{Binding IsThisDevice}"
+                                                           FontFamily="{DynamicResource Inconsolata-Bold}" />
+                                            </StackPanel>
+
+                                            <Button Grid.Column="1"
+                                                    Content="Logout"
+                                                    Classes="textButton"
+                                                    IsVisible="{Binding !IsThisDevice}"
+                                                    Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
+                                                    CommandParameter="{Binding device_id}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
 
                 <!-- Actions -->
                 <StackPanel Grid.Row="3"
