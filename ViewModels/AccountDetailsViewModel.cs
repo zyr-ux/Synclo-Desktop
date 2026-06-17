@@ -96,6 +96,10 @@ public partial class AccountDetailsViewModel : ViewModelBase
     [RelayCommand]
     private async Task LogoutAsync()
     {
+        var confirmed = await _dialogService.ShowConfirmationAsync("Logout");
+        if (!confirmed)
+            return;
+        
         IsBusy = true;
         try
         {
@@ -131,16 +135,7 @@ public partial class AccountDetailsViewModel : ViewModelBase
     [RelayCommand]
     private async Task ResetPasswordAsync()
     {
-        var dialog = new ResetPasswordDialogView();
-        
-        var desktop =
-            Avalonia.Application.Current?.ApplicationLifetime
-                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
-
-        var viewModel = _factory.Create<ResetPasswordDialogViewModel>((Action<bool?>)(res => dialog.Close(res)));
-        dialog.DataContext = viewModel;
-        
-        var result = await dialog.ShowDialog<bool?>(desktop?.MainWindow!);
+        var result = await _dialogService.ShowResetPasswordAsync();
         if (result == true)
             _notificationService.ShowSuccess("Password updated.");
     }
