@@ -6,7 +6,7 @@ namespace Synclo.Components;
 
 public partial class ConfirmationDialog : Window
 {
-    private ConfirmationDialog()
+    public ConfirmationDialog()
     {
         InitializeComponent();
         // Allows moving the window since SystemDecorations="None"
