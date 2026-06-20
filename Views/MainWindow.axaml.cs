@@ -13,6 +13,16 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        if (OperatingSystem.IsMacOS())
+        {
+            var titleBarContainer = this.FindControl<StackPanel>("TitleBarContainer");
+            if (titleBarContainer != null)
+            {
+                titleBarContainer.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+                titleBarContainer.Margin = new Avalonia.Thickness(0);
+            }
+        }
     }
 
     public void Initialize(IApplicationControlService appControl)

@@ -15,10 +15,32 @@
         MinHeight="350"
         Background="{DynamicResource PrimaryBackground}"
         ExtendClientAreaToDecorationsHint="True"
-        SystemDecorations="Full">
-
+        SystemDecorations="Full"
+        Padding="{Binding $self.OffScreenMargin}">
 
     <Grid ColumnDefinitions="200,*">
+
+        <!-- Title Bar -->
+        <StackPanel x:Name="TitleBarContainer"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Height="40"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Left"
+                    Spacing="12"
+                    Margin="16,0,0,0"
+                    IsHitTestVisible="False">
+                    <!-- Make this image controller use a 16x16 png for proper title bar logo scaling-->
+            <Image Source="avares://Synclo/Assets/avalonia-logo.ico"
+                   Width="16"
+                   Height="16"
+                   RenderOptions.BitmapInterpolationMode="HighQuality"
+                   VerticalAlignment="Center"/>
+            <TextBlock Text="Synclo"
+                       FontSize="12"
+                       VerticalAlignment="Center"/>
+        </StackPanel>
 
         <!-- Sidebar -->
         <Border Grid.Column="0"
