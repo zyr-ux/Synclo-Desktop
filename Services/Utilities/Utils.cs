@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,6 +13,7 @@ public interface IUtils
     string GetOrCreateDeviceId();
     string ComputeHash(string content);
     DateTime TruncateToMilliseconds(DateTime dateTime);
+    void OpenUrl(string url);
 }
 
 public sealed class Utils(ISettingsService settingsService) : IUtils
@@ -67,5 +69,28 @@ public sealed class Utils(ISettingsService settingsService) : IUtils
             dateTime.Millisecond,
             dateTime.Kind
         );
+    }
+
+    public void OpenUrl(string url)
+    {
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                Process.Start("xdg-open", url);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Process.Start("open", url);
+            }
+        }
+        catch
+        {
+            // Suppress launch failures
+        }
     }
 }

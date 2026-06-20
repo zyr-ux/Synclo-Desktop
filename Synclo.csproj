@@ -22,6 +22,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
         <PackageReference Include="Polly" Version="8.7.0" />
+        <PackageReference Include="Svg.Controls.Avalonia" Version="11.3.9.5" />
         <PackageReference Include="System.IO.FileSystem.AccessControl" Version="5.0.0" />
         <PackageReference Include="Tmds.DBus" Version="0.94.1" />
         <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.1" />

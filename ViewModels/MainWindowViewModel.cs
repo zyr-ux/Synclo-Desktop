@@ -17,7 +17,8 @@ public enum NavigationPage
 {
     Home,
     Account,
-    Settings
+    Settings,
+    About
 }
 
 public enum ConnectionStatus
@@ -42,13 +43,15 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty, 
     NotifyPropertyChangedFor(nameof(IsHomePage)), 
     NotifyPropertyChangedFor(nameof(IsAccountPage)), 
-    NotifyPropertyChangedFor(nameof(IsSettingsPage))]
+    NotifyPropertyChangedFor(nameof(IsSettingsPage)),
+    NotifyPropertyChangedFor(nameof(IsAboutPage))]
     private NavigationPage _currentPage = NavigationPage.Home;
     
     // Computed properties for direct binding without converters
     public bool IsHomePage => CurrentPage == NavigationPage.Home;
     public bool IsAccountPage => CurrentPage == NavigationPage.Account;
     public bool IsSettingsPage => CurrentPage == NavigationPage.Settings;
+    public bool IsAboutPage => CurrentPage == NavigationPage.About;
     
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(10));
     private readonly CancellationTokenSource _cts = new();
@@ -201,6 +204,14 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         CurrentPage = NavigationPage.Account;
         _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<AccountViewModel>();
+    }
+
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        CurrentPage = NavigationPage.About;
+        _factory.Release(CurrentViewModel);
+        CurrentViewModel = _factory.Create<AboutViewModel>();
     }
     
     public void Dispose()

@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vm="using:Synclo.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Synclo.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+    
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Border Padding="30">
+            <StackPanel Spacing="25">
+                
+                <!-- Top section: App Logo & Basic info -->
+                <Grid ColumnDefinitions="Auto,*" Margin="0,10,0,10">
+                    <!-- Logo container -->
+                    <Border Grid.Column="0"
+                            Width="80"
+                            Height="80"
+                            CornerRadius="20"
+                            Background="{DynamicResource PrimaryBackground}"
+                            BorderBrush="{DynamicResource Border}"
+                            BorderThickness="1.5"
+                            Margin="0,0,24,0"
+                            ClipToBounds="True">
+                        <Image Source="avares://Synclo/Assets/avalonia-logo.ico"
+                               Width="48"
+                               Height="48"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center" />
+                    </Border>
+                    
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
+                            <TextBlock Text="Synclo"
+                                       FontSize="28"
+                                       FontFamily="{DynamicResource Inconsolata-Bold}"
+                                       Foreground="{DynamicResource Foreground}" />
+                            <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
+                                       FontSize="16"
+                                       FontFamily="{DynamicResource Inconsolata-Medium}"
+                                       Foreground="{DynamicResource Foreground}"
+                                       Opacity="0.6"
+                                       VerticalAlignment="Bottom"
+                                       Margin="0,0,0,4" />
+                        </StackPanel>
+                        <TextBlock Text="Secure, end-to-end encrypted clipboard synchronization."
+                                   FontSize="15"
+                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Opacity="0.7"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Cards section -->
+                <StackPanel Spacing="12">
+                    <!-- Links Card -->
+                    <Border CornerRadius="8"
+                            BorderThickness="1"
+                            Padding="12"
+                            BorderBrush="{DynamicResource Border}">
+                        <Border.Background>
+                            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.05" />
+                        </Border.Background>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="Links &amp; Resources"
+                                           FontFamily="{DynamicResource Inconsolata-Bold}"
+                                           FontSize="16"
+                                           Foreground="{DynamicResource Foreground}" />
+                                <TextBlock Text="Find documentation, source code, or report bugs."
+                                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource Foreground}"
+                                           Opacity="0.7" />
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <!-- <Button Classes="custom-button" -->
+                                <!--         Content="GitHub" -->
+                                <!--         Width="100" -->
+                                <!--         Height="36" -->
+                                <!--         Command="{Binding OpenGitHubCommand}" /> -->
+                                <!-- <Button Classes="custom-button" -->
+                                <!--         Content="Report Issue" -->
+                                <!--         Width="130" -->
+                                <!--         Height="36" -->
+                                <!--         Command="{Binding OpenIssuesCommand}" /> -->
+                                <Button
+                                    Classes="icon-button"
+                                    Command="{Binding OpenGitHubCommand}">
+                                    <ToolTip.Tip >
+                                        <ToolTip Content="Open Github"/>
+                                    </ToolTip.Tip>
+                                    <materialIcons:MaterialIcon
+                                        Kind="Github"
+                                        Width="26"
+                                        Height="26"/>
+                                </Button>
+                                
+                                <Button
+                                    Classes="icon-button"
+                                    Command="{Binding OpenIssuesCommand}">
+                                    <ToolTip.Tip >
+                                        <ToolTip Content="Open Issues"/>
+                                    </ToolTip.Tip>
+                                    <materialIcons:MaterialIcon
+                                        Kind="GitIssue"
+                                        Width="26"
+                                        Height="26"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Bottom Area / Footer -->
+                <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0" VerticalAlignment="Bottom">
+                    <!-- Left: Powered by Avalonia -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock Text="Powered by"
+                                   FontSize="16"
+                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   Foreground="{DynamicResource Foreground}"
+                                   VerticalAlignment="Center" />
+                        <Svg Path="avares://Synclo/Assets/avalonia.svg"
+                               Height="22"
+                               Css="* { fill: #007DF9; }"
+                               VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Right: License/Footer -->
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
+                        <TextBlock Text="Released under the GPL-3.0 License"
+                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Opacity="0.5"
+                                   HorizontalAlignment="Right" />
+                        <!-- <TextBlock Text="Copyright © 2026 Synclo Contributors"
+                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Opacity="0.5"
+                                   HorizontalAlignment="Right" /> -->
+                    </StackPanel>
+                </Grid>
+                
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

@@ -47,6 +47,18 @@
                 Padding="0 100 0 10">
 
             <DockPanel LastChildFill="True">
+                <RadioButton Classes="sidebar"
+                             GroupName="Sidebar"
+                             DockPanel.Dock="Bottom"
+                             IsChecked="{Binding IsAboutPage}"
+                             Command="{Binding ShowAboutCommand}"
+                             HorizontalContentAlignment="Left"
+                             Padding="10 0 5 0">
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <avalonia:MaterialIcon Kind="AboutCircleOutline" Width="20" Height="20" />
+                        <TextBlock Text="About" />
+                    </StackPanel>
+                </RadioButton>
 
                 <!-- Status bar -->
                 <!-- <StackPanel DockPanel.Dock="Bottom" -->

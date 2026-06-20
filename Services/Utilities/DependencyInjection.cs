@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddTransient<LoginViewModel>();
         services.AddTransient<AccountDetailsViewModel>();
         services.AddTransient<ResetPasswordDialogViewModel>();
+        services.AddTransient<AboutViewModel>();
 
         // API related services
         services.AddSingleton<HttpClient>();
