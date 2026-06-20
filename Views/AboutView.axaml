@@ -58,6 +58,83 @@
 
                 <!-- Cards section -->
                 <StackPanel Spacing="12">
+                    <!-- Status Card -->
+                    <Border CornerRadius="8"
+                            BorderThickness="1"
+                            Padding="12"
+                            BorderBrush="{DynamicResource Border}"
+                            Tag="{Binding ConnectionStatus}">
+                        <Border.Background>
+                            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.05" />
+                        </Border.Background>
+                        
+                        <Border.Styles>
+                            <!-- Online State -->
+                            <Style Selector="Border[Tag=Online] TextBlock#StatusText">
+                                <Setter Property="Text" Value="Online" />
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
+                            </Style>
+                            <Style Selector="Border[Tag=Online] materialIcons|MaterialIcon#StatusIcon">
+                                <Setter Property="Kind" Value="CheckCircleOutline" />
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
+                            </Style>
+
+                            <!-- Offline State -->
+                            <Style Selector="Border[Tag=Offline] TextBlock#StatusText">
+                                <Setter Property="Text" Value="Offline" />
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
+                            </Style>
+                            <Style Selector="Border[Tag=Offline] materialIcons|MaterialIcon#StatusIcon">
+                                <Setter Property="Kind" Value="Close" />
+                                <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
+                            </Style>
+
+                            <!-- NoInternet State -->
+                            <Style Selector="Border[Tag=NoInternet] TextBlock#StatusText">
+                                <Setter Property="Text" Value="No Internet" />
+                                <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
+                            </Style>
+                            <Style Selector="Border[Tag=NoInternet] materialIcons|MaterialIcon#StatusIcon">
+                                <Setter Property="Kind" Value="AlertCircleOutline" />
+                                <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
+                            </Style>
+                        </Border.Styles>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <!-- Left side: Status Text and Status Icon inline -->
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="Server Status:"
+                                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                                           FontSize="16"
+                                           Foreground="{DynamicResource Foreground}"
+                                           VerticalAlignment="Center" />
+                                
+                                <TextBlock Name="StatusText"
+                                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                                           FontSize="16"
+                                           VerticalAlignment="Center" />
+                                
+                                <materialIcons:MaterialIcon Name="StatusIcon"
+                                                            Width="16"
+                                                            Height="16"
+                                                            VerticalAlignment="Center" />
+                            </StackPanel>
+                            
+                            <!-- Right side: Refresh button -->
+                            <Button Grid.Column="1"
+                                    Classes="icon-button"
+                                    Command="{Binding CheckStatusManualCommand}"
+                                    VerticalAlignment="Center">
+                                <ToolTip.Tip>
+                                    <ToolTip Content="Refresh Status" />
+                                </ToolTip.Tip>
+                                <materialIcons:MaterialIcon Kind="Refresh"
+                                                            Width="20"
+                                                            Height="20" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
                     <!-- Links Card -->
                     <Border CornerRadius="8"
                             BorderThickness="1"
