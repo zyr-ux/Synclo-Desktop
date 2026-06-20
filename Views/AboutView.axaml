@@ -129,8 +129,8 @@
                                     <ToolTip Content="Refresh Status" />
                                 </ToolTip.Tip>
                                 <materialIcons:MaterialIcon Kind="Refresh"
-                                                            Width="20"
-                                                            Height="20" />
+                                                            Width="26"
+                                                            Height="26" />
                             </Button>
                         </Grid>
                     </Border>
