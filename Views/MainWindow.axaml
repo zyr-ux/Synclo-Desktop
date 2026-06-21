@@ -18,7 +18,7 @@
         SystemDecorations="Full"
         Padding="{Binding $self.OffScreenMargin}">
 
-    <Grid ColumnDefinitions="200,*">
+    <Grid ColumnDefinitions="Auto,*">
 
         <!-- Title Bar -->
         <StackPanel x:Name="TitleBarContainer"
@@ -44,7 +44,14 @@
 
         <!-- Sidebar -->
         <Border Grid.Column="0"
-                Padding="0 100 0 10">
+                Width="{Binding SidebarWidth}"
+                Padding="0 50 0 10"
+                ClipToBounds="True">
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Width" Duration="0:0:0.2" Easing="CubicEaseInOut" />
+                </Transitions>
+            </Border.Transitions>
 
             <DockPanel LastChildFill="True">
                 <RadioButton Classes="sidebar"
@@ -56,7 +63,7 @@
                              Padding="10 0 5 0">
                     <StackPanel Orientation="Horizontal" Spacing="15">
                         <avalonia:MaterialIcon Kind="AboutCircleOutline" Width="20" Height="20" />
-                        <TextBlock Text="About" />
+                        <TextBlock Text="About" IsVisible="{Binding !IsSidebarCollapsed}" />
                     </StackPanel>
                 </RadioButton>
 
@@ -77,6 +84,14 @@
                     <!--         Opacity="0.5" -->
                     <!--         Margin="10 0 10 20" /> -->
 
+                    <Button Classes="sidebar"
+                            Command="{Binding ToggleSidebarCommand}"
+                            HorizontalAlignment="Left"
+                            Width="40"
+                            Padding="0">
+                        <avalonia:MaterialIcon Kind="Menu" Width="20" Height="20" />
+                    </Button>
+                    
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
                                  IsChecked="{Binding IsHomePage}"
@@ -85,7 +100,7 @@
                                  Padding="10 0 5 0">
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="HomeVariantOutline" Width="20" Height="20" />
-                            <TextBlock Text="Home" />
+                            <TextBlock Text="Home" IsVisible="{Binding !IsSidebarCollapsed}" />
                         </StackPanel>
                     </RadioButton>
 
@@ -97,7 +112,7 @@
                                  Padding="10 0 5 0">
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="AccountOutline" Width="20" Height="20" />
-                            <TextBlock Text="Account" />
+                            <TextBlock Text="Account" IsVisible="{Binding !IsSidebarCollapsed}" />
                         </StackPanel>
                     </RadioButton>
 
@@ -109,7 +124,7 @@
                                  Padding="10 0 5 0">
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="SettingsOutline" Width="20" Height="20" />
-                            <TextBlock Text="Settings" />
+                            <TextBlock Text="Settings" IsVisible="{Binding !IsSidebarCollapsed}" />
                         </StackPanel>
                     </RadioButton>
                 </StackPanel>

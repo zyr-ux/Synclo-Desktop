@@ -65,4 +65,41 @@
         </Setter>
     </Style>
 
+    <!-- Base Sidebar Button (for action buttons like Menu toggle) -->
+    <Style Selector="Button.sidebar">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter
+                        Content="{TemplateBinding Content}"
+                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Foreground="{TemplateBinding Foreground}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+
+        <Setter Property="FontFamily" Value="{DynamicResource Inconsolata-Medium}" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Margin" Value="7 0 7 0" />
+
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource SystemBaseHighColor}" />
+    </Style>
+
+    <!-- Button Hover -->
+    <Style Selector="Button.sidebar:pointerover">
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.08" />
+        </Setter>
+    </Style>
+
 </Styles>

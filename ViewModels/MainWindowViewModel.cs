@@ -39,6 +39,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     NotifyPropertyChangedFor(nameof(IsAboutPage))]
     private NavigationPage _currentPage = NavigationPage.Home;
     
+    [ObservableProperty,
+    NotifyPropertyChangedFor(nameof(SidebarWidth))]
+    private bool _isSidebarCollapsed;
+    
+    public double SidebarWidth => IsSidebarCollapsed ? 54 : 200;
+    
     // Computed properties for direct binding without converters
     public bool IsHomePage => CurrentPage == NavigationPage.Home;
     public bool IsAccountPage => CurrentPage == NavigationPage.Account;
@@ -125,6 +131,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         CurrentPage = NavigationPage.About;
         _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<AboutViewModel>();
+    }
+
+    [RelayCommand]
+    private void ToggleSidebar()
+    {
+        IsSidebarCollapsed = !IsSidebarCollapsed;
     }
     
     public void Dispose()
