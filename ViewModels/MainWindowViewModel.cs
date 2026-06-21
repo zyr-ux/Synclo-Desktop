@@ -29,6 +29,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IAccountService _accountService;
     private readonly IWebSocketService _webSocketService;
     private readonly IDialogService _dialogService;
+    private readonly ISettingsService _settingsService;
     
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private bool _isDialogOpen;
@@ -56,19 +57,22 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         INotificationService notificationService,
         IAccountService accountService,
         IWebSocketService webSocketService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        ISettingsService settingsService)
     {
         _factory = factory;
         _notificationService = notificationService;
         _accountService = accountService;
         _webSocketService = webSocketService;
         _dialogService = dialogService;
+        _settingsService = settingsService;
         
         IsDialogOpen = _dialogService.IsDialogOpen;
         _dialogService.IsDialogOpenChanged += OnIsDialogOpenChanged;
 
         CurrentViewModel = _factory.Create<HomeViewModel>();
         CurrentPage = NavigationPage.Home;
+        _isSidebarCollapsed = _settingsService.Settings.is_sidebar_collapsed;
     }
 
     private void OnIsDialogOpenChanged(object? sender, bool isOpen)
@@ -137,6 +141,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ToggleSidebar()
     {
         IsSidebarCollapsed = !IsSidebarCollapsed;
+        _settingsService.Settings.is_sidebar_collapsed = IsSidebarCollapsed;
+        _settingsService.Save();
     }
     
     public void Dispose()

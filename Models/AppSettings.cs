@@ -16,6 +16,7 @@ public sealed class AppSettings
     public bool start_on_boot { get; set; } = false;
     public bool minimize_to_tray { get; set; } = false;
     public bool is_mica_enabled { get; set; } = true;
+    public bool is_sidebar_collapsed { get; set; } = false;
     
     // Hidden setting for sync/page limit
     public int sync_page_size { get; set; } = 100;
