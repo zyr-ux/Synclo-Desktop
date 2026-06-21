@@ -69,14 +69,37 @@
                         </Border.Background>
                         
                         <Border.Styles>
+                            <!-- Default: hide pulsating orb -->
+                            <Style Selector="Grid#StatusOrb">
+                                <Setter Property="IsVisible" Value="False" />
+                            </Style>
+                            
                             <!-- Online State -->
                             <Style Selector="Border[Tag=Online] TextBlock#StatusText">
                                 <Setter Property="Text" Value="Online" />
                                 <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
                             </Style>
                             <Style Selector="Border[Tag=Online] materialIcons|MaterialIcon#StatusIcon">
-                                <Setter Property="Kind" Value="CheckCircleOutline" />
-                                <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
+                                <Setter Property="IsVisible" Value="False" />
+                            </Style>
+                            <Style Selector="Border[Tag=Online] Grid#StatusOrb">
+                                <Setter Property="IsVisible" Value="True" />
+                            </Style>
+                            <Style Selector="Border[Tag=Online] Ellipse#StatusOrbRipple">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1.5" IterationCount="Infinite">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                                            <Setter Property="ScaleTransform.ScaleY" Value="1" />
+                                            <Setter Property="Opacity" Value="0.6" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="ScaleTransform.ScaleX" Value="2.5" />
+                                            <Setter Property="ScaleTransform.ScaleY" Value="2.5" />
+                                            <Setter Property="Opacity" Value="0" />
+                                        </KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
                             </Style>
 
                             <!-- Offline State -->
@@ -102,7 +125,7 @@
 
                         <Grid ColumnDefinitions="*,Auto">
                             <!-- Left side: Status Text and Status Icon inline -->
-                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <TextBlock Text="Server Status:"
                                            FontFamily="{DynamicResource Inconsolata-Medium}"
                                            FontSize="16"
@@ -118,6 +141,21 @@
                                                             Width="16"
                                                             Height="16"
                                                             VerticalAlignment="Center" />
+                                
+                                <!-- Pulsating status orb (visible only when Online) -->
+                                <Grid Name="StatusOrb" VerticalAlignment="Center">
+                                    <Ellipse Name="StatusOrbRipple"
+                                             Width="10" Height="10"
+                                             Fill="{DynamicResource StatusOnline}"
+                                             Opacity="0"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             RenderTransformOrigin="50%,50%" />
+                                    <Ellipse Width="10" Height="10"
+                                             Fill="{DynamicResource StatusOnline}"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center" />
+                                </Grid>
                             </StackPanel>
                             
                             <!-- Right side: Refresh button -->
