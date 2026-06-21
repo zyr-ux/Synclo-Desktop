@@ -29,10 +29,8 @@
                         Margin="20 0 0 0"
                         VerticalAlignment="Center"
                         IsEnabled="{Binding !IsLoading}"
-                        Command="{Binding RefreshClipboardHistoryCommand}">
-                    <ToolTip.Tip>
-                        <ToolTip Content="Refresh Clipboard Contents"/>
-                    </ToolTip.Tip>
+                        Command="{Binding RefreshClipboardHistoryCommand}"
+                        ToolTip.Tip="Refresh Clipboard Contents">
                     <materialIcons:MaterialIcon Kind="Refresh"
                                                 Width="26"
                                                 Height="26" />

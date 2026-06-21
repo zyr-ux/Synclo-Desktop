@@ -61,10 +61,9 @@
                              Command="{Binding ShowAboutCommand}"
                              HorizontalContentAlignment="Left"
                              Padding="10 0 5 0"
-                             ToolTip.Placement="Right">
-                    <ToolTip.Tip>
-                        <ToolTip Content="About" IsEnabled="{Binding IsSidebarCollapsed}"/>
-                    </ToolTip.Tip>
+                             ToolTip.Placement="Right"
+                             ToolTip.Tip="About"
+                             ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
                     <StackPanel Orientation="Horizontal" Spacing="15">
                         <avalonia:MaterialIcon Kind="AboutCircleOutline" Width="20" Height="20" />
                         <TextBlock Text="About" IsVisible="{Binding !IsSidebarCollapsed}" />
@@ -102,10 +101,9 @@
                                  Command="{Binding ShowHomeCommand}"
                                  HorizontalContentAlignment="Left"
                                  Padding="10 0 5 0"
-                                 ToolTip.Placement="Right">
-                        <ToolTip.Tip>
-                            <ToolTip Content="Home" IsEnabled="{Binding IsSidebarCollapsed}"/>
-                        </ToolTip.Tip>
+                                 ToolTip.Placement="Right"
+                                 ToolTip.Tip="Home"
+                                 ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="HomeVariantOutline" Width="20" Height="20" />
                             <TextBlock Text="Home" IsVisible="{Binding !IsSidebarCollapsed}" />
@@ -118,10 +116,9 @@
                                  Command="{Binding ShowAccountCommand}"
                                  HorizontalContentAlignment="Left"
                                  Padding="10 0 5 0"
-                                 ToolTip.Placement="Right">
-                        <ToolTip.Tip>
-                            <ToolTip Content="Account" IsEnabled="{Binding IsSidebarCollapsed}"/>
-                        </ToolTip.Tip>
+                                 ToolTip.Placement="Right"
+                                 ToolTip.Tip="Account"
+                                 ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="AccountOutline" Width="20" Height="20" />
                             <TextBlock Text="Account" IsVisible="{Binding !IsSidebarCollapsed}" />
@@ -134,10 +131,9 @@
                                  Command="{Binding ShowSettingsCommand}"
                                  HorizontalContentAlignment="Left"
                                  Padding="10 0 5 0"
-                                 ToolTip.Placement="Right">
-                        <ToolTip.Tip>
-                            <ToolTip Content="Settings" IsEnabled="{Binding IsSidebarCollapsed}"/>
-                        </ToolTip.Tip>
+                                 ToolTip.Placement="Right"
+                                 ToolTip.Tip="Settings"
+                                 ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="SettingsOutline" Width="20" Height="20" />
                             <TextBlock Text="Settings" IsVisible="{Binding !IsSidebarCollapsed}" />

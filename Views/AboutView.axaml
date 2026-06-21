@@ -163,7 +163,7 @@
                                     Classes="icon-button"
                                     Command="{Binding CheckStatusManualCommand}"
                                     VerticalAlignment="Center"
-                                    ToolTip.Tip="Refresh Status">
+                                    ToolTip.Tip="Refresh Server Status">
                                 <materialIcons:MaterialIcon Kind="Refresh"
                                                             Width="26"
                                                             Height="26" />
