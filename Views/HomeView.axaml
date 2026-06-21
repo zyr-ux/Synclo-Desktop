@@ -30,6 +30,9 @@
                         VerticalAlignment="Center"
                         IsEnabled="{Binding !IsLoading}"
                         Command="{Binding RefreshClipboardHistoryCommand}">
+                    <ToolTip.Tip>
+                        <ToolTip Content="Refresh Clipboard Contents"/>
+                    </ToolTip.Tip>
                     <materialIcons:MaterialIcon Kind="Refresh"
                                                 Width="26"
                                                 Height="26" />
@@ -54,7 +57,7 @@
                    IsVisible="{Binding HomeStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    IsHitTestVisible="False" />
 
-        <!-- ListBox handles its own scrolling (Virtualization enabled) -->
+        <!-- Clipboard Items ListBox -->
         <ListBox Grid.Row="1"
                  Classes="HistoryList"
                  ItemsSource="{Binding HistoryEntries}">

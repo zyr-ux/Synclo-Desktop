@@ -124,10 +124,8 @@
                             <Button Grid.Column="1"
                                     Classes="icon-button"
                                     Command="{Binding CheckStatusManualCommand}"
-                                    VerticalAlignment="Center">
-                                <ToolTip.Tip>
-                                    <ToolTip Content="Refresh Status" />
-                                </ToolTip.Tip>
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="Refresh Status">
                                 <materialIcons:MaterialIcon Kind="Refresh"
                                                             Width="26"
                                                             Height="26" />
@@ -169,10 +167,9 @@
                                 <!--         Command="{Binding OpenIssuesCommand}" /> -->
                                 <Button
                                     Classes="icon-button"
-                                    Command="{Binding OpenGitHubCommand}">
-                                    <ToolTip.Tip >
-                                        <ToolTip Content="Open Github"/>
-                                    </ToolTip.Tip>
+                                    Command="{Binding OpenGitHubCommand}"
+                                    ToolTip.Tip="Open Github"
+                                    ToolTip.Placement="Left">
                                     <materialIcons:MaterialIcon
                                         Kind="Github"
                                         Width="26"
@@ -181,10 +178,9 @@
                                 
                                 <Button
                                     Classes="icon-button"
-                                    Command="{Binding OpenIssuesCommand}">
-                                    <ToolTip.Tip >
-                                        <ToolTip Content="Open Issues"/>
-                                    </ToolTip.Tip>
+                                    Command="{Binding OpenIssuesCommand}"
+                                    ToolTip.Tip="Open Issues"
+                                    ToolTip.Placement="Right">
                                     <materialIcons:MaterialIcon
                                         Kind="GitIssue"
                                         Width="26"

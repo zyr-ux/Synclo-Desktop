@@ -60,7 +60,11 @@
                              IsChecked="{Binding IsAboutPage}"
                              Command="{Binding ShowAboutCommand}"
                              HorizontalContentAlignment="Left"
-                             Padding="10 0 5 0">
+                             Padding="10 0 5 0"
+                             ToolTip.Placement="Right">
+                    <ToolTip.Tip>
+                        <ToolTip Content="About" IsEnabled="{Binding IsSidebarCollapsed}"/>
+                    </ToolTip.Tip>
                     <StackPanel Orientation="Horizontal" Spacing="15">
                         <avalonia:MaterialIcon Kind="AboutCircleOutline" Width="20" Height="20" />
                         <TextBlock Text="About" IsVisible="{Binding !IsSidebarCollapsed}" />
@@ -97,7 +101,11 @@
                                  IsChecked="{Binding IsHomePage}"
                                  Command="{Binding ShowHomeCommand}"
                                  HorizontalContentAlignment="Left"
-                                 Padding="10 0 5 0">
+                                 Padding="10 0 5 0"
+                                 ToolTip.Placement="Right">
+                        <ToolTip.Tip>
+                            <ToolTip Content="Home" IsEnabled="{Binding IsSidebarCollapsed}"/>
+                        </ToolTip.Tip>
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="HomeVariantOutline" Width="20" Height="20" />
                             <TextBlock Text="Home" IsVisible="{Binding !IsSidebarCollapsed}" />
@@ -109,7 +117,11 @@
                                  IsChecked="{Binding IsAccountPage}"
                                  Command="{Binding ShowAccountCommand}"
                                  HorizontalContentAlignment="Left"
-                                 Padding="10 0 5 0">
+                                 Padding="10 0 5 0"
+                                 ToolTip.Placement="Right">
+                        <ToolTip.Tip>
+                            <ToolTip Content="Account" IsEnabled="{Binding IsSidebarCollapsed}"/>
+                        </ToolTip.Tip>
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="AccountOutline" Width="20" Height="20" />
                             <TextBlock Text="Account" IsVisible="{Binding !IsSidebarCollapsed}" />
@@ -121,7 +133,11 @@
                                  IsChecked="{Binding IsSettingsPage}"
                                  Command="{Binding ShowSettingsCommand}"
                                  HorizontalContentAlignment="Left"
-                                 Padding="10 0 5 0">
+                                 Padding="10 0 5 0"
+                                 ToolTip.Placement="Right">
+                        <ToolTip.Tip>
+                            <ToolTip Content="Settings" IsEnabled="{Binding IsSidebarCollapsed}"/>
+                        </ToolTip.Tip>
                         <StackPanel Orientation="Horizontal" Spacing="15">
                             <avalonia:MaterialIcon Kind="SettingsOutline" Width="20" Height="20" />
                             <TextBlock Text="Settings" IsVisible="{Binding !IsSidebarCollapsed}" />
