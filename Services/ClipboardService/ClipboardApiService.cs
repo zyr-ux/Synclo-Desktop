@@ -14,6 +14,7 @@ public interface IClipboardApiService
     Task<string> GetLatestClipboardAsync();
     Task<ClipboardSyncResponse> GetClipboardSyncAsync(DateTime? since = null, int limit = 1000, long offset = 0);
     Task<ClipboardDeleteResponse> DeleteClipboardAsync(string clipboardId);
+    Task<ClipboardDeleteResponse> ClearClipboardHistoryAsync();
     T Deserialize<T>(string json);
 }
 
@@ -132,6 +133,29 @@ public class ClipboardApiService(
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Failed to delete clipboard entry: {clipboardId}");
+            throw;
+        }
+    }
+
+    public async Task<ClipboardDeleteResponse> ClearClipboardHistoryAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
+            var response = await _api.DeleteAsync("/api/clipboard", cts.Token);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var deleteResponse = _api.Deserialize<ClipboardDeleteResponse>(json);
+
+            if (deleteResponse == null)
+                throw new InvalidOperationException("Server returned null response");
+
+            return deleteResponse;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to clear clipboard history on server");
             throw;
         }
     }

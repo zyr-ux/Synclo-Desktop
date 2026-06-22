@@ -29,6 +29,9 @@ public partial class HistoryItemModel : ObservableObject
     [ObservableProperty]
     private bool _isDeleting;
     
+    [ObservableProperty]
+    private bool _isBeingCleared;
+    
     public HistoryItemModel CopyWith(
         string? id = null,
         string? content = null,

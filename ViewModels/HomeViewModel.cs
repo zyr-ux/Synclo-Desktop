@@ -30,6 +30,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private string? _errorMessage;
     [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _isClearing;
     [ObservableProperty] private AvaloniaList<HistoryItemModel> _historyEntries = new();
     [ObservableProperty] private string? _homeStatusMessage;
     
@@ -71,6 +72,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     // Debounces history updates and refreshes the UI with new clipboard entries
     private void OnHistoryUpdated()
     {
+        if (IsClearing) return;
+
         _updateCts?.Cancel();
         _updateCts = new CancellationTokenSource();
         var token = _updateCts.Token;
@@ -198,6 +201,53 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     private async Task RefreshClipboardHistory()
     {
         await RefreshDataAsync(silent: false);
+    }
+
+    // Clears all clipboard history from the server and local database
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task ClearClipboardHistory()
+    {
+        if (IsClearing) return;
+        
+        try
+        {
+            IsClearing = true;
+            ErrorMessage = null;
+            
+            // Cascading slide-out effect — stagger from bottom to top
+            var itemsCount = HistoryEntries.Count;
+            if (itemsCount > 0)
+            {
+                const int animationDurationMs = 100;
+                var staggerDelayMs = Math.Max(20, Math.Min(60, 600 / itemsCount));
+                
+                // Trigger the slide-out animation on each item from bottom to top
+                for (int i = itemsCount - 1; i >= 0; i--)
+                {
+                    HistoryEntries[i].IsBeingCleared = true;
+                    await Task.Delay(staggerDelayMs);
+                }
+                
+                // Wait for the last item's animation to finish
+                await Task.Delay(animationDurationMs);
+                
+                // Bulk remove after all animations complete
+                HistoryEntries.Clear();
+            }
+
+            // After the visual cascade completes, clear server + local DB
+            await _clipboardSyncService.ClearHistoryAsync();
+            await UpdateHomeStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = "Failed to clear history.";
+            _notificationService.ShowError("Clear failed: " + ex.Message);
+        }
+        finally
+        {
+            IsClearing = false;
+        }
     }
 
     // Refreshes clipboard history from the server with optional UI feedback

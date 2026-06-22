@@ -11,31 +11,43 @@
              d:DesignHeight="450"
              x:Class="Synclo.Views.HomeView"
              x:DataType="vm:HomeViewModel">
-
-    <!-- Root grid has NO margin -->
+    
     <Grid RowDefinitions="Auto,*">
-        <!-- Header keeps padding -->
         <StackPanel Grid.Row="0"
                     Margin="30,30,30,0"
                     Orientation="Vertical">
 
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="History"
-                           FontSize="36"
-                           FontFamily="{DynamicResource Inconsolata-Bold}"
-                           Foreground="{DynamicResource Foreground}" />
+            <Grid ColumnDefinitions="*, Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="History"
+                               FontSize="36"
+                               FontFamily="{DynamicResource Inconsolata-Bold}"
+                               Foreground="{DynamicResource Foreground}" />
 
-                <Button Classes="icon-button"
-                        Margin="20 0 0 0"
+                    <Button Classes="icon-button"
+                            Margin="20 0 0 0"
+                            VerticalAlignment="Center"
+                            IsEnabled="{Binding !IsLoading}"
+                            Command="{Binding RefreshClipboardHistoryCommand}"
+                            ToolTip.Tip="Refresh Clipboard Contents">
+                        <materialIcons:MaterialIcon Kind="Refresh"
+                                                    Width="26"
+                                                    Height="26" />
+                    </Button>
+                </StackPanel>
+                
+                <Button Grid.Column="1"
+                        Classes="icon-button"
                         VerticalAlignment="Center"
-                        IsEnabled="{Binding !IsLoading}"
-                        Command="{Binding RefreshClipboardHistoryCommand}"
-                        ToolTip.Tip="Refresh Clipboard Contents">
-                    <materialIcons:MaterialIcon Kind="Refresh"
+                        Margin="0 0 15 0"
+                        IsEnabled="{Binding !IsClearing}"
+                        Command="{Binding ClearClipboardHistoryCommand}"
+                        ToolTip.Tip="Clear Clipboard History">
+                    <materialIcons:MaterialIcon Kind="NotificationClearAll"
                                                 Width="26"
                                                 Height="26" />
                 </Button>
-            </StackPanel>
+            </Grid>
 
             <Border Height="1"
                     Background="{DynamicResource Accent}"
@@ -69,7 +81,9 @@
 
             <ListBox.ItemTemplate>
                 <DataTemplate DataType="models:HistoryItemModel">
-                    <Border Classes="HistoryItem">
+                    <Border Classes="HistoryItem"
+                            Classes.clearing="{Binding IsBeingCleared}"
+                            ClipToBounds="True">
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                             <Border Grid.Column="0"
                                     Margin="0,0,15,0"

@@ -35,6 +35,7 @@ public interface IClipboardSyncService : IDisposable
     Task<List<HistoryItemModel>> GetHistoryForUI(int limit = 0, int offset = 0);
     Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0);
     Task DeleteClipboardEntryAsync(string clipboardId);
+    Task ClearHistoryAsync();
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
 }
@@ -312,6 +313,26 @@ public class ClipboardSyncService(
         {
             _notificationService.ShowError($"Failed to delete clipboard entry: {ex.Message}");
             _logger.LogError(ex, $"Failed to delete clipboard entry {clipboardId}");
+            throw;
+        }
+    }
+
+    public async Task ClearHistoryAsync()
+    {
+        try
+        {
+            var response = await _clipboardApiService.ClearClipboardHistoryAsync();
+            await _repository.ClearAllAsync();
+
+            _settingsService.Settings.last_sync = null;
+            _settingsService.Save();
+
+            _notificationService.ShowSuccess(response.message);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.ShowError($"Failed to clear history: {ex.Message}");
+            _logger.LogError(ex, "Failed to clear clipboard history");
             throw;
         }
     }

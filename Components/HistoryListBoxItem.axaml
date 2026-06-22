@@ -78,6 +78,8 @@
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.15" />
                 <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                <DoubleTransition Property="Opacity" Duration="0:0:0.3" Easing="CubicEaseIn" />
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="CubicEaseIn" />
             </Transitions>
         </Setter>
     </Style>
@@ -90,6 +92,12 @@
         <Setter Property="BorderBrush">
             <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.5" />
         </Setter>
+    </Style>
+    
+    <!-- Slide-out animation for cascading clear -->
+    <Style Selector="Border.HistoryItem.clearing">
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="RenderTransform" Value="translateX(400px)" />
     </Style>
 
 </Styles>
