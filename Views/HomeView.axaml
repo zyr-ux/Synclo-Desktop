@@ -27,7 +27,6 @@
                     <Button Classes="icon-button"
                             Margin="20 0 0 0"
                             VerticalAlignment="Center"
-                            IsEnabled="{Binding !IsLoading}"
                             Command="{Binding RefreshClipboardHistoryCommand}"
                             ToolTip.Tip="Refresh Clipboard Contents">
                         <materialIcons:MaterialIcon Kind="Refresh"
@@ -40,7 +39,6 @@
                         Classes="icon-button"
                         VerticalAlignment="Center"
                         Margin="0 0 15 0"
-                        IsEnabled="{Binding !IsClearing}"
                         Command="{Binding ClearClipboardHistoryCommand}"
                         ToolTip.Tip="Clear Clipboard History">
                     <materialIcons:MaterialIcon Kind="NotificationClearAll"

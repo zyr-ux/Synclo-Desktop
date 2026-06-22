@@ -204,11 +204,9 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     }
 
     // Clears all clipboard history from the server and local database
-    [RelayCommand(AllowConcurrentExecutions = true)]
+    [RelayCommand]
     private async Task ClearClipboardHistory()
     {
-        if (IsClearing) return;
-        
         try
         {
             IsClearing = true;
