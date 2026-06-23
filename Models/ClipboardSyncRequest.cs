@@ -10,4 +10,6 @@ public class ClipboardSyncRequest
     public int blob_version { get; set; } = 1;
     public DateTime timestamp { get; set; }
     public bool is_deleted { get; set; } = false;
+    public bool is_pinned { get; set; } = false;
 }
+

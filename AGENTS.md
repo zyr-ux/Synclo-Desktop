@@ -14,6 +14,7 @@ Synclo-Desktop is an offline-first, end-to-end encrypted clipboard synchronizati
 3. **Persistence (SQLite queue)**: The encrypted payload (with unique ID, tag, and nonce) is written to local SQLite via [ClipboardRepository](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/ClipboardService/ClipboardRepository.cs) scheduling on an exclusive single-thread.
 4. **Transmission (WS / REST)**: The client pushes the payload to the server over a persistent WebSocket [WebSocketService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/API/WebSocketService.cs) and awaits a server ACK.
 5. **Propagation (Remote Write)**: Synced devices receive the WebSocket payload, decrypt it client-side, persist it to SQLite, temporarily disable the local copy monitor using a **Suppression Guard**, and write the plaintext to the OS clipboard.
+6. **Pinning Synchronization**: Toggling the pin state updates the local DB entry, sets `isSynced = 0`, and broadcasts the update frame over WebSocket. Incoming remote updates containing pin status changes are processed and merged without skipping, ensuring the pinning state is synchronized across all devices.
 
 ---
 
@@ -70,6 +71,14 @@ To keep the application stable, you must strictly follow these structural constr
 - **Rule**: All file edits, refactorings, and additions must remain in the working directory as unstaged/staged modifications. The final review, staging, and committing sequence is reserved **exclusively** for the human developer.
 - **Reason**: Maintains manual developer control over the git history, signature signing, branch staging, and repository integrity.
 
+### 7. Clipboard Pinning and Ordering Rules
+- **Rule**: All database select queries fetching clipboard entries must enforce the strict pinning stack order: `ORDER BY is_pinned DESC, pinned_at DESC, created_at DESC, ROWID DESC`.
+- **Rule**: When synchronizing updates from WebSocket/API, never skip processing an incoming frame solely because the plaintext content matches an existing local entry. Verify if the pin state (`is_pinned`) has changed and apply the update.
+- **Rule**: The UI must display the original copy creation timestamp (`CreatedAtLocal`), even though the order of pinned items is governed by `pinned_at`.
+- **Rule**: Historical clear operations must only clear unpinned items (`ClearUnpinnedAsync()`), preserving pinned items both locally and in synchronization requests.
+- **Rule**: Clear animations in the UI must stagger-animate unpinned items from the bottom-up and halt immediately when a pinned item is encountered, leaving pinned items static.
+- **Reason**: Maintains ordering consistency, ensures remote pin updates propagate, avoids unwanted data loss of pinned history, and prevents visual jarring.
+
 ---
 
 ## 🪵 Known Engineering Gotchas
@@ -80,6 +89,8 @@ When modifying code in the synchronization layers, watch out for these recurring
 2. **Delta Sync Expiration (410 Gone)**: If the client's `last_sync` timestamp is out of sync with the server database, the server returns `HTTP 410 Gone`. The catch block **MUST** perform a hard reset (calling `ClearAllAsync()`, resetting `last_sync = null`, and triggering a recursive `SyncInBackgroundAsync()`) to recover gracefully.
 3. **Graceful Shutdown Wait**: During application exit, the channel consumer must wait for pending database writes to complete. Ensure you cancel the `CancellationTokenSource _shutdownCts` and await the `ProcessClipboardChannelAsync` task with a reasonable timeout.
 4. **Windows generic credential size limits**: Windows Generic Vault (`CRED_TYPE_GENERIC`) has a hard limit of **512 bytes** for credential blobs. Do not store massive JSON structures or tokens inside `SecureStorageWindows.cs`.
+5. **WebSocket Pin Merging**: When updating the pin status of an entry from the network, ensure the local DB is updated with `is_pinned` and `pinned_at` (mapped from the server's update timestamp or sync payload) to avoid infinite sync cycles or local UI ordering mismatch.
+6. **Card Click vs Pin Toggle Event Bubble**: Ensure the Pin button click doesn't trigger card selection, or that the Pin command is isolated so that toggling a pin doesn't cause the card's content to be copied to the clipboard.
 
 ---
 
@@ -95,4 +106,8 @@ Before submitting any code modifications, verify your implementation against thi
 - [ ] **Feedback Loop Prevention**: Does your clipboard setting code check and toggle the `_isProcessingRemoteUpdate` guard?
 - [ ] **Graceful Disposals**: If you created disposable class connections, are they cleaned up in the parent's `Dispose()` or `ShutdownAsync()`?
 - [ ] **No Automated Git Commits**: Did you refrain from staging/committing the code automatically, leaving it entirely for human developer review?
+- [ ] **Pin Sorting**: Do SQLite queries select and order clipboard entries via `is_pinned DESC, pinned_at DESC, created_at DESC, ROWID DESC`?
+- [ ] **Pin Sync Safety**: Did you ensure that incoming sync events verify and merge `is_pinned` updates even if the content matches?
+- [ ] **History Clear Behavior**: Does `ClearHistoryAsync` call `ClearUnpinnedAsync` to keep pinned items intact?
+- [ ] **Tray & UI Icon Colors**: Do UI buttons and icons use `{DynamicResource Foreground}` to respect theme styling instead of static colors?
 

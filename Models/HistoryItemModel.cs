@@ -24,6 +24,11 @@ public partial class HistoryItemModel : ObservableObject
     public bool IsSynced { get; init; } = false;
     public bool IsDeleted { get; init; } = false;
     
+    [ObservableProperty]
+    private bool _isPinned;
+
+    public DateTime? PinnedAt { get; init; }
+
     public DateTime CreatedAtLocal => CreatedAt.ToLocalTime();
     
     [ObservableProperty]
@@ -41,7 +46,10 @@ public partial class HistoryItemModel : ObservableObject
         int? blobVersion = null,
         DateTime? createdAt = null,
         bool? isSynced = null,
-        bool? isDeleted = null)
+        bool? isDeleted = null,
+        bool? isPinned = null,
+        DateTime? pinnedAt = null,
+        bool clearPinnedAt = false)
     {
         return new HistoryItemModel
         {
@@ -53,7 +61,9 @@ public partial class HistoryItemModel : ObservableObject
             BlobVersion = blobVersion ?? this.BlobVersion,
             CreatedAt = createdAt ?? this.CreatedAt,
             IsSynced = isSynced ?? this.IsSynced,
-            IsDeleted = isDeleted ?? this.IsDeleted
+            IsDeleted = isDeleted ?? this.IsDeleted,
+            IsPinned = isPinned ?? this.IsPinned,
+            PinnedAt = clearPinnedAt ? null : (pinnedAt ?? this.PinnedAt)
         };
     }
     

@@ -27,6 +27,7 @@ public interface IClipboardRepository
     Task MarkDeletedAsync(string id);
     Task DeleteByIdAsync(string id);
     Task ClearAllAsync();
+    Task ClearUnpinnedAsync();
     Task PurgeTombstonesAsync();
     Task RunInTransactionAsync(Func<Task> action);
     event Action? OnDataChanged;
@@ -87,12 +88,16 @@ CREATE TABLE IF NOT EXISTS clipboard_entries (
     blob_version INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     is_synced INTEGER NOT NULL DEFAULT 0,
-    is_deleted INTEGER NOT NULL DEFAULT 0
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    is_pinned INTEGER NOT NULL DEFAULT 0,
+    pinned_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_hash ON clipboard_entries(content_hash);
 CREATE INDEX IF NOT EXISTS idx_created_at ON clipboard_entries(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_is_synced ON clipboard_entries(is_synced);
+CREATE INDEX IF NOT EXISTS idx_is_pinned ON clipboard_entries(is_pinned);
+CREATE INDEX IF NOT EXISTS idx_pinned_at ON clipboard_entries(pinned_at DESC);
 ";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
@@ -130,10 +135,10 @@ CREATE INDEX IF NOT EXISTS idx_is_synced ON clipboard_entries(is_synced);
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       created_at, is_synced, is_deleted
+       created_at, is_synced, is_deleted, is_pinned, pinned_at
 FROM clipboard_entries
 WHERE is_deleted = 0
-ORDER BY created_at DESC, ROWID DESC
+ORDER BY is_pinned DESC, pinned_at DESC, created_at DESC, ROWID DESC
 LIMIT $limit OFFSET $offset
 ";
                 cmd.Parameters.AddWithValue("$limit", limit);
@@ -163,7 +168,11 @@ LIMIT $limit OFFSET $offset
                 await connection.OpenAsync().ConfigureAwait(false);
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE id = $id";
+                cmd.CommandText = @"
+SELECT id, content, content_hash, ciphertext, nonce, blob_version,
+       created_at, is_synced, is_deleted, is_pinned, pinned_at
+FROM clipboard_entries
+WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
 
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -188,7 +197,11 @@ LIMIT $limit OFFSET $offset
                 await connection.OpenAsync().ConfigureAwait(false);
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT * FROM clipboard_entries WHERE content_hash = $hash LIMIT 1";
+                cmd.CommandText = @"
+SELECT id, content, content_hash, ciphertext, nonce, blob_version,
+       created_at, is_synced, is_deleted, is_pinned, pinned_at
+FROM clipboard_entries
+WHERE content_hash = $hash LIMIT 1";
                 cmd.Parameters.AddWithValue("$hash", hash);
 
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -215,7 +228,7 @@ LIMIT $limit OFFSET $offset
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 SELECT id, content, content_hash, ciphertext, nonce, blob_version,
-       created_at, is_synced, is_deleted
+       created_at, is_synced, is_deleted, is_pinned, pinned_at
 FROM clipboard_entries
 WHERE is_synced = 0
 ORDER BY created_at ASC
@@ -260,7 +273,7 @@ ORDER BY created_at ASC
                     
                     cmd.CommandText = $@"
                         SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                               created_at, is_synced, is_deleted
+                               created_at, is_synced, is_deleted, is_pinned, pinned_at
                         FROM clipboard_entries
                         WHERE content_hash IN ({placeholders})";
 
@@ -315,7 +328,7 @@ ORDER BY created_at ASC
                     
                     cmd.CommandText = $@"
                         SELECT id, content, content_hash, ciphertext, nonce, blob_version, 
-                               created_at, is_synced, is_deleted
+                               created_at, is_synced, is_deleted, is_pinned, pinned_at
                         FROM clipboard_entries
                         WHERE id IN ({placeholders})";
 
@@ -406,8 +419,8 @@ ORDER BY created_at ASC
                     cmd.Transaction = tx;
                     cmd.CommandText = @"
 INSERT OR REPLACE INTO clipboard_entries
-(id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted)
-VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted)";
+(id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted, is_pinned, pinned_at)
+VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted, $pinned, $pinned_at)";
                     AddParams(cmd, entry);
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
@@ -454,7 +467,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
     }
 
     /// <summary>
-    /// Marks an entry as deleted (tombstone). Sets is_deleted_remotely=1 and is_synced=0.
+    /// Marks an entry as deleted (tombstone). Sets is_deleted=1, is_synced=0, is_pinned=0, pinned_at=NULL.
     /// </summary>
     public Task MarkDeletedAsync(string id)
     {
@@ -469,7 +482,7 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     UPDATE clipboard_entries 
-                    SET is_deleted = 1, is_synced = 0 
+                    SET is_deleted = 1, is_synced = 0, is_pinned = 0, pinned_at = NULL 
                     WHERE id = $id";
                 cmd.Parameters.AddWithValue("$id", id);
                 
@@ -489,10 +502,10 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                     var insertCmd = connection.CreateCommand();
                     insertCmd.CommandText = @"
                         INSERT INTO clipboard_entries 
-                        (id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted)
+                        (id, content, content_hash, ciphertext, nonce, blob_version, created_at, is_synced, is_deleted, is_pinned, pinned_at)
                         VALUES 
-                        ($id, '', 'TOMBSTONE', '', '', 0, $created, 0, 1)
-                        ON CONFLICT(id) DO UPDATE SET is_deleted = 1, is_synced = 0";
+                        ($id, '', 'TOMBSTONE', '', '', 0, $created, 0, 1, 0, NULL)
+                        ON CONFLICT(id) DO UPDATE SET is_deleted = 1, is_synced = 0, is_pinned = 0, pinned_at = NULL";
 
                     insertCmd.Parameters.AddWithValue("$id", id);
                     insertCmd.Parameters.AddWithValue("$created", DateTime.UtcNow.ToString("O"));
@@ -552,6 +565,29 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to clear all entries");
+                throw;
+            }
+        })).Unwrap();
+    }
+
+    public Task ClearUnpinnedAsync()
+    {
+        return _db.StartNew((Func<Task>)(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_pinned = 0";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+                NotifyObservers();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to clear unpinned entries");
                 throw;
             }
         })).Unwrap();
@@ -671,6 +707,8 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
         cmd.Parameters.AddWithValue("$created", entry.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("$synced", entry.IsSynced ? 1 : 0);
         cmd.Parameters.AddWithValue("$deleted", entry.IsDeleted ? 1 : 0);
+        cmd.Parameters.AddWithValue("$pinned", entry.IsPinned ? 1 : 0);
+        cmd.Parameters.AddWithValue("$pinned_at", entry.PinnedAt.HasValue ? entry.PinnedAt.Value.ToString("O") : DBNull.Value);
     }
 
     private static HistoryItemModel MapFromReader(SqliteDataReader reader)
@@ -687,7 +725,11 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 ? DateTime.UtcNow
                 : DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
             IsSynced = reader.FieldCount > 7 && !reader.IsDBNull(7) && reader.GetInt32(7) == 1,
-            IsDeleted = reader.FieldCount > 8 && !reader.IsDBNull(8) && reader.GetInt32(8) == 1
+            IsDeleted = reader.FieldCount > 8 && !reader.IsDBNull(8) && reader.GetInt32(8) == 1,
+            IsPinned = reader.FieldCount > 9 && !reader.IsDBNull(9) && reader.GetInt32(9) == 1,
+            PinnedAt = reader.FieldCount > 10 && !reader.IsDBNull(10)
+                ? DateTime.Parse(reader.GetString(10), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+                : null
         };
     }
 }

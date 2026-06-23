@@ -68,7 +68,8 @@
         <!-- Clipboard Items ListBox -->
         <ListBox Grid.Row="1"
                  Classes="HistoryList"
-                 ItemsSource="{Binding HistoryEntries}">
+                 ItemsSource="{Binding HistoryEntries}"
+                 SelectedItem="{Binding SelectedEntry}">
 
             <Interaction.Behaviors>
                 <!-- Infinite Scroll Behavior adapted for ListBox internal ScrollViewer -->
@@ -117,9 +118,10 @@
                                 <Button Classes="icon-button"
                                         VerticalAlignment="Center"
                                         Width="30" Height="30"
-                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                                        CommandParameter="{Binding}">
-                                    <materialIcons:MaterialIcon Kind="ContentCopy"
+                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).TogglePinCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{Binding IsPinned, Converter={StaticResource PinStateToToolTipConverter}}">
+                                    <materialIcons:MaterialIcon Kind="{Binding IsPinned, Converter={StaticResource PinStateToIconConverter}}"
                                                                 Width="18"
                                                                 Height="18"
                                                                 Foreground="{DynamicResource Foreground}" />

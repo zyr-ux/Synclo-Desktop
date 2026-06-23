@@ -125,6 +125,19 @@ When the app launches or reconnects:
 - **Tombstones**: Deletion updates are received as tombstone models (`is_deleted = 1`). The local repository flags matching entries as deleted so they disappear from the UI, but maintains the ID to prevent syncing them again.
 - **Hard Recovery (410 Gone)**: If the client's delta timestamp is outdated or expired on the server, the server returns an `HTTP 410 Gone` error. The sync engine catches this, performs a **Hard Reset** (wiping the local SQLite tables and purging `last_sync`), and automatically triggers a complete, clean, first-time full sync.
 
+### 4. Clipboard Pinning Stack and Synchronization
+To support pinning items to the top of the history list, Synclo implements a client-side pinning system that synchronizes in real time:
+- **Ordering Algorithm**: Pinned clipboard entries are displayed at the top of the history list. They behave like a stack where the most recently pinned item is on top. This is implemented via the database query order:
+  ```sql
+  ORDER BY is_pinned DESC, pinned_at DESC, created_at DESC, ROWID DESC
+  ```
+- **Timestamp Separation**: While the sorting relies on the internal `pinned_at` timestamp (which is updated to `DateTime.UtcNow` upon pinning), the UI binding continues to display the item's original copy creation time (`CreatedAtLocal`), preserving the visual creation history.
+- **Sync Interoperability**: When pinning is toggled locally, the local entry's `IsPinned` and `PinnedAt` properties are updated. The entry is marked as unsynced (`isSynced = 0`) and pushed over the WebSocket stream. When a remote pinning update is received, the sync engine checks if the incoming `is_pinned` status differs from the local database. If it does, the update is merged and UI reordered, bypassing the normal duplicate suppression that checks plaintext values.
+- **UI Animation & Polish**:
+  - **Card Interaction**: The explicit Copy button was removed, and clicking any part of a card copies its content to the operating system clipboard.
+  - **Pin Toggling**: The card includes a Pin/Unpin icon button that toggles the pinned state without selecting the card (preventing accidental copying). All icons use default foreground coloring (`{DynamicResource Foreground}`).
+  - **Staggered Clear Animation**: When clearing history, a bottom-up stagger animation is applied only to unpinned items. Once the animation loop reaches the index of a pinned item, the animation halts. All pinned items remain visually static, moving together smoothly into their final positions.
+
 ---
 
 ## 💾 Thread-Safe Database Design
@@ -152,6 +165,11 @@ private static readonly TaskFactory _db =
    PRAGMA busy_timeout=5000;
    ```
    This configuration allows concurrent readers to query the database freely while the exclusive background thread processes write operations.
+4. **Pinning Schema Extensions**: The `clipboard` table is extended to support pinning features with these columns:
+   - `is_pinned`: `INTEGER NOT NULL DEFAULT 0` (Boolean flag to mark pinned status).
+   - `pinned_at`: `TEXT` (ISO-8601 UTC timestamp of when it was pinned, allowing proper stack sorting).
+   An index on `(is_pinned, pinned_at)` is established during initialization to optimize search, ordering, and synchronization processes.
+5. **Partial Clear Mechanism**: Instead of deleting all history entries, the clearing method only targets unpinned rows (`is_pinned = 0`), marking unpinned entries as deleted and maintaining the records as tombstones (`is_deleted = 1`) to preserve sync synchronization logic, while leaving pinned records completely untouched.
 
 ---
 

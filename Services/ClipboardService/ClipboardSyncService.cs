@@ -35,6 +35,7 @@ public interface IClipboardSyncService : IDisposable
     Task<List<HistoryItemModel>> GetHistoryForUI(int limit = 0, int offset = 0);
     Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0);
     Task DeleteClipboardEntryAsync(string clipboardId);
+    Task TogglePinClipboardEntryAsync(string clipboardId);
     Task ClearHistoryAsync();
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
@@ -317,12 +318,44 @@ public class ClipboardSyncService(
         }
     }
 
+    public async Task TogglePinClipboardEntryAsync(string clipboardId)
+    {
+        if (string.IsNullOrEmpty(clipboardId))
+            throw new ArgumentException("Clipboard ID cannot be null or empty", nameof(clipboardId));
+
+        try
+        {
+            var entry = await _repository.GetByIdAsync(clipboardId);
+            if (entry == null) return;
+
+            var targetPinned = !entry.IsPinned;
+            var pinnedAt = targetPinned ? DateTime.UtcNow : (DateTime?)null;
+            var updated = entry.CopyWith(
+                isPinned: targetPinned,
+                pinnedAt: pinnedAt,
+                clearPinnedAt: !targetPinned,
+                isSynced: false
+            );
+
+            await _repository.UpsertAsync(updated);
+
+            // Push the change to the server
+            await SendExistingEntryAsync(updated);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.ShowError($"Failed to pin/unpin entry: {ex.Message}");
+            _logger.LogError(ex, $"Failed to toggle pin on entry {clipboardId}");
+            throw;
+        }
+    }
+
     public async Task ClearHistoryAsync()
     {
         try
         {
             var response = await _clipboardApiService.ClearClipboardHistoryAsync();
-            await _repository.ClearAllAsync();
+            await _repository.ClearUnpinnedAsync();
 
             _settingsService.Settings.last_sync = null;
             _settingsService.Save();
@@ -576,8 +609,10 @@ public class ClipboardSyncService(
             existingEntriesById.TryGetValue(entry.id, out var existingById);
 
             // Deduplication Logic:
-            // If we have the entry by ID, and the content hash matches, it's a true duplicate. Skip.
-            if (existingById != null && existingById.ContentHash == contentHash)
+            // If we have the entry by ID, and the content hash and pin state match, it's a true duplicate. Skip.
+            if (existingById != null && 
+                existingById.ContentHash == contentHash && 
+                existingById.IsPinned == entry.is_pinned)
                 continue;
 
             // Normalize Timestamp
@@ -596,7 +631,9 @@ public class ClipboardSyncService(
                 Nonce = entry.nonce ?? string.Empty,
                 BlobVersion = entry.blob_version,
                 CreatedAt = serverTimestamp,
-                IsSynced = true // It came from server, so it is synced
+                IsSynced = true, // It came from server, so it is synced
+                IsPinned = entry.is_pinned,
+                PinnedAt = entry.is_pinned ? entry.updated_at : null
             };
 
             incomingBatch.Add(dbEntry);
@@ -887,6 +924,7 @@ public class ClipboardSyncService(
                                     timestamp = entry.CreatedAt,
                                     blob_version = entry.BlobVersion,
                                     is_deleted = isTombstone, // <--- CRITICAL FIX
+                                    is_pinned = entry.IsPinned,
                                     // If deleted, send null payload. If upsert, send ciphertext.
                                     ciphertext = isTombstone ? null : entry.Ciphertext,
                                     nonce = isTombstone ? null : entry.Nonce,
@@ -1083,16 +1121,22 @@ public class ClipboardSyncService(
             var existingEntry = await _repository.GetByHashAsync(contentHash);
             if (existingEntry != null)
             {
-                // If we already have the exact same ID, skip
+                // If we already have the exact same ID, check if it's a true duplicate (same pin state too)
                 if (existingEntry.Id == entry.id)
                 {
-                    _logger.LogDebug($"Skipping duplicate clipboard entry: {entry.id}");
-                    return;
+                    if (existingEntry.IsPinned == entry.is_pinned)
+                    {
+                        _logger.LogDebug($"Skipping duplicate clipboard entry: {entry.id}");
+                        return;
+                    }
+                    _logger.LogInformation($"Updating pin state of existing clipboard entry {entry.id} to {entry.is_pinned}");
                 }
-                // If we have a local entry with different ID but same content, 
-                // replace it with the authoritative version from server
-
-                _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
+                else
+                {
+                    // If we have a local entry with different ID but same content, 
+                    // replace it with the authoritative version from server
+                    _logger.LogInformation($"Replacing local entry {existingEntry.Id} with authoritative entry {entry.id}");
+                }
             }
 
             // Timestamp already normalized at start of method
@@ -1108,7 +1152,9 @@ public class ClipboardSyncService(
                 Nonce = entry.nonce ?? string.Empty,
                 BlobVersion = entry.blob_version,
                 CreatedAt = serverTimestamp,
-                IsSynced = true // Entries from server are already synced
+                IsSynced = true, // Entries from server are already synced
+                IsPinned = entry.is_pinned,
+                PinnedAt = entry.is_pinned ? entry.updated_at : null
             };
 
             // Issue #3 fix: Wrap delete+upsert in transaction to prevent data loss

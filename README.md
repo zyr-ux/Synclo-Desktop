@@ -28,6 +28,10 @@ Your clipboard data is encrypted on-device before it ever leaves your system. Sy
 
 Access previously copied items even when offline. Clipboard history is stored locally using SQLite for fast and reliable performance.
 
+### 📌 Clipboard Pinning
+
+Pin frequently used items to the top of your history list. Pinned items behave as a stack (most recently pinned on top) and are preserved during bulk history clearing. Pin status changes synchronize in real time across all of your active devices.
+
 ### 🖥️ Native Platform Integration
 
 Synclo integrates directly with platform-native APIs for clipboard monitoring, secure credential storage, and automatic startup.
@@ -63,7 +67,7 @@ Clipboard deletions sync properly across devices, including devices that were te
 
 ### 🎨 Modern UI
 
-Responsive dark and light themes with smooth scrolling, infinite history loading, and a clean desktop-focused interface.
+Responsive dark and light themes with smooth scrolling, infinite history loading, and a clean desktop-focused interface. Copying content is simplified: clicking anywhere on a history card copies it directly to your clipboard, and you can easily toggle pin status directly on each card.
 
 ---
 

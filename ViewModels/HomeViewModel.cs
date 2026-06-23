@@ -33,6 +33,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isClearing;
     [ObservableProperty] private AvaloniaList<HistoryItemModel> _historyEntries = new();
     [ObservableProperty] private string? _homeStatusMessage;
+    [ObservableProperty] private HistoryItemModel? _selectedEntry;
     
     private int PageSize => _settingsService.Settings.sync_page_size;
     private bool _isLoadingMore;
@@ -103,6 +104,15 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 _updateLock.Release();
             }
         });
+    }
+
+    partial void OnSelectedEntryChanged(HistoryItemModel? value)
+    {
+        if (value != null)
+        {
+            _ = ItemClicked(value);
+            SelectedEntry = null; // Clear selection to allow re-click
+        }
     }
 
     // Efficiently syncs the UI collection with new entries, handling insertions, updates, moves, and removals
@@ -193,7 +203,8 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         return a.Id == b.Id &&
                a.Content == b.Content &&
                a.ContentHash == b.ContentHash &&
-               a.IsDeleting == b.IsDeleting; 
+               a.IsDeleting == b.IsDeleting &&
+               a.IsPinned == b.IsPinned; 
     }
     
     // Triggers a manual refresh of the clipboard history
@@ -212,25 +223,36 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             IsClearing = true;
             ErrorMessage = null;
             
-            // Cascading slide-out effect — stagger from bottom to top
+            // Cascading slide-out effect — stagger from bottom to top, skipping pinned
             var itemsCount = HistoryEntries.Count;
             if (itemsCount > 0)
             {
                 const int animationDurationMs = 100;
                 var staggerDelayMs = Math.Max(20, Math.Min(60, 600 / itemsCount));
                 
-                // Trigger the slide-out animation on each item from bottom to top
+                // Trigger the slide-out animation on each unpinned item from bottom to top
                 for (int i = itemsCount - 1; i >= 0; i--)
                 {
-                    HistoryEntries[i].IsBeingCleared = true;
+                    var item = HistoryEntries[i];
+                    if (item.IsPinned)
+                    {
+                        break; // Stop animating when reaching the last pinned item
+                    }
+                    item.IsBeingCleared = true;
                     await Task.Delay(staggerDelayMs);
                 }
                 
-                // Wait for the last item's animation to finish
+                // Wait for the animation to finish
                 await Task.Delay(animationDurationMs);
                 
-                // Bulk remove after all animations complete
-                HistoryEntries.Clear();
+                // Remove cleared items from the list
+                for (int i = HistoryEntries.Count - 1; i >= 0; i--)
+                {
+                    if (HistoryEntries[i].IsBeingCleared || !HistoryEntries[i].IsPinned)
+                    {
+                        HistoryEntries.RemoveAt(i);
+                    }
+                }
             }
 
             // After the visual cascade completes, clear server + local DB
@@ -347,6 +369,19 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         catch (Exception)
         {
             entry.IsDeleting = false;
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task TogglePin(HistoryItemModel entry)
+    {
+        try
+        {
+            await _clipboardSyncService.TogglePinClipboardEntryAsync(entry.Id);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.ShowError($"Failed to pin/unpin entry: {ex.Message}");
         }
     }
 

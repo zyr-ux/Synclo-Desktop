@@ -17,5 +17,8 @@ public class ClipboardEntry
     
     // New field for sync logic
     public DateTime updated_at { get; set; }
+    
+    public bool is_pinned { get; set; } = false;
 }
+
 
