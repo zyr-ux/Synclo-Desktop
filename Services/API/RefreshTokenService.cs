@@ -272,7 +272,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
 
         try
         {
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/refresh")
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "refresh")
             {
                 Content = new StringContent(
                     JsonSerializer.Serialize(body, _jsonOptions),

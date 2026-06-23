@@ -24,7 +24,7 @@ public interface IApiService : IDisposable
 
 public sealed class ApiService : IApiService
 {
-    private const string BaseUrl = "https://synclo.zyrux.dev";
+    private const string BaseUrl = "https://synclo.zyrux.dev/api/v1/";
     private readonly HttpClient _http;
     private readonly ISecureStorage _secureStorage;
     private readonly IRefreshTokenService _refreshTokenService;
@@ -39,7 +39,7 @@ public sealed class ApiService : IApiService
         
         if (_http.BaseAddress == null)
         {
-            _http.BaseAddress = new Uri(BaseUrl.TrimEnd('/'));
+            _http.BaseAddress = new Uri(BaseUrl);
             _http.Timeout = TimeSpan.FromSeconds(15);
         }
         
@@ -67,7 +67,7 @@ public sealed class ApiService : IApiService
 
     public async Task Health()
     {
-        var req = await _http.GetAsync("/api/health");
+        var req = await _http.GetAsync("/health");
         req.EnsureSuccessStatusCode();
     }
 

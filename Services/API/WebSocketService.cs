@@ -85,12 +85,7 @@ public sealed class WebSocketService : IWebSocketService
 
         await DisconnectInternal();
     }
-
-    /// <summary>
-    /// Ensures WebSocket is connected within the specified timeout.
-    /// </summary>
-    /// <param name="timeout">Maximum time to wait for connection</param>
-    /// <returns>True if connected, false if timeout</returns>
+    
     public async Task<bool> EnsureConnectedAsync(TimeSpan timeout)
     {
         if (IsConnected) return true;
@@ -105,12 +100,7 @@ public sealed class WebSocketService : IWebSocketService
         
         return IsConnected;
     }
-
-    /// <summary>
-    /// Sends a message with automatic JSON serialization.
-    /// </summary>
-    /// <typeparam name="T">Type of message to send</typeparam>
-    /// <param name="message">Message object to serialize and send</param>
+    
     public async Task SendMessageAsync<T>(T message)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(message);
@@ -137,7 +127,7 @@ public sealed class WebSocketService : IWebSocketService
 
             // Use Authorization header instead of query parameter
             _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-            var url = "wss://synclo.zyrux.dev/ws/clipboard";
+            var url = "wss://synclo.zyrux.dev/ws/v1/clipboard";
 
             try
             {

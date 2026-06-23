@@ -47,7 +47,7 @@ public class ClipboardApiService(
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
-            var response = await _api.GetAsync("/api/clipboard", cts.Token);
+            var response = await _api.GetAsync("clipboard", cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -72,7 +72,7 @@ public class ClipboardApiService(
 
             var masterKey = _cryptographyService.FromBase64(masterKeyBase64);
             
-            var query = $"/api/clipboard/sync?limit={limit}&offset={offset}";
+            var query = $"clipboard/sync?limit={limit}&offset={offset}";
             if (since.HasValue)
             {
                 // Format as ISO 8601
@@ -119,7 +119,7 @@ public class ClipboardApiService(
                 throw new ArgumentException("Clipboard ID cannot be null or empty", nameof(clipboardId));
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var response = await _api.DeleteAsync($"/api/clipboard/{clipboardId}", cts.Token);
+            var response = await _api.DeleteAsync($"clipboard/{clipboardId}", cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -142,7 +142,7 @@ public class ClipboardApiService(
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var response = await _api.DeleteAsync("/api/clipboard", cts.Token);
+            var response = await _api.DeleteAsync("clipboard", cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();

@@ -28,7 +28,7 @@ public sealed class DeviceService(IApiService api, ISettingsService settings, IS
 
     public async Task<List<DeviceModel>> GetDevicesAsync(CancellationToken ct = default)
     {
-        using var res = await api.GetAsync("/api/devices", ct);
+        using var res = await api.GetAsync("devices", ct);
         var content = await res.Content.ReadAsStringAsync(ct);
         
         // Check if device was deleted (unauthorized/forbidden)
@@ -52,7 +52,7 @@ public sealed class DeviceService(IApiService api, ISettingsService settings, IS
 
     public async Task DeleteDeviceAsync(string deviceId, CancellationToken ct = default)
     {
-        using var res = await api.DeleteAsync($"/api/devices/{deviceId}", ct);
+        using var res = await api.DeleteAsync($"devices/{deviceId}", ct);
         if (!res.IsSuccessStatusCode)
         {
             var error = await res.Content.ReadAsStringAsync(ct);

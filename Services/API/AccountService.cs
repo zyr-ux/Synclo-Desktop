@@ -175,7 +175,7 @@ public sealed class AccountService : IAccountService
                 os = _utils.GetClientOS()
             };
 
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/login");
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "login");
             httpReq.Content = _api.Serialize(req);
             using var res = await _http.SendAsync(httpReq, ct);
             var content = await res.Content.ReadAsStringAsync(ct);
@@ -276,7 +276,7 @@ public sealed class AccountService : IAccountService
                 os = _utils.GetClientOS()
             };
 
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/register")
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "register")
             {
                 Content = _api.Serialize(req)
             };
@@ -381,7 +381,7 @@ public sealed class AccountService : IAccountService
             new_kdf_version = SupportedKdfVersion
         };
 
-        using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/password/change")
+        using var httpReq = new HttpRequestMessage(HttpMethod.Post, "password/change")
         {
             Content = _api.Serialize(req)
         };
@@ -469,7 +469,7 @@ public sealed class AccountService : IAccountService
     private async Task<SaltResponse> GetSaltAsync(string email, CancellationToken ct)
     {
         using var res =
-            await _http.GetAsync($"/api/auth/salt?email={Uri.EscapeDataString(email)}", ct);
+            await _http.GetAsync($"auth/salt?email={Uri.EscapeDataString(email)}", ct);
 
         var content = await res.Content.ReadAsStringAsync(ct);
 
@@ -486,7 +486,7 @@ public sealed class AccountService : IAccountService
     // Delete Account
     public async Task DeleteAccountAsync(CancellationToken ct = default)
     {
-        using var res = await _api.DeleteAsync("/api/delete", ct);
+        using var res = await _api.DeleteAsync("delete", ct);
 
         if (!res.IsSuccessStatusCode)
         {
