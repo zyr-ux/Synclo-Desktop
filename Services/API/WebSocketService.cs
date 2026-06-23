@@ -127,7 +127,7 @@ public sealed class WebSocketService : IWebSocketService
 
             // Use Authorization header instead of query parameter
             _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-            var url = "wss://synclo.zyrux.dev/ws/v1/clipboard";
+            var url = "wss://synclo.zyrux.dev/ws/v1/sync";
 
             try
             {
