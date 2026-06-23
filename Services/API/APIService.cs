@@ -123,17 +123,14 @@ public sealed class ApiService : IApiService
 
             if ((int)res.StatusCode == 429)
             {
-                var retryAfter = ParseRetryAfter(res);
-                var text = await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 res.Dispose();
-                throw new RateLimitException($"Rate limited. Retry after: {retryAfter.TotalSeconds}s. Response: {text}");
+                throw new RateLimitException();
             }
 
             if ((int)res.StatusCode >= 500)
             {
-                var text = await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 res.Dispose();
-                throw new ServerFailureException(text);
+                throw new ServerFailureException();
             }
 
             return res;
