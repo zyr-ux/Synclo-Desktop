@@ -37,6 +37,8 @@ public interface IClipboardSyncService : IDisposable
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task TogglePinClipboardEntryAsync(string clipboardId);
     Task ClearHistoryAsync();
+    Task<bool> HasUnpinnedAsync();
+    Task PurgeUnpinnedTombstonesAsync();
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
 }
@@ -354,21 +356,36 @@ public class ClipboardSyncService(
     {
         try
         {
-            var response = await _clipboardApiService.ClearClipboardHistoryAsync();
+            // 1. Mark unpinned as tombstones locally (UI updates instantly)
             await _repository.ClearUnpinnedAsync();
 
-            _settingsService.Settings.last_sync = null;
-            _settingsService.Save();
+            // 2. Try updating the server
+            try
+            {
+                var response = await _clipboardApiService.ClearClipboardHistoryAsync();
+                await _repository.PurgeUnpinnedTombstonesAsync();
 
-            _notificationService.ShowSuccess(response.message);
+                _settingsService.Settings.last_sync = null;
+                _settingsService.Save();
+
+                _notificationService.ShowSuccess(response.message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clear clipboard history on server immediately. Will sync in background later.");
+                _notificationService.ShowWarning("Offline: Cleared history locally. Server will be updated when online.");
+            }
         }
         catch (Exception ex)
         {
-            _notificationService.ShowError($"Failed to clear history: {ex.Message}");
-            _logger.LogError(ex, "Failed to clear clipboard history");
+            _logger.LogError(ex, "Failed to clear clipboard history locally");
             throw;
         }
     }
+
+    public Task<bool> HasUnpinnedAsync() => _repository.HasUnpinnedAsync();
+
+    public Task PurgeUnpinnedTombstonesAsync() => _repository.PurgeUnpinnedTombstonesAsync();
 
     public async Task ShutdownAsync()
     {

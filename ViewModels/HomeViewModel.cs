@@ -218,6 +218,11 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task ClearClipboardHistory()
     {
+        if (!await _clipboardSyncService.HasUnpinnedAsync())
+        {
+            return;
+        }
+
         try
         {
             IsClearing = true;
@@ -257,16 +262,23 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
 
             // After the visual cascade completes, clear server + local DB
             await _clipboardSyncService.ClearHistoryAsync();
-            await UpdateHomeStatusAsync();
+            await Dispatcher.UIThread.InvokeAsync(UpdateHomeStatusAsync);
         }
         catch (Exception ex)
         {
-            ErrorMessage = "Failed to clear history.";
-            _notificationService.ShowError("Clear failed: " + ex.Message);
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                ErrorMessage = ex.Message;
+                _notificationService.ShowError(ex.Message);
+                await RefreshDataAsync(silent: true);
+            });
         }
         finally
         {
-            IsClearing = false;
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsClearing = false;
+            });
         }
     }
 

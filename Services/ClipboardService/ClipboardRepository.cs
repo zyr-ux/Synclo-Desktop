@@ -28,7 +28,9 @@ public interface IClipboardRepository
     Task DeleteByIdAsync(string id);
     Task ClearAllAsync();
     Task ClearUnpinnedAsync();
+    Task<bool> HasUnpinnedAsync();
     Task PurgeTombstonesAsync();
+    Task PurgeUnpinnedTombstonesAsync();
     Task RunInTransactionAsync(Func<Task> action);
     event Action? OnDataChanged;
 }
@@ -580,17 +582,40 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 await connection.OpenAsync().ConfigureAwait(false);
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_pinned = 0";
+                cmd.CommandText = "UPDATE clipboard_entries SET is_deleted = 1, is_synced = 0, is_pinned = 0, pinned_at = NULL WHERE is_pinned = 0";
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
                 NotifyObservers();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to clear unpinned entries");
+                _logger.LogError(ex, "Failed to mark unpinned entries as deleted");
                 throw;
             }
         })).Unwrap();
+    }
+
+    public Task<bool> HasUnpinnedAsync()
+    {
+        return _db.StartNew(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM clipboard_entries WHERE is_pinned = 0 AND is_deleted = 0)";
+                
+                var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+                return result != null && Convert.ToInt32(result) == 1;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check for unpinned entries");
+                throw;
+            }
+        }).Unwrap();
     }
 
     public Task PurgeTombstonesAsync()
@@ -603,18 +628,45 @@ VALUES ($id, $content, $hash, $cipher, $nonce, $ver, $created, $synced, $deleted
                 await connection.OpenAsync().ConfigureAwait(false);
 
                 var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_deleted = 1";
+                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_deleted = 1 AND is_synced = 1";
                 var count = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 
                 if (count > 0)
                 {
-                    _logger.LogInformation($"Purged {count} tombstone(s) from database");
+                    _logger.LogInformation($"Purged {count} synced tombstone(s) from database");
                     NotifyObservers();
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to purge tombstones");
+                throw;
+            }
+        })).Unwrap();
+    }
+
+    public Task PurgeUnpinnedTombstonesAsync()
+    {
+        return _db.StartNew((Func<Task>)(async () =>
+        {
+            try
+            {
+                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await connection.OpenAsync().ConfigureAwait(false);
+
+                var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_deleted = 1 AND is_pinned = 0";
+                var count = await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                
+                if (count > 0)
+                {
+                    _logger.LogInformation($"Purged {count} unpinned tombstone(s) from database");
+                    NotifyObservers();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to purge unpinned tombstones");
                 throw;
             }
         })).Unwrap();
