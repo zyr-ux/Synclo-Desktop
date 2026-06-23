@@ -15,13 +15,14 @@ using Synclo.Services.Utilities;
 
 namespace Synclo.ViewModels;
 
-public partial class AccountDetailsViewModel : ViewModelBase
+public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
 {
     private readonly IAccountService _accountService;
     private readonly IDeviceService _deviceService;
     private readonly IViewModelFactory _factory;
     private readonly INotificationService _notificationService;
     private readonly IDialogService _dialogService;
+    private readonly IWebSocketService _webSocketService;
 
     [ObservableProperty] private string _username = string.Empty;
     [ObservableProperty] private bool _isBusy;
@@ -35,13 +36,19 @@ public partial class AccountDetailsViewModel : ViewModelBase
         IDeviceService deviceService,
         IViewModelFactory factory,
         INotificationService notificationService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IWebSocketService webSocketService)
     {
         _factory = factory;
         _accountService = accountService;
         _deviceService = deviceService;
         _notificationService = notificationService;
         _dialogService = dialogService;
+        _webSocketService = webSocketService;
+
+        _webSocketService.OnDeviceAdded += OnDeviceAddedHandler;
+        _webSocketService.OnDeviceUpdated += OnDeviceUpdatedHandler;
+        _webSocketService.OnDeviceDeleted += OnDeviceDeletedHandler;
 
         _ = InitializeAsync();
     }
@@ -166,5 +173,38 @@ public partial class AccountDetailsViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    private void OnDeviceAddedHandler(string deviceJson)
+    {
+        _ = LoadDevicesAsync();
+    }
+
+    private void OnDeviceUpdatedHandler(string deviceJson)
+    {
+        _ = LoadDevicesAsync();
+    }
+
+    private void OnDeviceDeletedHandler(string? deviceId)
+    {
+        if (deviceId != null)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var target = Devices.FirstOrDefault(x => x.device_id == deviceId);
+                if (target != null)
+                {
+                    Devices.Remove(target);
+                    _ = _deviceService.SaveAsync(Devices.ToList());
+                }
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        _webSocketService.OnDeviceAdded -= OnDeviceAddedHandler;
+        _webSocketService.OnDeviceUpdated -= OnDeviceUpdatedHandler;
+        _webSocketService.OnDeviceDeleted -= OnDeviceDeletedHandler;
     }
 }

@@ -21,6 +21,8 @@ public interface IWebSocketService : IDisposable
     event Action? OnDisconnected;
     event Action<string>? OnError;
     event Action<string?>? OnDeviceDeleted;
+    event Action<string>? OnDeviceAdded;
+    event Action<string>? OnDeviceUpdated;
 }
 
 public sealed class WebSocketService : IWebSocketService
@@ -52,6 +54,8 @@ public sealed class WebSocketService : IWebSocketService
     public event Action? OnDisconnected;
     public event Action<string>? OnError;
     public event Action<string?>? OnDeviceDeleted;
+    public event Action<string>? OnDeviceAdded;
+    public event Action<string>? OnDeviceUpdated;
 
     private void OnTokenRefreshed(string token)
     {
@@ -246,6 +250,26 @@ public sealed class WebSocketService : IWebSocketService
                             : null;
                             
                         OnDeviceDeleted?.Invoke(deviceId);
+                        return true;
+
+                    case "device_added":
+                        var addedDevice = doc.RootElement.TryGetProperty("device", out var adProp)
+                            ? adProp.GetRawText()
+                            : null;
+                        if (addedDevice != null)
+                        {
+                            OnDeviceAdded?.Invoke(addedDevice);
+                        }
+                        return true;
+
+                    case "device_updated":
+                        var updatedDevice = doc.RootElement.TryGetProperty("device", out var udProp)
+                            ? udProp.GetRawText()
+                            : null;
+                        if (updatedDevice != null)
+                        {
+                            OnDeviceUpdated?.Invoke(updatedDevice);
+                        }
                         return true;
                 }
             }

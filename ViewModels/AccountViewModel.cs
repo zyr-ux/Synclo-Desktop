@@ -38,12 +38,14 @@ public partial class AccountViewModel : ViewModelBase, IDisposable
 
     private void ShowLogin()
     {
+        _factory.Release(CurrentViewModel);
         var loginViewModel = _factory.Create<LoginViewModel>();
         loginViewModel.LoginSucceeded += OnLoginSuccess;
         CurrentViewModel = loginViewModel;
     }
 
     private void ShowAccountDetails() {
+        _factory.Release(CurrentViewModel);
         var accountDetailsViewModel = _factory.Create<AccountDetailsViewModel>();
         accountDetailsViewModel.LoggedOut += OnLogout;
         CurrentViewModel = accountDetailsViewModel;
@@ -67,6 +69,6 @@ public partial class AccountViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _accountService.OnLogout -= OnLogoutAsync;
-        (CurrentViewModel as IDisposable)?.Dispose();
+        _factory.Release(CurrentViewModel);
     }
 }
