@@ -4,9 +4,17 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              xmlns:vm="using:Synclo.ViewModels"
+             xmlns:converters="using:Synclo.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Synclo.Views.AboutView"
              x:DataType="vm:AboutViewModel">
+    
+    <UserControl.Resources>
+        <converters:ConnectionStatusToTextConverter x:Key="ConnectionStatusToTextConverter" />
+        <converters:ConnectionStatusToIconKindConverter x:Key="ConnectionStatusToIconKindConverter" />
+        <converters:ConnectionStatusToVisibilityConverter x:Key="ConnectionStatusToVisibilityConverter" />
+        <converters:ConnectionStatusToBrushConverter x:Key="ConnectionStatusToBrushConverter" />
+    </UserControl.Resources>
     
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
@@ -62,66 +70,10 @@
                     <Border CornerRadius="8"
                             BorderThickness="1"
                             Padding="12"
-                            BorderBrush="{DynamicResource Border}"
-                            Tag="{Binding ConnectionStatus}">
+                            BorderBrush="{DynamicResource Border}">
                         <Border.Background>
                             <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.05" />
                         </Border.Background>
-                        
-                        <Border.Styles>
-                            <!-- Default: hide pulsating orb -->
-                            <Style Selector="Grid#StatusOrb">
-                                <Setter Property="IsVisible" Value="False" />
-                            </Style>
-                            
-                            <!-- Online State -->
-                            <Style Selector="Border[Tag=Online] TextBlock#StatusText">
-                                <Setter Property="Text" Value="Online" />
-                                <Setter Property="Foreground" Value="{DynamicResource StatusOnline}" />
-                            </Style>
-                            <Style Selector="Border[Tag=Online] materialIcons|MaterialIcon#StatusIcon">
-                                <Setter Property="IsVisible" Value="False" />
-                            </Style>
-                            <Style Selector="Border[Tag=Online] Grid#StatusOrb">
-                                <Setter Property="IsVisible" Value="True" />
-                            </Style>
-                            <Style Selector="Border[Tag=Online] Ellipse#StatusOrbRipple">
-                                <Style.Animations>
-                                    <Animation Duration="0:0:1.5" IterationCount="Infinite">
-                                        <KeyFrame Cue="0%">
-                                            <Setter Property="ScaleTransform.ScaleX" Value="1" />
-                                            <Setter Property="ScaleTransform.ScaleY" Value="1" />
-                                            <Setter Property="Opacity" Value="0.6" />
-                                        </KeyFrame>
-                                        <KeyFrame Cue="100%">
-                                            <Setter Property="ScaleTransform.ScaleX" Value="2.5" />
-                                            <Setter Property="ScaleTransform.ScaleY" Value="2.5" />
-                                            <Setter Property="Opacity" Value="0" />
-                                        </KeyFrame>
-                                    </Animation>
-                                </Style.Animations>
-                            </Style>
-
-                            <!-- Offline State -->
-                            <Style Selector="Border[Tag=Offline] TextBlock#StatusText">
-                                <Setter Property="Text" Value="Offline" />
-                                <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
-                            </Style>
-                            <Style Selector="Border[Tag=Offline] materialIcons|MaterialIcon#StatusIcon">
-                                <Setter Property="Kind" Value="Close" />
-                                <Setter Property="Foreground" Value="{DynamicResource StatusOffline}" />
-                            </Style>
-
-                            <!-- NoInternet State -->
-                            <Style Selector="Border[Tag=NoInternet] TextBlock#StatusText">
-                                <Setter Property="Text" Value="No Internet" />
-                                <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
-                            </Style>
-                            <Style Selector="Border[Tag=NoInternet] materialIcons|MaterialIcon#StatusIcon">
-                                <Setter Property="Kind" Value="AlertCircleOutline" />
-                                <Setter Property="Foreground" Value="{DynamicResource StatusNoInternet}" />
-                            </Style>
-                        </Border.Styles>
 
                         <Grid ColumnDefinitions="*,Auto">
                             <!-- Left side: Status Text and Status Icon inline -->
@@ -133,29 +85,35 @@
                                            VerticalAlignment="Center" />
                                 
                                 <TextBlock Name="StatusText"
+                                           Text="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusToTextConverter}}"
                                            FontFamily="{DynamicResource Inconsolata-Medium}"
                                            FontSize="16"
-                                           VerticalAlignment="Center" />
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Foreground>
+                                        <MultiBinding Converter="{StaticResource ConnectionStatusToBrushConverter}">
+                                            <Binding Path="ConnectionStatus" />
+                                            <Binding Path="ActualThemeVariant" Source="{x:Static Application.Current}" />
+                                        </MultiBinding>
+                                    </TextBlock.Foreground>
+                                </TextBlock>
                                 
                                 <materialIcons:MaterialIcon Name="StatusIcon"
+                                                            Kind="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusToIconKindConverter}}"
                                                             Width="16"
                                                             Height="16"
-                                                            VerticalAlignment="Center" />
+                                                            IsVisible="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusToVisibilityConverter}, ConverterParameter='Icon'}"
+                                                            VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Foreground>
+                                        <MultiBinding Converter="{StaticResource ConnectionStatusToBrushConverter}">
+                                            <Binding Path="ConnectionStatus" />
+                                            <Binding Path="ActualThemeVariant" Source="{x:Static Application.Current}" />
+                                        </MultiBinding>
+                                    </materialIcons:MaterialIcon.Foreground>
+                                </materialIcons:MaterialIcon>
                                 
                                 <!-- Pulsating status orb (visible only when Online) -->
-                                <Grid Name="StatusOrb" VerticalAlignment="Center">
-                                    <Ellipse Name="StatusOrbRipple"
-                                             Width="10" Height="10"
-                                             Fill="{DynamicResource StatusOnline}"
-                                             Opacity="0"
-                                             HorizontalAlignment="Center"
-                                             VerticalAlignment="Center"
-                                             RenderTransformOrigin="50%,50%" />
-                                    <Ellipse Width="10" Height="10"
-                                             Fill="{DynamicResource StatusOnline}"
-                                             HorizontalAlignment="Center"
-                                             VerticalAlignment="Center" />
-                                </Grid>
+                                <ContentControl Classes="connection-orb"
+                                                IsVisible="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusToVisibilityConverter}, ConverterParameter='Orb'}" />
                             </StackPanel>
                             
                             <!-- Right side: Refresh button -->

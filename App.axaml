@@ -20,6 +20,7 @@
         <StyleInclude Source="avares://Synclo/Components/IconButton.axaml" />
         <StyleInclude Source="avares://Synclo/Components/HistoryListBoxItem.axaml" />
         <StyleInclude Source="avares://Synclo/Components/SettingsItem.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/ConnectionOrb.axaml" />
     </Application.Styles>
 
     <Application.Resources>
