@@ -30,7 +30,7 @@ public interface IWebSocketService : IDisposable
 public sealed class WebSocketService : IWebSocketService
 {
     private readonly IApiService _apiService;
-    private readonly ISecureStorage _secureStorage;
+    private readonly ISecretsManager _secretsManager;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly ISettingsService _settingsService;
     private const int BufferSize = 8192;
@@ -45,12 +45,12 @@ public sealed class WebSocketService : IWebSocketService
 
     public WebSocketService(
         IApiService api, 
-        ISecureStorage secureStorage, 
+        ISecretsManager secretsManager, 
         IRefreshTokenService refreshTokenService,
         ISettingsService settingsService)
     {
         _apiService = api;
-        _secureStorage = secureStorage;
+        _secretsManager = secretsManager;
         _refreshTokenService = refreshTokenService;
         _settingsService = settingsService;
         
@@ -130,7 +130,7 @@ public sealed class WebSocketService : IWebSocketService
 
         while (true)
         {
-            var token = await _secureStorage.LoadAsync(Constants.AccessToken);
+            var token = await _secretsManager.GetAccessTokenAsync();
             if (string.IsNullOrWhiteSpace(token)) return;
 
             await DisconnectInternal();

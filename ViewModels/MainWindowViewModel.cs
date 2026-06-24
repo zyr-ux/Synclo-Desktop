@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using Synclo.Factory;
 using Synclo.Services.API;
 using Synclo.Services.Utilities;
+using Synclo.Services.SecretsManager;
 using Synclo.Models;
 
 namespace Synclo.ViewModels;
@@ -31,6 +32,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IWebSocketService _webSocketService;
     private readonly IDialogService _dialogService;
     private readonly ISettingsService _settingsService;
+    private readonly ISecretsManager _secretsManager;
     
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private bool _isDialogOpen;
@@ -59,7 +61,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         IAccountService accountService,
         IWebSocketService webSocketService,
         IDialogService dialogService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        ISecretsManager secretsManager)
     {
         _factory = factory;
         _notificationService = notificationService;
@@ -67,6 +70,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         _webSocketService = webSocketService;
         _dialogService = dialogService;
         _settingsService = settingsService;
+        _secretsManager = secretsManager;
         
         IsDialogOpen = _dialogService.IsDialogOpen;
         _dialogService.IsDialogOpenChanged += OnIsDialogOpenChanged;
@@ -85,7 +89,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            await _settingsService.LoadServerUrlAsync();
+            var serverUrl = await _secretsManager.GetServerUrlAsync();
+            if (!string.IsNullOrEmpty(serverUrl))
+            {
+                _settingsService.Settings.ServerUrl = serverUrl;
+            }
             await _accountService.EnforceLocalKdfVersionAsync();
         }
         catch (SecurityException ex)

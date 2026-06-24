@@ -21,7 +21,7 @@ public interface IClipboardApiService
 public class ClipboardApiService(
     IApiService api,
     ICryptographyService cryptographyService,
-    ISecureStorage secureStorage,
+    ISecretsManager secretsManager,
     ILogger<ClipboardApiService> logger)
     : IClipboardApiService
 {
@@ -33,8 +33,8 @@ public class ClipboardApiService(
 
     private readonly ILogger<ClipboardApiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    private readonly ISecureStorage _secureStorage =
-        secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+    private readonly ISecretsManager _secretsManager =
+        secretsManager ?? throw new ArgumentNullException(nameof(secretsManager));
 
 
     public async Task<string> GetLatestClipboardAsync()
@@ -42,7 +42,7 @@ public class ClipboardApiService(
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey);
+            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync();
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 
@@ -66,7 +66,7 @@ public class ClipboardApiService(
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey);
+            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync();
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 

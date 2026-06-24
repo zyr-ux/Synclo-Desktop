@@ -92,6 +92,8 @@ public static class DependencyInjection
             throw new PlatformNotSupportedException("Unsupported operating system");
         });
 
+        services.AddSingleton<ISecretsManager, Synclo.Services.SecretsManager.SecretsManager>();
+
         // Single instance manager
         services.AddSingleton<SingleInstanceManager>();
 

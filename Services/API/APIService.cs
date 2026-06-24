@@ -21,12 +21,13 @@ public interface IApiService : IDisposable
     Task Health(string? baseUrl = null);
     StringContent Serialize(object obj);
     T Deserialize<T>(string json);
+    string GetAbsoluteUrl(string url);
 }
 
 public sealed class ApiService : IApiService
 {
     private readonly HttpClient _http;
-    private readonly ISecureStorage _secureStorage;
+    private readonly ISecretsManager _secretsManager;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly ISettingsService _settingsService;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -34,12 +35,12 @@ public sealed class ApiService : IApiService
 
     public ApiService(
         HttpClient http, 
-        ISecureStorage secureStorage, 
+        ISecretsManager secretsManager, 
         IRefreshTokenService refreshTokenService,
         ISettingsService settingsService)
     {
         _http = http;
-        _secureStorage = secureStorage;
+        _secretsManager = secretsManager;
         _refreshTokenService = refreshTokenService;
         _settingsService = settingsService;
         
@@ -114,8 +115,8 @@ public sealed class ApiService : IApiService
 
             var res = await policy.ExecuteAsync(async (ct2) =>
             {
-                using var attemptReq = new HttpRequestMessage(method, _settingsService.GetAbsoluteUrl(url));
-                var token2 = await _secureStorage.LoadAsync(Constants.AccessToken);
+                using var attemptReq = new HttpRequestMessage(method, GetAbsoluteUrl(url));
+                var token2 = await _secretsManager.GetAccessTokenAsync();
                 if (!string.IsNullOrWhiteSpace(token2))
                     attemptReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token2);
 
@@ -178,6 +179,19 @@ public sealed class ApiService : IApiService
 
         _disposed = true;
         _http.Dispose();
+    }
+
+    public string GetAbsoluteUrl(string url) => GetAbsoluteUrl(_settingsService.Settings.ServerUrl, url);
+
+    public static string GetAbsoluteUrl(string serverUrl, string url)
+    {
+        var trimmedServerUrl = serverUrl.TrimEnd('/');
+        var baseAddress = $"{trimmedServerUrl}/api/v1/";
+        var relative = url.TrimStart('/');
+        return relative.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+               relative.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+               ? relative
+               : $"{baseAddress}{relative}";
     }
 
     #endregion

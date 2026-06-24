@@ -20,7 +20,7 @@ public interface IDeviceService
     Task ClearAsync();
 }
 
-public sealed class DeviceService(IApiService api, ISettingsService settings, ISecureStorage secureStorage) : IDeviceService
+public sealed class DeviceService(IApiService api, ISettingsService settings, ISecretsManager secretsManager) : IDeviceService
 {
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly JsonSerializerOptions _options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -140,7 +140,7 @@ public sealed class DeviceService(IApiService api, ISettingsService settings, IS
     {
         if (_cachedPath != null) return _cachedPath;
 
-        var email = await secureStorage.LoadAsync(Constants.UserEmail);
+        var email = await secretsManager.GetUserEmailAsync();
         var identifier = "anonymous";
         if (!string.IsNullOrWhiteSpace(email))
         {

@@ -11,6 +11,7 @@ using Synclo.Services.API;
 using Synclo.Services.ClipboardService;
 using Synclo.Services.Startup;
 using Synclo.Services.Utilities;
+using Synclo.Services.SecretsManager;
 using Synclo.Themes;
 
 namespace Synclo.ViewModels;
@@ -23,6 +24,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IStartupManager _startupManager;
     private readonly IAccountService _accountService;
     private readonly INotificationService _notificationService;
+    private readonly ISecretsManager _secretsManager;
+    private readonly IUtils _utils;
 
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
@@ -47,7 +50,9 @@ public partial class SettingsViewModel : ViewModelBase
         IThemeService themeService,
         IStartupManager startupManager,
         IAccountService accountService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        ISecretsManager secretsManager,
+        IUtils utils)
     {
         _settings = settings;
         _apiService = apiService;
@@ -55,6 +60,8 @@ public partial class SettingsViewModel : ViewModelBase
         _startupManager = startupManager;
         _accountService = accountService;
         _notificationService = notificationService;
+        _secretsManager = secretsManager;
+        _utils = utils;
         
         SelectedTheme = _settings.Settings.Theme;
         IsMicaEnabled = _settings.Settings.is_mica_enabled;
@@ -189,7 +196,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         try
         {
-            if (!_settings.TryNormalizeServerUrl(text, out var cleanUrl, out var error))
+            if (!_utils.TryNormalizeServerUrl(text, out var cleanUrl, out var error))
             {
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -222,7 +229,9 @@ public partial class SettingsViewModel : ViewModelBase
                 }
             }
 
-            await _settings.SaveServerUrlAsync(cleanUrl);
+            await _secretsManager.SaveServerUrlAsync(cleanUrl);
+            _settings.Settings.ServerUrl = cleanUrl;
+            _settings.Save();
 
             var isAuth = await _accountService.IsAuthenticatedAsync();
 

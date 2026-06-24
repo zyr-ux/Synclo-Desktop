@@ -39,7 +39,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
     private const int SupportedKdfVersion = 1;
 
     private readonly HttpClient _http;
-    private readonly ISecureStorage _secureStorage;
+    private readonly ISecretsManager _secretsManager;
     private readonly ICryptographyService _cryptographyService;
     private readonly ISettingsService _settingsService;
 
@@ -64,12 +64,12 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
 
     public RefreshTokenService(
         HttpClient http,
-        ISecureStorage secureStorage,
+        ISecretsManager secretsManager,
         ICryptographyService cryptographyService,
         ISettingsService settingsService)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
-        _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+        _secretsManager = secretsManager ?? throw new ArgumentNullException(nameof(secretsManager));
         _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         
@@ -264,7 +264,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
     private async Task<string> DoActualRefreshAsync()
     {
         var refreshToken =
-            await _secureStorage.LoadAsync(Constants.RefreshToken).ConfigureAwait(false);
+            await _secretsManager.GetRefreshTokenAsync().ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
@@ -276,7 +276,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
 
         try
         {
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, _settingsService.GetAbsoluteUrl("refresh"))
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, ApiService.GetAbsoluteUrl(_settingsService.Settings.ServerUrl, "refresh"))
             {
                 Content = new StringContent(
                     JsonSerializer.Serialize(body, _jsonOptions),
@@ -324,24 +324,22 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
                     $"Account upgraded to security version {data.kdf_version}. Please update the app.");
             }
 
-            await _secureStorage
-                .SaveAsync(Constants.RefreshToken, data.refresh_token)
+            await _secretsManager
+                .SaveRefreshTokenAsync(data.refresh_token)
                 .ConfigureAwait(false);
 
-            await _secureStorage
-                .SaveAsync(Constants.AccessToken, data.access_token)
+            await _secretsManager
+                .SaveAccessTokenAsync(data.access_token)
                 .ConfigureAwait(false);
 
             if (!string.IsNullOrWhiteSpace(data.salt))
-                await _secureStorage
-                    .SaveAsync(Constants.Salt, data.salt)
+                await _secretsManager
+                    .SaveSaltAsync(data.salt)
                     .ConfigureAwait(false);
 
             if (data.kdf_version.HasValue)
-                await _secureStorage
-                    .SaveAsync(
-                        Constants.KdfVersion,
-                        data.kdf_version.Value.ToString())
+                await _secretsManager
+                    .SaveKdfVersionAsync(data.kdf_version.Value)
                     .ConfigureAwait(false);
 
             return data.access_token;
@@ -396,12 +394,6 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
 
     private async Task ClearLocalSession()
     {
-        await _secureStorage.DeleteAsync(Constants.AccessToken).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(Constants.RefreshToken).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(Constants.UserEmail).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(Constants.MasterKey).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(Constants.Salt).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(Constants.KdfVersion).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(Constants.ServerUrl).ConfigureAwait(false);
+        await _secretsManager.ClearAllSecretsAsync().ConfigureAwait(false);
     }
 }

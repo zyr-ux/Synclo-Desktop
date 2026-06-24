@@ -52,7 +52,7 @@ public class ClipboardSyncService(
     INotificationService notificationService,
     IAccountService accountService,
     ICryptographyService cryptographyService,
-    ISecureStorage secureStorage,
+    ISecretsManager secretsManager,
     IUtils utils,
     ILogger<ClipboardSyncService> logger
 ) : IDisposable, IClipboardSyncService
@@ -95,8 +95,8 @@ public class ClipboardSyncService(
                 logger.LogWarning(exception, $"Retry attempt {retryCount} after {timeSpan.TotalSeconds}s");
             });
 
-    private readonly ISecureStorage _secureStorage =
-        secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+    private readonly ISecretsManager _secretsManager =
+        secretsManager ?? throw new ArgumentNullException(nameof(secretsManager));
 
     private readonly ISettingsService _settingsService =
         settingsService ?? throw new ArgumentNullException(nameof(settingsService));
@@ -189,7 +189,7 @@ public class ClipboardSyncService(
                 _logger.LogInformation("Event subscriptions completed");
 
                 // Connect WebSocket if user is authenticated
-                var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey).ConfigureAwait(false);
+                var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync().ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(masterKeyBase64))
                 {
                     _logger.LogInformation("User is authenticated, ensuring WebSocket connection");
@@ -472,7 +472,7 @@ public class ClipboardSyncService(
     {
         try
         {
-            var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey).ConfigureAwait(false);
+            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync().ConfigureAwait(false);
             if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogInformation("Sync skipped: User not logged in");
@@ -798,7 +798,7 @@ public class ClipboardSyncService(
                 return _cachedMasterKey;
             }
 
-            var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey).ConfigureAwait(false);
+            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync().ConfigureAwait(false);
             if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 return null;

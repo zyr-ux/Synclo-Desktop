@@ -32,7 +32,7 @@ public sealed class AccountService : IAccountService
     private readonly ISettingsService _settings;
     private readonly IDeviceService _deviceService;
     private readonly ICryptographyService _cryptographyService;
-    private readonly ISecureStorage _secureStorage;
+    private readonly ISecretsManager _secretsManager;
     private readonly IUtils _utils;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IWebSocketService _webSocketService;
@@ -48,7 +48,7 @@ public sealed class AccountService : IAccountService
         ISettingsService settings,
         IDeviceService deviceService,
         ICryptographyService cryptographyService,
-        ISecureStorage secureStorage,
+        ISecretsManager secretsManager,
         IUtils utils,
         IRefreshTokenService refreshTokenService,
         IWebSocketService webSocketService,
@@ -60,7 +60,7 @@ public sealed class AccountService : IAccountService
         _settings = settings;
         _deviceService = deviceService;
         _cryptographyService = cryptographyService;
-        _secureStorage = secureStorage;
+        _secretsManager = secretsManager;
         _utils = utils;
         _refreshTokenService = refreshTokenService;
         _webSocketService = webSocketService;
@@ -81,11 +81,11 @@ public sealed class AccountService : IAccountService
         // Check logout flag first to avoid race condition
         if (_isLoggingOut) return false;
         
-        var token = await _secureStorage.LoadAsync(Constants.AccessToken);
+        var token = await _secretsManager.GetAccessTokenAsync();
         return !string.IsNullOrWhiteSpace(token);
     }
 
-    public async Task<string?> GetStoredEmailAsync() => await _secureStorage.LoadAsync(Constants.UserEmail);
+    public async Task<string?> GetStoredEmailAsync() => await _secretsManager.GetUserEmailAsync();
 
     private void OnDeviceDeletedHandler(string? deletedDeviceId)
     {
@@ -129,16 +129,16 @@ public sealed class AccountService : IAccountService
     // -------------------- KDF ENFORCEMENT --------------------
     public async Task EnforceLocalKdfVersionAsync()
     {
-        var stored = await _secureStorage.LoadAsync(Constants.KdfVersion);
+        var stored = await _secretsManager.GetKdfVersionAsync();
 
-        if (string.IsNullOrWhiteSpace(stored))
+        if (!stored.HasValue)
             return;
 
-        if (!int.TryParse(stored, out var version) || version != SupportedKdfVersion)
+        if (stored.Value != SupportedKdfVersion)
         {
             await LogoutAsync();
             throw new SecurityException(
-                $"Local session uses unsupported security version {stored}. Please log in again.");
+                $"Local session uses unsupported security version {stored.Value}. Please log in again.");
         }
     }
 
@@ -174,7 +174,7 @@ public sealed class AccountService : IAccountService
                 os = _utils.GetClientOS()
             };
 
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, _settings.GetAbsoluteUrl("login"));
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, _api.GetAbsoluteUrl("login"));
             httpReq.Content = _api.Serialize(req);
             using var res = await _http.SendAsync(httpReq, ct);
             var content = await res.Content.ReadAsStringAsync(ct);
@@ -199,21 +199,15 @@ public sealed class AccountService : IAccountService
             var masterKey =
                 _cryptographyService.UnwrapMasterKey(wrappedMk, wrappingKey);
 
-            await _secureStorage.SaveAsync(Constants.AccessToken, data.access_token);
-            await _secureStorage.SaveAsync(Constants.RefreshToken, data.refresh_token);
-            await _secureStorage.SaveAsync(Constants.UserEmail, email);
-            await _secureStorage.SaveAsync(
-                Constants.MasterKey,
-                _cryptographyService.ToBase64(masterKey));
-            await _secureStorage.SaveAsync(
-                Constants.KdfVersion,
-                SupportedKdfVersion.ToString());
-            await _secureStorage.SaveAsync(
-                Constants.ServerUrl,
-                _settings.Settings.ServerUrl);
+            await _secretsManager.SaveAccessTokenAsync(data.access_token);
+            await _secretsManager.SaveRefreshTokenAsync(data.refresh_token);
+            await _secretsManager.SaveUserEmailAsync(email);
+            await _secretsManager.SaveMasterKeyAsync(_cryptographyService.ToBase64(masterKey));
+            await _secretsManager.SaveKdfVersionAsync(SupportedKdfVersion);
+            await _secretsManager.SaveServerUrlAsync(_settings.Settings.ServerUrl);
 
             if (!string.IsNullOrWhiteSpace(data.salt))
-                await _secureStorage.SaveAsync(Constants.Salt, data.salt);
+                await _secretsManager.SaveSaltAsync(data.salt);
 
             _settings.Settings.device_id = req.device_id;
             _settings.Settings.device_name = req.device_name;
@@ -278,7 +272,7 @@ public sealed class AccountService : IAccountService
                 os = _utils.GetClientOS()
             };
 
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, _settings.GetAbsoluteUrl("register"))
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, _api.GetAbsoluteUrl("register"))
             {
                 Content = _api.Serialize(req)
             };
@@ -300,21 +294,13 @@ public sealed class AccountService : IAccountService
                 string.IsNullOrWhiteSpace(data.refresh_token))
                 throw new ServerFailureException("Missing tokens");
 
-            await _secureStorage.SaveAsync(Constants.AccessToken, data.access_token);
-            await _secureStorage.SaveAsync(Constants.RefreshToken, data.refresh_token);
-            await _secureStorage.SaveAsync(Constants.UserEmail, email);
-            await _secureStorage.SaveAsync(
-                Constants.MasterKey,
-                _cryptographyService.ToBase64(masterKey));
-            await _secureStorage.SaveAsync(
-                Constants.Salt,
-                _cryptographyService.ToBase64(salt));
-            await _secureStorage.SaveAsync(
-                Constants.KdfVersion,
-                SupportedKdfVersion.ToString());
-            await _secureStorage.SaveAsync(
-                Constants.ServerUrl,
-                _settings.Settings.ServerUrl);
+            await _secretsManager.SaveAccessTokenAsync(data.access_token);
+            await _secretsManager.SaveRefreshTokenAsync(data.refresh_token);
+            await _secretsManager.SaveUserEmailAsync(email);
+            await _secretsManager.SaveMasterKeyAsync(_cryptographyService.ToBase64(masterKey));
+            await _secretsManager.SaveSaltAsync(_cryptographyService.ToBase64(salt));
+            await _secretsManager.SaveKdfVersionAsync(SupportedKdfVersion);
+            await _secretsManager.SaveServerUrlAsync(_settings.Settings.ServerUrl);
 
             _settings.Settings.device_id = req.device_id;
             _settings.Settings.device_name = req.device_name;
@@ -357,8 +343,8 @@ public sealed class AccountService : IAccountService
             string.IsNullOrWhiteSpace(newPassword))
             throw new InvalidRequestException("Passwords are required");
 
-        var storedSalt = await _secureStorage.LoadAsync(Constants.Salt);
-        var storedMk = await _secureStorage.LoadAsync(Constants.MasterKey);
+        var storedSalt = await _secretsManager.GetSaltAsync();
+        var storedMk = await _secretsManager.GetMasterKeyAsync();
 
         if (string.IsNullOrWhiteSpace(storedSalt) ||
             string.IsNullOrWhiteSpace(storedMk))
@@ -386,12 +372,12 @@ public sealed class AccountService : IAccountService
             new_kdf_version = SupportedKdfVersion
         };
 
-        using var httpReq = new HttpRequestMessage(HttpMethod.Post, _settings.GetAbsoluteUrl("password/change"))
+        using var httpReq = new HttpRequestMessage(HttpMethod.Post, _api.GetAbsoluteUrl("password/change"))
         {
             Content = _api.Serialize(req)
         };
         
-        var token = await _secureStorage.LoadAsync(Constants.AccessToken);
+        var token = await _secretsManager.GetAccessTokenAsync();
         if (!string.IsNullOrWhiteSpace(token))
             httpReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
@@ -404,12 +390,8 @@ public sealed class AccountService : IAccountService
         if (!res.IsSuccessStatusCode)
             throw new ServerFailureException(content);
 
-        await _secureStorage.SaveAsync(
-            Constants.Salt,
-            _cryptographyService.ToBase64(newSalt));
-        await _secureStorage.SaveAsync(
-            Constants.KdfVersion,
-            SupportedKdfVersion.ToString());
+        await _secretsManager.SaveSaltAsync(_cryptographyService.ToBase64(newSalt));
+        await _secretsManager.SaveKdfVersionAsync(SupportedKdfVersion);
     }
 
 
@@ -456,14 +438,10 @@ public sealed class AccountService : IAccountService
         // Fix: Explicitly disconnect WebSocket to fail-safe against orphaned connections
         await _webSocketService.DisconnectAsync();
 
-        await _secureStorage.DeleteAsync(Constants.AccessToken);
-        await _secureStorage.DeleteAsync(Constants.RefreshToken);
-        await _secureStorage.DeleteAsync(Constants.UserEmail);
-        await _secureStorage.DeleteAsync(Constants.MasterKey);
-        await _secureStorage.DeleteAsync(Constants.Salt);
-        await _secureStorage.DeleteAsync(Constants.KdfVersion);
+        await _secretsManager.ClearAllSecretsAsync();
         _settings.Settings.last_sync = null;
-        await _settings.DeleteServerUrlAsync();
+        _settings.Settings.ServerUrl = AppSettings.DefaultServerUrl;
+        _settings.Save();
 
         await _deviceService.ClearAsync();
 
@@ -478,7 +456,7 @@ public sealed class AccountService : IAccountService
     private async Task<SaltResponse> GetSaltAsync(string email, CancellationToken ct)
     {
         using var res =
-            await _http.GetAsync(_settings.GetAbsoluteUrl($"auth/salt?email={Uri.EscapeDataString(email)}"), ct);
+            await _http.GetAsync(_api.GetAbsoluteUrl($"auth/salt?email={Uri.EscapeDataString(email)}"), ct);
 
         var content = await res.Content.ReadAsStringAsync(ct);
 
