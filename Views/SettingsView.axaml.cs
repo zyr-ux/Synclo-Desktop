@@ -14,11 +14,25 @@ public partial class SettingsView : UserControl
         InitializeComponent();
     }
 
-    private void ServerUrl_LostFocus(object? sender, RoutedEventArgs e)
+    private async void ServerUrl_LostFocus(object? sender, RoutedEventArgs e)
     {
         if (sender is TextBox textBox && DataContext is SettingsViewModel vm)
         {
-            textBox.Text = vm.ServerUrl;
+            if (textBox.Text != vm.ServerUrl)
+            {
+                try
+                {
+                    await vm.UpdateServerUrlAsync(textBox.Text);
+                }
+                catch
+                {
+                    // Revert the TextBox to the last committed value on unexpected failure
+                }
+                finally
+                {
+                    textBox.Text = vm.ServerUrl;
+                }
+            }
         }
     }
 

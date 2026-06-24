@@ -28,11 +28,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IViewModelFactory _factory;
     private readonly INotificationService _notificationService;
-    private readonly IAccountService _accountService;
     private readonly IWebSocketService _webSocketService;
     private readonly IDialogService _dialogService;
     private readonly ISettingsService _settingsService;
-    private readonly ISecretsManager _secretsManager;
     
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private bool _isDialogOpen;
@@ -58,19 +56,15 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel(
         IViewModelFactory factory,
         INotificationService notificationService,
-        IAccountService accountService,
         IWebSocketService webSocketService,
         IDialogService dialogService,
-        ISettingsService settingsService,
-        ISecretsManager secretsManager)
+        ISettingsService settingsService)
     {
         _factory = factory;
         _notificationService = notificationService;
-        _accountService = accountService;
         _webSocketService = webSocketService;
         _dialogService = dialogService;
         _settingsService = settingsService;
-        _secretsManager = secretsManager;
         
         IsDialogOpen = _dialogService.IsDialogOpen;
         _dialogService.IsDialogOpenChanged += OnIsDialogOpenChanged;
@@ -83,35 +77,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void OnIsDialogOpenChanged(object? sender, bool isOpen)
     {
         Dispatcher.UIThread.Post(() => IsDialogOpen = isOpen);
-    }
-
-    public async Task InitializeApplicationAsync()
-    {
-        try
-        {
-            var serverUrl = await _secretsManager.GetServerUrlAsync();
-            if (!string.IsNullOrEmpty(serverUrl))
-            {
-                _settingsService.Settings.ServerUrl = serverUrl;
-            }
-            await _accountService.EnforceLocalKdfVersionAsync();
-        }
-        catch (SecurityException ex)
-        {
-            _notificationService.ShowError(ex.Message, "Security Update");
-            return;
-        }
-        catch
-        {
-            return;
-        }
-
-        StartBackgroundServices();
-    }
-
-    private void StartBackgroundServices()
-    {
-        _ = _webSocketService.ConnectAsync();
     }
 
 

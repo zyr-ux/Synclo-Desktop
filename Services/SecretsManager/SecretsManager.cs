@@ -94,6 +94,5 @@ public sealed class SecretsManager : ISecretsManager
         await _secureStorage.DeleteAsync(MasterKey).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(Salt).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(KdfVersion).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(ServerUrl).ConfigureAwait(false);
     }
 }

@@ -201,8 +201,7 @@ public partial class SettingsViewModel : ViewModelBase
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     _notificationService.ShowError(error!);
-                    ServerUrl = "";
-                    ServerUrl = _previousServerUrl;
+                    OnPropertyChanged(nameof(ServerUrl));
                 });
                 return;
             }
@@ -222,8 +221,7 @@ public partial class SettingsViewModel : ViewModelBase
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         _notificationService.ShowError("Could not connect to server.");
-                        ServerUrl = "";
-                        ServerUrl = _previousServerUrl;
+                        OnPropertyChanged(nameof(ServerUrl));
                     });
                     return;
                 }
@@ -231,18 +229,20 @@ public partial class SettingsViewModel : ViewModelBase
 
             await _secretsManager.SaveServerUrlAsync(cleanUrl);
             _settings.Settings.ServerUrl = cleanUrl;
-            _settings.Save();
 
             var isAuth = await _accountService.IsAuthenticatedAsync();
+            if (isAuth)
+            {
+                await _accountService.LogoutAsync();
+            }
 
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 _previousServerUrl = cleanUrl;
                 ServerUrl = cleanUrl;
 
                 if (isAuth)
                 {
-                    await _accountService.LogoutAsync();
                     _notificationService.ShowSuccess("Server URL updated. Please log in to use the new server instance.");
                 }
                 else

@@ -133,9 +133,7 @@ public class ClipboardSyncService(
     // Initialization lock to prevent race conditions (Bug #9 fix)
     private readonly SemaphoreSlim _initLock = new(1, 1);
     
-    // Master key cache to avoid repeated secure storage I/O (Issue #2 fix)
-    private byte[]? _cachedMasterKey;
-    private readonly SemaphoreSlim _masterKeyLock = new(1, 1);
+
 
     private bool _disposed;
     private volatile bool _isInitialized;
@@ -450,12 +448,9 @@ public class ClipboardSyncService(
             _accountService.OnLogout -= OnAccountLoggedOut;
             _repository.OnDataChanged -= HandleRepositoryDataChanged;
 
-            ClearMasterKeyCache();
-
             _refreshLock.Dispose();
             // _ackLock.Dispose(); // Removed
             _initLock.Dispose();
-            _masterKeyLock.Dispose();
 
             _shutdownCts.Cancel();
             _shutdownCts.Dispose();
@@ -481,88 +476,94 @@ public class ClipboardSyncService(
             
             // Optimize: Decode key once outside the loop
             var masterKey = Convert.FromBase64String(masterKeyBase64);
-
-            // Delta Sync Logic
-            DateTime? since = _settingsService.Settings.last_sync;
-            long currentOffset = 0;
-            bool hasMore = true;
-            int totalSynced = 0;
-            
-            // Track the max updated_at seen in this sync session to update last_sync at the end
-            DateTime? maxUpdatedAt = since;
-            var resetAttempted = false;
-
-            while (true)
+            try
             {
-                try 
+                // Delta Sync Logic
+                DateTime? since = _settingsService.Settings.last_sync;
+                long currentOffset = 0;
+                bool hasMore = true;
+                int totalSynced = 0;
+                
+                // Track the max updated_at seen in this sync session to update last_sync at the end
+                DateTime? maxUpdatedAt = since;
+                var resetAttempted = false;
+
+                while (true)
                 {
-                    while (hasMore)
+                    try 
                     {
-                        if (_shutdownCts.IsCancellationRequested) break;
-
-                        var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
-                            since: since,
-                            limit: DefaultSyncPageSize,
-                            offset: currentOffset
-                        ).ConfigureAwait(false);
-
-                        if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
+                        while (hasMore)
                         {
+                            if (_shutdownCts.IsCancellationRequested) break;
+
+                            var syncResponse = await _clipboardApiService.GetClipboardSyncAsync(
+                                since: since,
+                                limit: DefaultSyncPageSize,
+                                offset: currentOffset
+                            ).ConfigureAwait(false);
+
+                            if (syncResponse?.entries == null || syncResponse.entries.Count == 0)
+                            {
+                                break;
+                            }
+
+                            await ProcessSyncBatch(syncResponse.entries, masterKey);
+
+                            // Track max updated_at for next sync
+                            foreach (var entry in syncResponse.entries)
+                            {
+                                if (entry.updated_at > (maxUpdatedAt ?? DateTime.MinValue))
+                                {
+                                    maxUpdatedAt = entry.updated_at;
+                                }
+                            }
+
+                            currentOffset = syncResponse.next_offset;
+                            hasMore = syncResponse.has_more;
+                            totalSynced += syncResponse.entries.Count;
+                            
+                            _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
+                        }
+
+                        // Update last_sync only if we successfully synced everything
+                        if (maxUpdatedAt > since || (since == null && maxUpdatedAt != null))
+                        {
+                             _settingsService.Settings.last_sync = maxUpdatedAt;
+                             _settingsService.Save();
+                        }
+                        
+                        if (totalSynced > 0)
+                        {
+                            _logger.LogInformation($"Sync completed: {totalSynced} total entries synced. New last_sync: {maxUpdatedAt}");
+                        }
+
+                        break;
+                    }
+                    catch (HttpRequestException ex) when (ex.Message.Contains("410") || ex.StatusCode == System.Net.HttpStatusCode.Gone)
+                    {
+                        if (resetAttempted)
+                        {
+                            _logger.LogError("Sync state expired repeatedly (410 Gone) after reset. Aborting sync attempt.");
                             break;
                         }
 
-                        await ProcessSyncBatch(syncResponse.entries, masterKey);
+                        _logger.LogWarning("Sync state expired (410 Gone). Wiping local database and performing fresh sync.");
+                        await _repository.ClearAllAsync();
+                        _settingsService.Settings.last_sync = null;
+                        _settingsService.Save();
 
-                        // Track max updated_at for next sync
-                        foreach (var entry in syncResponse.entries)
-                        {
-                            if (entry.updated_at > (maxUpdatedAt ?? DateTime.MinValue))
-                            {
-                                maxUpdatedAt = entry.updated_at;
-                            }
-                        }
-
-                        currentOffset = syncResponse.next_offset;
-                        hasMore = syncResponse.has_more;
-                        totalSynced += syncResponse.entries.Count;
-                        
-                        _logger.LogInformation($"Synced batch: {syncResponse.entries.Count} entries, next_offset: {currentOffset}, has_more: {hasMore}");
+                        resetAttempted = true;
+                        since = null;
+                        currentOffset = 0;
+                        hasMore = true;
+                        totalSynced = 0;
+                        maxUpdatedAt = null;
                     }
-
-                    // Update last_sync only if we successfully synced everything
-                    if (maxUpdatedAt > since || (since == null && maxUpdatedAt != null))
-                    {
-                         _settingsService.Settings.last_sync = maxUpdatedAt;
-                         _settingsService.Save();
-                    }
-                    
-                    if (totalSynced > 0)
-                    {
-                        _logger.LogInformation($"Sync completed: {totalSynced} total entries synced. New last_sync: {maxUpdatedAt}");
-                    }
-
-                    break;
                 }
-                catch (HttpRequestException ex) when (ex.Message.Contains("410") || ex.StatusCode == System.Net.HttpStatusCode.Gone)
-                {
-                    if (resetAttempted)
-                    {
-                        _logger.LogError("Sync state expired repeatedly (410 Gone) after reset. Aborting sync attempt.");
-                        break;
-                    }
-
-                    _logger.LogWarning("Sync state expired (410 Gone). Wiping local database and performing fresh sync.");
-                    await _repository.ClearAllAsync();
-                    _settingsService.Settings.last_sync = null;
-                    _settingsService.Save();
-
-                    resetAttempted = true;
-                    since = null;
-                    currentOffset = 0;
-                    hasMore = true;
-                    totalSynced = 0;
-                    maxUpdatedAt = null;
-                }
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(masterKey);
             }
         }
         catch (Exception ex)
@@ -784,57 +785,6 @@ public class ClipboardSyncService(
         _logger.LogInformation("Clipboard channel consumer loop stopped");
     }
 
-    // Issue #2 fix: Cache master key to avoid repeated secure storage I/O
-    private async Task<byte[]?> GetMasterKeyAsync()
-    {
-        // Bug #2.4 fix: Double-check locking optimization
-        if (_cachedMasterKey != null) return _cachedMasterKey;
-
-        await _masterKeyLock.WaitAsync();
-        try
-        {
-            if (_cachedMasterKey != null)
-            {
-                return _cachedMasterKey;
-            }
-
-            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync().ConfigureAwait(false);
-            if (string.IsNullOrEmpty(masterKeyBase64))
-            {
-                return null;
-            }
-
-            _cachedMasterKey = Convert.FromBase64String(masterKeyBase64);
-            _logger.LogDebug("Master key cached in memory");
-            return _cachedMasterKey;
-        }
-        finally
-        {
-            _masterKeyLock.Release();
-        }
-    }
-
-    /// <summary>
-    /// Clears the cached master key. Should be called on logout or key rotation.
-    /// </summary>
-    public void ClearMasterKeyCache()
-    {
-        _masterKeyLock.Wait();
-        try
-        {
-            if (_cachedMasterKey != null)
-            {
-                CryptographicOperations.ZeroMemory(_cachedMasterKey);
-            }
-            _cachedMasterKey = null;
-            _logger.LogDebug("Master key cache cleared");
-        }
-        finally
-        {
-            _masterKeyLock.Release();
-        }
-    }
-
     private async Task ProcessOutgoingClipboardAsync(string content)
     {
         try
@@ -866,15 +816,26 @@ public class ClipboardSyncService(
             var clientId = Guid.NewGuid().ToString();
             var timestamp = _utils.TruncateToMilliseconds(DateTime.UtcNow);
 
-            // Issue #2 fix: Use cached master key
-            var masterKey = await GetMasterKeyAsync();
-            if (masterKey == null)
+            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync().ConfigureAwait(false);
+            if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogWarning("Master key not found - cannot encrypt clipboard content");
                 return;
             }
 
-            var (ciphertext, nonce) = _cryptographyService.EncryptClipboard(content, masterKey);
+            var masterKey = Convert.FromBase64String(masterKeyBase64);
+            byte[] ciphertext;
+            byte[] nonce;
+            try
+            {
+                var cryptResult = _cryptographyService.EncryptClipboard(content, masterKey);
+                ciphertext = cryptResult.ciphertext;
+                nonce = cryptResult.nonce;
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(masterKey);
+            }
 
             // Save to SQLite with encrypted data
             var dbEntry = new HistoryItemModel
@@ -1106,14 +1067,14 @@ public class ClipboardSyncService(
                 return;
             }
 
-            // Issue #2 fix: Use cached master key
-            var masterKey = await GetMasterKeyAsync();
-            if (masterKey == null)
+            var masterKeyBase64 = await _secretsManager.GetMasterKeyAsync().ConfigureAwait(false);
+            if (string.IsNullOrEmpty(masterKeyBase64))
             {
                 _logger.LogWarning("Master key not available, user may not be authenticated");
                 return;
             }
 
+            var masterKey = Convert.FromBase64String(masterKeyBase64);
             var ciphertext = _cryptographyService.FromBase64(entry.ciphertext);
             var nonce = _cryptographyService.FromBase64(entry.nonce);
 
@@ -1131,6 +1092,10 @@ public class ClipboardSyncService(
                 // Fix 2: Include ciphertext hash in plaintext to ensure unique contentHash for different failed entries
                 var safeHash = _utils.ComputeHash(entry.ciphertext ?? string.Empty);
                 plaintext = $"Encrypted Content Unavailable [{safeHash}]";
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(masterKey);
             }
             
             var contentHash = _utils.ComputeHash(plaintext);
@@ -1291,8 +1256,6 @@ public class ClipboardSyncService(
 
     private async Task OnAccountLoggedOut()
     {
-        ClearMasterKeyCache();
-        
         // Wipe local database completely on logout/failure to ensure fresh state on next login
         await _repository.ClearAllAsync();
         

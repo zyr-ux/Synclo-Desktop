@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -6,7 +7,10 @@ using Avalonia.Controls.Notifications;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Synclo.Services.API;
 using Synclo.Services.ClipboardMonitor;
+using Synclo.Services.ClipboardService;
+using Synclo.Services.SecretsManager;
 using Synclo.Services.Utilities;
 using Synclo.Themes;
 using Synclo.ViewModels;
@@ -27,35 +31,29 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        // 1. Setup DI
+        // Setup DI
         var collection = new ServiceCollection();
         collection.AddSyncloServices();
         _services = collection.BuildServiceProvider();
 
-        // 2. Single Instance Check
         var instanceManager = _services.GetRequiredService<SingleInstanceManager>();
-        if (!instanceManager.IsPrimary)
+
+        // Single Instance Check
+        if (!CheckSingleInstance(instanceManager))
         {
-            instanceManager.SignalPrimary();
             Environment.Exit(0);
             return;
         }
 
-        // 3. Resolve key system services
+        // Resolve key system services
         _appControl = _services.GetRequiredService<IApplicationControlService>();
         var settingsService = _services.GetRequiredService<ISettingsService>();
         var themeService = _services.GetRequiredService<IThemeService>();
 
+        // Apply visual theme
         themeService.ApplyTheme(settingsService.Settings.Theme);
 
-        // 4. Initialize Bootstrapper (wires ws connection, clipboard repository, etc)
-        var bootstrapper = _services.GetRequiredService<IAppBootstrapper>();
-        bootstrapper.Initialize(_services);
-
-        // 5. IPC single instance focus event
-        instanceManager.SignalReceived += () => _appControl.ShowMainWindow();
-
-        // 6. Handle Tray Icon Visibility
+        // Handle Tray Icon Visibility
         settingsService.SettingsChanged += s =>
         {
             Dispatcher.UIThread.InvokeAsync(() => UpdateTrayIconVisibility(s.minimize_to_tray));
@@ -66,41 +64,63 @@ public class App : Application
         {
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            var mainVm = _services.GetRequiredService<MainWindowViewModel>();
-            _mainWindow = new MainWindow { DataContext = mainVm };
-            themeService.ApplyMica(settingsService.Settings.is_mica_enabled, _mainWindow);
-            _mainWindow.Initialize(_appControl);
-            _appControl.SetWindow(_mainWindow);
-
-            // Setup notification manager
-            var notificationService = _services.GetRequiredService<INotificationService>();
-            var notificationManager = new WindowNotificationManager(_mainWindow)
+            // Sequential async initialization
+            Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                Position = NotificationPosition.TopRight,
-                MaxItems = 3,
-                Margin = new Thickness(0, 40, 0, 0)
-            };
-            notificationService.SetManager(notificationManager);
+                System.Security.SecurityException? kdfException = null;
+                try
+                {
+                    await InitializeServicesAsync(_services);
+                }
+                catch (System.Security.SecurityException ex)
+                {
+                    kdfException = ex;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error during services initialization: {ex}");
+                }
 
-            // Set host window on ClipboardProvider
-            if (_services.GetService<IClipboardProvider>() is AvaloniaClipboardProvider provider)
-                provider.SetHostWindow(_mainWindow);
+                var mainVm = _services.GetRequiredService<MainWindowViewModel>();
+                _mainWindow = new MainWindow { DataContext = mainVm };
+                themeService.ApplyMica(settingsService.Settings.is_mica_enabled, _mainWindow);
+                _mainWindow.Initialize(_appControl);
+                _appControl.SetWindow(_mainWindow);
 
-            // Determine autostart hidden window states
-            var isAutostart = desktop.Args?.Contains("--autostart") ?? false;
-            if (isAutostart)
-            {
-                var startHidden = settingsService.Settings.background_sync_enabled ||
-                                  settingsService.Settings.minimize_to_tray;
-                if (!startHidden) desktop.MainWindow = _mainWindow;
-            }
-            else
-            {
-                desktop.MainWindow = _mainWindow;
-            }
+                // Setup notification manager
+                var notificationService = _services.GetRequiredService<INotificationService>();
+                var notificationManager = new WindowNotificationManager(_mainWindow)
+                {
+                    Position = NotificationPosition.TopRight,
+                    MaxItems = 3,
+                    Margin = new Thickness(0, 40, 0, 0)
+                };
+                notificationService.SetManager(notificationManager);
 
-            // Initialize UI View Model
-            Dispatcher.UIThread.InvokeAsync(mainVm.InitializeApplicationAsync);
+                // Set host window on ClipboardProvider
+                if (_services.GetService<IClipboardProvider>() is AvaloniaClipboardProvider provider)
+                    provider.SetHostWindow(_mainWindow);
+
+                // Determine autostart hidden window states
+                var isAutostart = desktop.Args?.Contains("--autostart") ?? false;
+                if (isAutostart)
+                {
+                    var startHidden = settingsService.Settings.background_sync_enabled ||
+                                      settingsService.Settings.minimize_to_tray;
+                    if (!startHidden) desktop.MainWindow = _mainWindow;
+                }
+                else
+                {
+                    desktop.MainWindow = _mainWindow;
+                }
+
+                _mainWindow.Show();
+
+                if (kdfException != null)
+                {
+                    notificationService.ShowError(kdfException.Message, "Security Update");
+                }
+            });
 
             // Graceful shutdown wiring
             var isShuttingDown = false;
@@ -114,7 +134,7 @@ public class App : Application
                 {
                     try
                     {
-                        await bootstrapper.ShutdownAsync();
+                        await ShutdownServicesAsync(_services);
                     }
                     catch (Exception ex)
                     {
@@ -129,6 +149,78 @@ public class App : Application
 
             base.OnFrameworkInitializationCompleted();
         }
+    }
+
+    private bool CheckSingleInstance(SingleInstanceManager instanceManager)
+    {
+        if (!instanceManager.IsPrimary)
+        {
+            instanceManager.SignalPrimary();
+            return false;
+        }
+        return true;
+    }
+
+    private async Task InitializeServicesAsync(IServiceProvider services)
+    {
+        var appControl = services.GetRequiredService<IApplicationControlService>();
+        var secretsManager = services.GetRequiredService<ISecretsManager>();
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        var accountService = services.GetRequiredService<IAccountService>();
+        var webSocketService = services.GetRequiredService<IWebSocketService>();
+        var refreshTokenService = services.GetRequiredService<IRefreshTokenService>();
+        var instanceManager = services.GetRequiredService<SingleInstanceManager>();
+
+        // IPC single instance focus event
+        instanceManager.SignalReceived += () => appControl.ShowMainWindow();
+
+        // Wire up event connections
+        refreshTokenService.SessionExpired += OnSessionExpired;
+        accountService.OnLogout += webSocketService.DisconnectAsync;
+
+        // 1. Restore ServerUrl from secure secrets manager
+        var serverUrl = await secretsManager.GetServerUrlAsync().ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(serverUrl))
+        {
+            settingsService.Settings.ServerUrl = serverUrl;
+        }
+
+        // 2. Enforce local KDF version check (will throw SecurityException if invalid)
+        await accountService.EnforceLocalKdfVersionAsync().ConfigureAwait(false);
+
+        // 3. Initialize repository
+        var clipboardRepository = services.GetRequiredService<IClipboardRepository>();
+        await clipboardRepository.InitializeAsync().ConfigureAwait(false);
+
+        // 4. Initialize clipboard sync service (which connects WebSocket and syncs)
+        var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
+        await clipboardSyncService.InitializeAsync().ConfigureAwait(false);
+    }
+
+    private void OnSessionExpired()
+    {
+        if (_services == null) return;
+        var accountService = _services.GetRequiredService<IAccountService>();
+        _ = accountService.LogoutAsync();
+    }
+
+    private async Task ShutdownServicesAsync(IServiceProvider services)
+    {
+        // Graceful cleanup of registered services
+        var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
+        await clipboardSyncService.ShutdownAsync();
+
+        var webSocketService = services.GetRequiredService<IWebSocketService>();
+        webSocketService.Dispose();
+
+        var apiService = services.GetRequiredService<IApiService>();
+        apiService.Dispose();
+
+        var instanceManager = services.GetRequiredService<SingleInstanceManager>();
+        instanceManager.Dispose();
+
+        var mainVm = services.GetRequiredService<MainWindowViewModel>();
+        mainVm.Dispose();
     }
 
     private void OnExitClicked(object? sender, EventArgs e)

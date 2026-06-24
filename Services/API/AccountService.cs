@@ -440,7 +440,6 @@ public sealed class AccountService : IAccountService
 
         await _secretsManager.ClearAllSecretsAsync();
         _settings.Settings.last_sync = null;
-        _settings.Settings.ServerUrl = AppSettings.DefaultServerUrl;
         _settings.Save();
 
         await _deviceService.ClearAsync();
