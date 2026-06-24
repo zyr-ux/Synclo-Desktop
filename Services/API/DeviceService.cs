@@ -140,7 +140,7 @@ public sealed class DeviceService(IApiService api, ISettingsService settings, IS
     {
         if (_cachedPath != null) return _cachedPath;
 
-        var email = await secureStorage.LoadAsync(AccountService.UserEmail);
+        var email = await secureStorage.LoadAsync(Constants.UserEmail);
         var identifier = "anonymous";
         if (!string.IsNullOrWhiteSpace(email))
         {

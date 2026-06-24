@@ -41,6 +41,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
     private readonly HttpClient _http;
     private readonly ISecureStorage _secureStorage;
     private readonly ICryptographyService _cryptographyService;
+    private readonly ISettingsService _settingsService;
 
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -64,11 +65,13 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
     public RefreshTokenService(
         HttpClient http,
         ISecureStorage secureStorage,
-        ICryptographyService cryptographyService)
+        ICryptographyService cryptographyService,
+        ISettingsService settingsService)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
         _cryptographyService = cryptographyService ?? throw new ArgumentNullException(nameof(cryptographyService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         
         _jsonOptions = new JsonSerializerOptions
         {
@@ -86,6 +89,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
         // Start background processor
         _processorTask = ProcessRefreshQueue();
     }
+
 
     public void RaiseTokenExpired()
     {
@@ -260,7 +264,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
     private async Task<string> DoActualRefreshAsync()
     {
         var refreshToken =
-            await _secureStorage.LoadAsync(AccountService.RefreshToken).ConfigureAwait(false);
+            await _secureStorage.LoadAsync(Constants.RefreshToken).ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
@@ -272,7 +276,7 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
 
         try
         {
-            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "refresh")
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, _settingsService.GetAbsoluteUrl("refresh"))
             {
                 Content = new StringContent(
                     JsonSerializer.Serialize(body, _jsonOptions),
@@ -321,22 +325,22 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
             }
 
             await _secureStorage
-                .SaveAsync(AccountService.RefreshToken, data.refresh_token)
+                .SaveAsync(Constants.RefreshToken, data.refresh_token)
                 .ConfigureAwait(false);
 
             await _secureStorage
-                .SaveAsync(AccountService.AccessToken, data.access_token)
+                .SaveAsync(Constants.AccessToken, data.access_token)
                 .ConfigureAwait(false);
 
             if (!string.IsNullOrWhiteSpace(data.salt))
                 await _secureStorage
-                    .SaveAsync(_cryptographyService.Salt, data.salt)
+                    .SaveAsync(Constants.Salt, data.salt)
                     .ConfigureAwait(false);
 
             if (data.kdf_version.HasValue)
                 await _secureStorage
                     .SaveAsync(
-                        _cryptographyService.KdfVersion,
+                        Constants.KdfVersion,
                         data.kdf_version.Value.ToString())
                     .ConfigureAwait(false);
 
@@ -392,11 +396,12 @@ public sealed class RefreshTokenService : IRefreshTokenService, IDisposable
 
     private async Task ClearLocalSession()
     {
-        await _secureStorage.DeleteAsync(AccountService.AccessToken).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(AccountService.RefreshToken).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(AccountService.UserEmail).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(_cryptographyService.MasterKey).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(_cryptographyService.Salt).ConfigureAwait(false);
-        await _secureStorage.DeleteAsync(_cryptographyService.KdfVersion).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.AccessToken).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.RefreshToken).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.UserEmail).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.MasterKey).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.Salt).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.KdfVersion).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(Constants.ServerUrl).ConfigureAwait(false);
     }
 }

@@ -151,6 +151,49 @@
                                           SelectedItem="{Binding SelectedCloseBehavior}" />
                             </Grid>
                         </Border>
+                        
+                        <!-- Server URL -->
+                        <Border Classes="SettingsItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+
+                                <materialIcons:MaterialIcon
+                                    Kind="ServerNetwork"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Foreground}" />
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Server URL"
+                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontSize="16"
+                                               Foreground="{DynamicResource Foreground}" />
+                                    <TextBlock Text="Set a custom self-hosted instance URL"
+                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontSize="13"
+                                               Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Foreground}"
+                                               Opacity="0.7"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="Changing this URL will log you out and clear local history"
+                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0"
+                                               Foreground="OrangeRed"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <TextBox Grid.Column="2"
+                                         Width="250"
+                                         VerticalAlignment="Center"
+                                         FontFamily="{DynamicResource Inconsolata-Medium}"
+                                         Text="{Binding ServerUrl, Mode=OneWay}"
+                                         LostFocus="ServerUrl_LostFocus"
+                                         KeyDown="ServerUrl_KeyDown"
+                                         Watermark="https://synclo.zyrux.dev" />
+                            </Grid>
+                        </Border>
 
                         <!-- Start on boot Toggle -->
                         <Border Classes="SettingsItem">

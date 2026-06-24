@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Synclo.Models;
 using Polly;
 using Synclo.Services.SecretsManager;
+using Synclo.Services.Utilities;
 
 namespace Synclo.Services.API;
 
@@ -17,31 +18,32 @@ public interface IApiService : IDisposable
     Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default);
     Task<HttpResponseMessage> PostAsync(string url, object body, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteAsync(string url, CancellationToken ct = default);
-    Task Health();
+    Task Health(string? baseUrl = null);
     StringContent Serialize(object obj);
     T Deserialize<T>(string json);
 }
 
 public sealed class ApiService : IApiService
 {
-    private const string BaseUrl = "https://synclo.zyrux.dev/api/v1/";
     private readonly HttpClient _http;
     private readonly ISecureStorage _secureStorage;
     private readonly IRefreshTokenService _refreshTokenService;
+    private readonly ISettingsService _settingsService;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
-    public ApiService(HttpClient http, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
+    public ApiService(
+        HttpClient http, 
+        ISecureStorage secureStorage, 
+        IRefreshTokenService refreshTokenService,
+        ISettingsService settingsService)
     {
         _http = http;
         _secureStorage = secureStorage;
         _refreshTokenService = refreshTokenService;
+        _settingsService = settingsService;
         
-        if (_http.BaseAddress == null)
-        {
-            _http.BaseAddress = new Uri(BaseUrl);
-            _http.Timeout = TimeSpan.FromSeconds(15);
-        }
+        _http.Timeout = TimeSpan.FromSeconds(15);
         
         _jsonOptions = new JsonSerializerOptions
         {
@@ -49,6 +51,7 @@ public sealed class ApiService : IApiService
             PropertyNameCaseInsensitive = true
         };
     }
+
 
     public Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct = default)
     {
@@ -65,13 +68,14 @@ public sealed class ApiService : IApiService
         return SendAuthReqAsync(HttpMethod.Delete, url, null, ct);
     }
 
-    public async Task Health()
+    public async Task Health(string? baseUrl = null)
     {
-        var req = await _http.GetAsync("/health");
+        var url = (baseUrl ?? _settingsService.Settings.ServerUrl).TrimEnd('/');
+        var req = await _http.GetAsync($"{url}/health");
         req.EnsureSuccessStatusCode();
     }
 
-    #region Helper Proxies
+    #region Helper Methods
 
     private async Task<HttpResponseMessage> SendAuthReqAsync(HttpMethod method, string url, object? body,
         CancellationToken ct)
@@ -110,8 +114,8 @@ public sealed class ApiService : IApiService
 
             var res = await policy.ExecuteAsync(async (ct2) =>
             {
-                using var attemptReq = new HttpRequestMessage(method, url);
-                var token2 = await _secureStorage.LoadAsync(AccountService.AccessToken);
+                using var attemptReq = new HttpRequestMessage(method, _settingsService.GetAbsoluteUrl(url));
+                var token2 = await _secureStorage.LoadAsync(Constants.AccessToken);
                 if (!string.IsNullOrWhiteSpace(token2))
                     attemptReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token2);
 
@@ -135,7 +139,7 @@ public sealed class ApiService : IApiService
 
             return res;
         }
-        catch (HttpRequestException)
+        catch (Exception)
         {
             throw new NetworkFailureException();
         }

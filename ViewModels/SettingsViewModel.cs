@@ -5,6 +5,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Material.Icons;
+using Synclo.Models;
 using Synclo.Services;
 using Synclo.Services.API;
 using Synclo.Services.ClipboardService;
@@ -20,10 +21,17 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IApiService _apiService;
     private readonly IThemeService _themeService;
     private readonly IStartupManager _startupManager;
+    private readonly IAccountService _accountService;
+    private readonly INotificationService _notificationService;
+
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private bool _showResult;
     [ObservableProperty] private bool _isStartOnBootEnabled;
     [ObservableProperty] private bool _isMicaEnabled;
+    [ObservableProperty] private string _serverUrl = "";
+    
+    private string _previousServerUrl = "";
+    private bool _isUpdatingServerUrl;
     
     public bool IsMicaToggleVisible => OperatingSystem.IsWindows() && Environment.OSVersion.Version.Build >= 22000;
     
@@ -37,15 +45,21 @@ public partial class SettingsViewModel : ViewModelBase
         ISettingsService settings, 
         IApiService apiService, 
         IThemeService themeService,
-        IStartupManager startupManager)
+        IStartupManager startupManager,
+        IAccountService accountService,
+        INotificationService notificationService)
     {
         _settings = settings;
         _apiService = apiService;
         _themeService = themeService;
         _startupManager = startupManager;
+        _accountService = accountService;
+        _notificationService = notificationService;
         
         SelectedTheme = _settings.Settings.Theme;
         IsMicaEnabled = _settings.Settings.is_mica_enabled;
+        ServerUrl = _settings.Settings.ServerUrl;
+        _previousServerUrl = ServerUrl;
         
         // Load start on boot status
         _ = LoadStartOnBootStatusAsync();
@@ -163,6 +177,74 @@ public partial class SettingsViewModel : ViewModelBase
         else
         {
             SelectedCloseBehavior = "Quit Application";
+        }
+    }
+
+    public async Task UpdateServerUrlAsync(string? text)
+    {
+        if (_isUpdatingServerUrl) 
+            return;
+        
+        _isUpdatingServerUrl = true;
+
+        try
+        {
+            if (!_settings.TryNormalizeServerUrl(text, out var cleanUrl, out var error))
+            {
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    _notificationService.ShowError(error!);
+                    ServerUrl = "";
+                    ServerUrl = _previousServerUrl;
+                });
+                return;
+            }
+
+            if (cleanUrl == _previousServerUrl)
+                return;
+
+            // Ping the candidate URL before committing it (skip for the default server)
+            if (cleanUrl != AppSettings.DefaultServerUrl)
+            {
+                try
+                {
+                    await _apiService.Health(cleanUrl);
+                }
+                catch
+                {
+                    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        _notificationService.ShowError("Could not connect to server.");
+                        ServerUrl = "";
+                        ServerUrl = _previousServerUrl;
+                    });
+                    return;
+                }
+            }
+
+            await _settings.SaveServerUrlAsync(cleanUrl);
+
+            var isAuth = await _accountService.IsAuthenticatedAsync();
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                _previousServerUrl = cleanUrl;
+                ServerUrl = cleanUrl;
+
+                if (isAuth)
+                {
+                    await _accountService.LogoutAsync();
+                    _notificationService.ShowSuccess("Server URL updated. Please log in to use the new server instance.");
+                }
+                else
+                {
+                    _notificationService.ShowSuccess("Server URL updated successfully.");
+                }
+            });
+        }
+        finally
+        {
+            _isUpdatingServerUrl = false;
         }
     }
 }

@@ -42,7 +42,7 @@ public class ClipboardApiService(
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 
@@ -66,7 +66,7 @@ public class ClipboardApiService(
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(ApiTimeoutSeconds));
-            var masterKeyBase64 = await _secureStorage.LoadAsync(_cryptographyService.MasterKey);
+            var masterKeyBase64 = await _secureStorage.LoadAsync(Constants.MasterKey);
             if (string.IsNullOrEmpty(masterKeyBase64))
                 throw new InvalidOperationException("Master key not found. User must be logged in.");
 

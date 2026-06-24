@@ -9,9 +9,6 @@ namespace Synclo.Services.Utilities;
 
 public interface ICryptographyService
 {
-    string MasterKey { get; }
-    string Salt { get; }
-    string KdfVersion { get; }
     byte[] DeriveAuthKey(string password, byte[] salt);
     byte[] DeriveAuthKey(ReadOnlySpan<char> password, byte[] salt);
     (byte[] authKey, byte[] wrappingKey) DerivePasswordKeys(string password, byte[] salt);
@@ -44,11 +41,6 @@ public sealed class CryptographyService : ICryptographyService
     private readonly byte[] ClipboardAad = "clipboard_v1"u8.ToArray();
     private readonly byte[] WrapAad = "wrap_mk_v1"u8.ToArray();
     private readonly byte[] HkdfSaltLabel = "hkdf_salt_v1"u8.ToArray();
-
-    // Secure storage keys
-    public string MasterKey => $"{AccountService.Prefix}.crypto.master_key";
-    public string Salt => $"{AccountService.Prefix}.crypto.salt";
-    public string KdfVersion => $"{AccountService.Prefix}.crypto.kdf_version";
 
     // -------------------- PASSWORD DERIVATION --------------------
 

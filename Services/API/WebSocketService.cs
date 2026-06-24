@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Synclo.Services.SecretsManager;
+using Synclo.Services.Utilities;
+using Synclo.Models;
 
 namespace Synclo.Services.API;
 
@@ -30,6 +32,7 @@ public sealed class WebSocketService : IWebSocketService
     private readonly IApiService _apiService;
     private readonly ISecureStorage _secureStorage;
     private readonly IRefreshTokenService _refreshTokenService;
+    private readonly ISettingsService _settingsService;
     private const int BufferSize = 8192;
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private CancellationTokenSource? _cts;
@@ -40,11 +43,17 @@ public sealed class WebSocketService : IWebSocketService
     private ClientWebSocket? _socket;
     private Task? _pingTask;
 
-    public WebSocketService(IApiService api, ISecureStorage secureStorage, IRefreshTokenService refreshTokenService)
+    public WebSocketService(
+        IApiService api, 
+        ISecureStorage secureStorage, 
+        IRefreshTokenService refreshTokenService,
+        ISettingsService settingsService)
     {
         _apiService = api;
         _secureStorage = secureStorage;
         _refreshTokenService = refreshTokenService;
+        _settingsService = settingsService;
+        
         _refreshTokenService.TokenRefreshed += OnTokenRefreshed;
     }
 
@@ -121,7 +130,7 @@ public sealed class WebSocketService : IWebSocketService
 
         while (true)
         {
-            var token = await _secureStorage.LoadAsync(AccountService.AccessToken);
+            var token = await _secureStorage.LoadAsync(Constants.AccessToken);
             if (string.IsNullOrWhiteSpace(token)) return;
 
             await DisconnectInternal();
@@ -131,11 +140,31 @@ public sealed class WebSocketService : IWebSocketService
 
             // Use Authorization header instead of query parameter
             _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-            var url = "wss://synclo.zyrux.dev/ws/v1/sync";
+            
+            var serverUrl = _settingsService.Settings.ServerUrl;
+            var trimmed = serverUrl.TrimEnd('/');
+            string url;
+            if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = $"wss://{trimmed[8..]}/ws/v1/sync";
+            }
+            else if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = $"ws://{trimmed[7..]}/ws/v1/sync";
+            }
+            else
+            {
+                url = $"wss://{trimmed}/ws/v1/sync";
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var wsUri))
+            {
+                return;
+            }
 
             try
             {
-                await _socket.ConnectAsync(new Uri(url), _cts.Token);
+                await _socket.ConnectAsync(wsUri, _cts.Token);
                 _retryCount = 0;
                 _ = ReceiveLoop();
                 _pingTask = StartPingLoop(_cts.Token);

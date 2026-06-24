@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using Synclo.Factory;
 using Synclo.Services.API;
 using Synclo.Services.Utilities;
+using Synclo.Models;
 
 namespace Synclo.ViewModels;
 
@@ -84,6 +85,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
+            await _settingsService.LoadServerUrlAsync();
             await _accountService.EnforceLocalKdfVersionAsync();
         }
         catch (SecurityException ex)
