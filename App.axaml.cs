@@ -195,6 +195,9 @@ public class App : Application
         // 4. Initialize clipboard sync service (which connects WebSocket and syncs)
         var clipboardSyncService = services.GetRequiredService<IClipboardSyncService>();
         await clipboardSyncService.InitializeAsync().ConfigureAwait(false);
+
+        // 5. Warm up connection monitor to start background polling
+        _ = services.GetRequiredService<IConnectionMonitor>();
     }
 
     private void OnSessionExpired()
@@ -218,6 +221,9 @@ public class App : Application
 
         var instanceManager = services.GetRequiredService<SingleInstanceManager>();
         instanceManager.Dispose();
+
+        var connectionMonitor = services.GetService<IConnectionMonitor>();
+        connectionMonitor?.Dispose();
 
         var mainVm = services.GetRequiredService<MainWindowViewModel>();
         mainVm.Dispose();

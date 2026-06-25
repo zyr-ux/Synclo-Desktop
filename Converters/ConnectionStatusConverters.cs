@@ -6,7 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Material.Icons;
-using Synclo.ViewModels;
+using Synclo.Services.Utilities;
 
 namespace Synclo.Converters;
 
@@ -83,10 +83,16 @@ public class ConnectionStatusToBrushConverter : IMultiValueConverter
             };
 
             if (Application.Current is IResourceNode resourceNode &&
-                resourceNode.TryGetResource(key, Application.Current.ActualThemeVariant, out var resource) &&
-                resource is IBrush brush)
+                resourceNode.TryGetResource(key, Application.Current.ActualThemeVariant, out var resource))
             {
-                return brush;
+                if (resource is IBrush brush)
+                {
+                    return brush;
+                }
+                if (resource is Color color)
+                {
+                    return new SolidColorBrush(color);
+                }
             }
         }
         return null;

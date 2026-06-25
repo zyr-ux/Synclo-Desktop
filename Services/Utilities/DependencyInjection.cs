@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IApplicationControlService, ApplicationControlService>();
         services.AddSingleton<IUtils, Utils>();
+        services.AddSingleton<IConnectionMonitor, ConnectionMonitor>();
 
         // Clipboard subsystem (dependent services)
         services.AddSingleton<IClipboardRepository, ClipboardRepository>();
