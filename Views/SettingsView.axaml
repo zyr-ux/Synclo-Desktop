@@ -184,14 +184,38 @@
                                                TextWrapping="Wrap"/>
                                 </StackPanel>
 
-                                <TextBox Grid.Column="2"
-                                         Width="250"
-                                         VerticalAlignment="Center"
-                                         FontFamily="{DynamicResource Inconsolata-Medium}"
-                                         Text="{Binding ServerUrl, Mode=OneWay}"
-                                         LostFocus="ServerUrl_LostFocus"
-                                         KeyDown="ServerUrl_KeyDown"
-                                         Watermark="https://synclo.zyrux.dev" />
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            VerticalAlignment="Center">
+                                    <TextBox x:Name="ServerUrlTextBox"
+                                             Width="200"
+                                             VerticalAlignment="Center"
+                                             FontFamily="{DynamicResource Inconsolata-Medium}"
+                                             Text="{Binding ServerUrlInput, Mode=TwoWay}"
+                                             KeyDown="ServerUrl_KeyDown"
+                                             Watermark="https://synclo.zyrux.dev" />
+
+                                    <Button Classes="icon-button"
+                                            Command="{Binding UpdateServerUrlCommand}"
+                                            ToolTip.Tip="Confirm Server URL">
+                                        <materialIcons:MaterialIcon
+                                            Kind="Check"
+                                            Width="20"
+                                            Height="20"
+                                            Foreground="{DynamicResource Foreground}" />
+                                    </Button>
+
+                                    <Button Classes="icon-button"
+                                            Command="{Binding ResetServerUrlCommand}"
+                                            ToolTip.Tip="Reset to Default URL">
+                                        <materialIcons:MaterialIcon
+                                            Kind="Undo"
+                                            Width="20"
+                                            Height="20"
+                                            Foreground="{DynamicResource Foreground}" />
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                         </Border>
 

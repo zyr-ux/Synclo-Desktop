@@ -32,17 +32,15 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _isStartOnBootEnabled;
     [ObservableProperty] private bool _isMicaEnabled;
     [ObservableProperty] private string _serverUrl = "";
+    [ObservableProperty] private string _serverUrlInput = "";
+    [ObservableProperty] private string _selectedCloseBehavior="";
     
     private string _previousServerUrl = "";
     private bool _isUpdatingServerUrl;
-    
+    private bool CanExecuteServerUrlCommand() => !_isUpdatingServerUrl;
     public bool IsMicaToggleVisible => OperatingSystem.IsWindows() && Environment.OSVersion.Version.Build >= 22000;
-    
     public List<string> AvailableThemes { get; } = ["System", "Light", "Dark"];
-    
     public List<string> AvailableCloseBehaviors { get; } = ["Quit Application", "Minimize to System Tray", "Run in Background (Hidden)"];
-    
-    [ObservableProperty] private string _selectedCloseBehavior="";
 
     public SettingsViewModel(
         ISettingsService settings, 
@@ -66,6 +64,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedTheme = _settings.Settings.Theme;
         IsMicaEnabled = _settings.Settings.is_mica_enabled;
         ServerUrl = _settings.Settings.ServerUrl;
+        ServerUrlInput = ServerUrl;
         _previousServerUrl = ServerUrl;
         
         // Load start on boot status
@@ -187,27 +186,43 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    public async Task UpdateServerUrlAsync(string? text)
+    [RelayCommand(CanExecute = nameof(CanExecuteServerUrlCommand))]
+    public async Task UpdateServerUrlAsync()
     {
         if (_isUpdatingServerUrl) 
             return;
         
         _isUpdatingServerUrl = true;
+        UpdateServerUrlCommand.NotifyCanExecuteChanged();
+        ResetServerUrlCommand.NotifyCanExecuteChanged();
 
         try
         {
+            var text = ServerUrlInput;
             if (!_utils.TryNormalizeServerUrl(text, out var cleanUrl, out var error))
             {
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     _notificationService.ShowError(error!);
-                    OnPropertyChanged(nameof(ServerUrl));
                 });
                 return;
             }
 
             if (cleanUrl == _previousServerUrl)
+            {
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (cleanUrl == AppSettings.DefaultServerUrl)
+                    {
+                        _notificationService.ShowSuccess("Already using the default server instance.");
+                    }
+                    else
+                    {
+                        _notificationService.ShowSuccess("Already using this server instance.");
+                    }
+                });
                 return;
+            }
 
             // Ping the candidate URL before committing it (skip for the default server)
             if (cleanUrl != AppSettings.DefaultServerUrl)
@@ -221,7 +236,6 @@ public partial class SettingsViewModel : ViewModelBase
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         _notificationService.ShowError("Could not connect to server.");
-                        OnPropertyChanged(nameof(ServerUrl));
                     });
                     return;
                 }
@@ -240,20 +254,47 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 _previousServerUrl = cleanUrl;
                 ServerUrl = cleanUrl;
+                ServerUrlInput = cleanUrl;
 
-                if (isAuth)
+                if (cleanUrl == AppSettings.DefaultServerUrl)
                 {
-                    _notificationService.ShowSuccess("Server URL updated. Please log in to use the new server instance.");
+                    if (isAuth)
+                    {
+                        _notificationService.ShowSuccess("Server URL reset to default. Please log in to continue.");
+                    }
+                    else
+                    {
+                        _notificationService.ShowSuccess("Server URL reset to default.");
+                    }
                 }
                 else
                 {
-                    _notificationService.ShowSuccess("Server URL updated successfully.");
+                    if (isAuth)
+                    {
+                        _notificationService.ShowSuccess("Server URL updated. Please log in to use the new server instance.");
+                    }
+                    else
+                    {
+                        _notificationService.ShowSuccess("Server URL updated successfully.");
+                    }
                 }
             });
         }
         finally
         {
             _isUpdatingServerUrl = false;
+            UpdateServerUrlCommand.NotifyCanExecuteChanged();
+            ResetServerUrlCommand.NotifyCanExecuteChanged();
         }
+     }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteServerUrlCommand))]
+    public async Task ResetServerUrlAsync()
+    {
+        if (_isUpdatingServerUrl)
+            return;
+        
+        ServerUrlInput = AppSettings.DefaultServerUrl;
+        await UpdateServerUrlAsync();
     }
 }

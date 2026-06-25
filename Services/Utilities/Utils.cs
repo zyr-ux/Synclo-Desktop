@@ -131,6 +131,17 @@ public sealed class Utils(ISettingsService settingsService) : IUtils
             return false;
         }
 
+        var host = tempUri.Host;
+        if (host != "localhost" && 
+            !host.Contains('.') && 
+            Uri.CheckHostName(host) != UriHostNameType.IPv4 && 
+            Uri.CheckHostName(host) != UriHostNameType.IPv6)
+        {
+            normalized = "";
+            error = "Invalid URL format. Please enter a valid HTTP/HTTPS URL.";
+            return false;
+        }
+
         input = tempUri.ToString().TrimEnd('/');
 
         // Strip a trailing /api/v1 suffix so users can paste the full API endpoint URL
