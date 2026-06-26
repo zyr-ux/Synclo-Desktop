@@ -95,8 +95,7 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         }
         catch
         {
-            // Network or server error - show offline message
-            _notificationService.ShowError("Device Offline");
+            // Network or server error - fallback silently to cached list
         }
     }
 

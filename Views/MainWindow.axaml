@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+        xmlns:converters="using:Synclo.Converters"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
         x:Class="Synclo.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -18,6 +19,11 @@
         SystemDecorations="Full"
         Padding="{Binding $self.OffScreenMargin}">
 
+    <Window.Resources>
+        <converters:ConnectionStatusToTextConverter x:Key="ConnectionStatusToTextConverter" />
+        <converters:ConnectionStatusToBrushConverter x:Key="ConnectionStatusToBrushConverter" />
+    </Window.Resources>
+
     <Grid ColumnDefinitions="Auto,*">
 
         <!-- Title Bar -->
@@ -28,7 +34,7 @@
                     Orientation="Horizontal"
                     VerticalAlignment="Top"
                     HorizontalAlignment="Left"
-                    Spacing="12"
+                    Spacing="8"
                     Margin="16,0,0,0"
                     IsHitTestVisible="False">
                     <!-- Make this image controller use a 16x16 png for proper title bar logo scaling-->
@@ -39,7 +45,18 @@
                    VerticalAlignment="Center"/>
             <TextBlock Text="Synclo"
                        FontSize="12"
+                       FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
+            
+            <!-- Dynamic Status Dot (Orb) -->
+            <Ellipse Width="6" Height="6" VerticalAlignment="Center">
+                <Ellipse.Fill>
+                    <MultiBinding Converter="{StaticResource ConnectionStatusToBrushConverter}">
+                        <Binding Path="ConnectionStatus" />
+                        <Binding Path="ActualThemeVariant" Source="{x:Static Application.Current}" />
+                    </MultiBinding>
+                </Ellipse.Fill>
+            </Ellipse>
         </StackPanel>
 
         <!-- Sidebar -->

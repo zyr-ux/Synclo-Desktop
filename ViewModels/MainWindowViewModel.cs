@@ -31,6 +31,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IWebSocketService _webSocketService;
     private readonly IDialogService _dialogService;
     private readonly ISettingsService _settingsService;
+    private readonly IConnectionMonitor _connectionMonitor;
     
     [ObservableProperty] private ViewModelBase _currentViewModel;
     [ObservableProperty] private bool _isDialogOpen;
@@ -44,6 +45,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty,
     NotifyPropertyChangedFor(nameof(SidebarWidth))]
     private bool _isSidebarCollapsed;
+
+    [ObservableProperty]
+    private ConnectionStatus _connectionStatus;
     
     public double SidebarWidth => IsSidebarCollapsed ? 54 : 200;
     
@@ -58,16 +62,21 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         INotificationService notificationService,
         IWebSocketService webSocketService,
         IDialogService dialogService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        IConnectionMonitor connectionMonitor)
     {
         _factory = factory;
         _notificationService = notificationService;
         _webSocketService = webSocketService;
         _dialogService = dialogService;
         _settingsService = settingsService;
+        _connectionMonitor = connectionMonitor;
         
         IsDialogOpen = _dialogService.IsDialogOpen;
         _dialogService.IsDialogOpenChanged += OnIsDialogOpenChanged;
+
+        ConnectionStatus = _connectionMonitor.ConnectionStatus;
+        _connectionMonitor.ConnectionStatusChanged += HandleConnectionStatusChanged;
 
         CurrentViewModel = _factory.Create<HomeViewModel>();
         CurrentPage = NavigationPage.Home;
@@ -77,6 +86,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void OnIsDialogOpenChanged(object? sender, bool isOpen)
     {
         Dispatcher.UIThread.Post(() => IsDialogOpen = isOpen);
+    }
+
+    private void HandleConnectionStatusChanged(ConnectionStatus status)
+    {
+        Dispatcher.UIThread.Post(() => ConnectionStatus = status);
     }
 
 
@@ -123,6 +137,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _dialogService.IsDialogOpenChanged -= OnIsDialogOpenChanged;
+        _connectionMonitor.ConnectionStatusChanged -= HandleConnectionStatusChanged;
         _factory.Release(CurrentViewModel);
     }
 }
