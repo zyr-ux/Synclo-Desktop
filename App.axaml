@@ -36,6 +36,8 @@
             <converters:ClipboardItemTypeToIconConverter x:Key="ClipboardItemTypeToIconConverter" />
             <converters:PinStateToIconConverter x:Key="PinStateToIconConverter" />
             <converters:PinStateToToolTipConverter x:Key="PinStateToToolTipConverter" />
+            <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
+            <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
 
             <FontFamily x:Key="Inconsolata-Bold">
                 avares://Synclo/Assets/Fonts/Inconsolata-Bold.ttf#Inconsolata

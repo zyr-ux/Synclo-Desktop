@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:notifications="clr-namespace:Avalonia.Controls.Notifications;assembly=Avalonia.Controls"
+                    xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
                     x:ClassModifier="internal">
 
     <Design.PreviewWith>
@@ -16,7 +17,7 @@
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="RenderTransformOrigin" Value="50%,50%" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Background" Value="{DynamicResource Accent}" />
+        <Setter Property="Background" Value="{DynamicResource SecondaryBackground}"/>
         <Setter Property="FontFamily" Value="{DynamicResource Inconsolata-Medium}"/>
         <Setter Property="CornerRadius" Value="5" />
         <Setter Property="Template">
@@ -26,25 +27,53 @@
                             BoxShadow="0 2 8 0 #20000000"
                             Margin="5 10 8 10">
                         <Border Background="{TemplateBinding Background}"
-                                BorderThickness="0"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 ClipToBounds="True"
-                                Padding="20,10">
+                                Padding="15,10">
 
-                            <ContentPresenter Name="PART_ContentPresenter"
-                                              Content="{TemplateBinding Content}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center">
-                                <ContentPresenter.ContentTemplate>
-                                    <DataTemplate DataType="notifications:Notification">
-                                        <TextBlock Text="{Binding Message}"
-                                                   Foreground="{DynamicResource ForegroundD}"
-                                                   FontSize="14"
-                                                   TextWrapping="Wrap"
-                                                   TextAlignment="Center" />
-                                    </DataTemplate>
-                                </ContentPresenter.ContentTemplate>
-                            </ContentPresenter>
+                            <Grid ColumnDefinitions="*, Auto" VerticalAlignment="Center">
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  Grid.Column="0"
+                                                  Content="{TemplateBinding Content}"
+                                                  HorizontalAlignment="Left"
+                                                  VerticalAlignment="Center">
+                                    <ContentPresenter.ContentTemplate>
+                                        <DataTemplate DataType="notifications:Notification">
+                                            <Grid ColumnDefinitions="Auto, *" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Grid.Column="0"
+                                                                            Kind="{Binding Type, Converter={StaticResource NotificationTypeToIconConverter}}"
+                                                                            Foreground="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}"
+                                                                            Width="20"
+                                                                            Height="20"
+                                                                            Margin="0,0,10,0"
+                                                                            VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Message}"
+                                                           Foreground="{DynamicResource Foreground}"
+                                                           FontSize="14"
+                                                           TextWrapping="Wrap"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ContentPresenter.ContentTemplate>
+                                </ContentPresenter>
+
+                                <Button Grid.Column="1"
+                                        Classes="icon-button"
+                                        Command="{Binding $parent[NotificationCard].Close}"
+                                        VerticalAlignment="Center"
+                                        Width="26"
+                                        Height="26"
+                                        Margin="10,0,0,0"
+                                        Padding="0">
+                                    <materialIcons:MaterialIcon Kind="Close"
+                                                                Width="14"
+                                                                Height="14"
+                                                                Foreground="{DynamicResource Foreground}" />
+                                </Button>
+                            </Grid>
                         </Border>
                     </Border>
                 </LayoutTransformControl>

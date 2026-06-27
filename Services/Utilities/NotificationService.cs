@@ -26,14 +26,7 @@ public sealed class NotificationService : INotificationService
         if (_manager is null)
             return;
 
-        var timeout = type switch
-        {
-            NotificationType.Success => TimeSpan.FromSeconds(2),
-            NotificationType.Information => TimeSpan.FromSeconds(3),
-            NotificationType.Warning => TimeSpan.FromSeconds(5),
-            NotificationType.Error => TimeSpan.FromSeconds(0),
-            _ => TimeSpan.FromSeconds(3)
-        };
+        var timeout = TimeSpan.FromSeconds(3);
 
         _manager.Show(new Notification(title ?? type.ToString(), message, type, timeout));
     }
