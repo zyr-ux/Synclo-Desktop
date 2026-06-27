@@ -236,6 +236,7 @@ public partial class SettingsViewModel : ViewModelBase
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         _notificationService.ShowError("Could not connect to server.");
+                        ServerUrlInput = ServerUrl;
                     });
                     return;
                 }
