@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Synclo.Services.Utilities;
+using Synclo.Utilities;
+using Synclo.Features.Connection_Monitor;
 
 namespace Synclo.ViewModels;
 

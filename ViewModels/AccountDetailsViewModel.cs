@@ -6,12 +6,11 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Synclo.Components;
-using Synclo.Factory;
+using Synclo.Utilities;
 using Synclo.Models;
-using Synclo.Services;
-using Synclo.Services.API;
-using Synclo.Services.Utilities;
+using Synclo.Features.Network_Services;
+using Synclo.Features.Notifications_Manager;
+using Synclo.Features.Dialog_Manager;
 
 namespace Synclo.ViewModels;
 

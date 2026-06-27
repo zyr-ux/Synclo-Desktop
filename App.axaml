@@ -19,8 +19,8 @@
         <StyleInclude Source="avares://Synclo/Components/CustomButton.axaml" />
         <StyleInclude Source="avares://Synclo/Components/IconButton.axaml" />
         <StyleInclude Source="avares://Synclo/Components/HistoryListBoxItem.axaml" />
-        <StyleInclude Source="avares://Synclo/Components/SettingsItem.axaml" />
-        <StyleInclude Source="avares://Synclo/Components/ConnectionOrb.axaml" />
+        <StyleInclude Source="avares://Synclo/Features/Settings_Manager/SettingsItem.axaml" />
+        <StyleInclude Source="avares://Synclo/Features/Connection_Monitor/ConnectionOrb.axaml" />
     </Application.Styles>
 
     <Application.Resources>
@@ -30,7 +30,7 @@
                 <ResourceInclude Source="avares://Synclo/Themes/ThemePalettes.axaml" />
                 <ResourceInclude Source="avares://Synclo/Components/Combobox.axaml" />
                 <ResourceInclude Source="avares://Synclo/Components/TextBox.axaml" />
-                <ResourceInclude Source="avares://Synclo/Components/NotificationCard.axaml" />
+                <ResourceInclude Source="avares://Synclo/Features/Notifications_Manager/NotificationCard.axaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <converters:ClipboardItemTypeToIconConverter x:Key="ClipboardItemTypeToIconConverter" />

@@ -1,9 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Synclo.Factory;
-using Synclo.Services;
-using Synclo.Services.API;
+using Synclo.Utilities;
+using Synclo.Features.Network_Services;
 
 namespace Synclo.ViewModels;
 

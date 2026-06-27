@@ -1,0 +1,63 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Synclo.Features.Dialog_Manager.Confirmation_Dialog.ConfirmationDialog"
+        Title="Confirm Action" 
+        Width="350"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="Transparent"
+        TransparencyLevelHint="None"
+        SystemDecorations="None"
+        CanResize="False"
+        ShowInTaskbar="False">
+
+    <Border Background="{DynamicResource PrimaryBackground}"
+            CornerRadius="5" 
+            BorderBrush="{DynamicResource Border}" 
+            BorderThickness="1"
+            BoxShadow="0 10 20 0 #40000000, 0 -4 14 0 #22000000, 0 2 10 0 #20000000"
+            Padding="15"
+            Margin="20">
+        <Grid RowDefinitions="Auto, *, Auto">
+            
+            <TextBlock Grid.Row="0" 
+                       Name="TitleText"
+                       Text="Confirm Action" 
+                       FontSize="28"
+                       TextAlignment="Center"
+                       FontFamily="{DynamicResource Inconsolata-Bold}" 
+                       Foreground="{DynamicResource Foreground}"/>
+
+            <TextBlock Grid.Row="1" 
+                       Name="MessageText"
+                       Text="Are you sure you want to proceed with this action?" 
+                       Foreground="{DynamicResource Foreground}" 
+                       TextWrapping="Wrap"
+                       TextAlignment="Left"
+                       FontSize="16"
+                       FontFamily="{DynamicResource Inconsolata-Medium}"
+                       VerticalAlignment="Center" 
+                       Margin="0,35"/>
+
+            <StackPanel Grid.Row="2" 
+                        Orientation="Horizontal" 
+                        HorizontalAlignment="Right" 
+                        Spacing="12">
+                
+                <Button Name="NoButton" 
+                        Content="No" 
+                        Click="OnNoClick"
+                        Width="100" 
+                        Height="40"
+                        Classes="custom-button"/>
+
+                <Button Name="YesButton" 
+                        Content="Yes" 
+                        Click="OnYesClick"
+                        Width="100" 
+                        Height="40"
+                        Classes="custom-button"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

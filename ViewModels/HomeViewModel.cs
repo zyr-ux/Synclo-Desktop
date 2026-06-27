@@ -9,11 +9,14 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Synclo.Models;
-using Synclo.Services;
-using Synclo.Services.API;
-using Synclo.Services.ClipboardMonitor;
-using Synclo.Services.ClipboardService;
-using Synclo.Services.Utilities;
+using Synclo.Features.Network_Services;
+using Synclo.Features.Clipboard_Manager.Clipboard_Monitor;
+using Synclo.Features.Clipboard_Manager.Clipboard_Service;
+using Synclo.Utilities;
+using Synclo.Features.Notifications_Manager;
+using Synclo.Features.Connection_Monitor;
+using Synclo.Features.Dialog_Manager;
+using Synclo.Features.Settings_Manager;
 
 namespace Synclo.ViewModels;
 

@@ -60,18 +60,27 @@ Synclo-Desktop/
 │
 ├── Assets/                   # Visual resources (App icon, SVGs)
 ├── Themes/                   # Fluent theme toggling and styling definitions
-├── Factory/                  # Dependency-Injected ViewModel instantiation factory
 ├── Models/                   # Data DTOs (AppSettings, HistoryItemModel, DTO Requests/Responses)
 ├── Behaviors/                # Interactive UI behaviors (Smooth scroll, Infinite loading)
 ├── Converters/               # Custom XAML binding converters (OS type, icon type)
 │
-├── Services/                 # Core business logic Layer
-│   ├── API/                  # REST Endpoint calls, Session validation, WebSocket streams
-│   ├── ClipboardMonitor/     # Platform-native clipboard hardware hooks & message pollers
-│   ├── ClipboardService/     # SQLite local repository, Synclo data orchestrator
-│   ├── SecretsManager/       # Platform-native secure secret store (DPAPI, Keychain, DBus)
-│   ├── Startup/              # Platform-native autostart management
-│   └── Utilities/            # Argon2 Cryptography, Single-instance guard, Notifications
+├── Utilities/                # Core helper utilities & factory layers
+│   ├── ApplicationControlService.cs # App runtime state control
+│   ├── CryptographyService.cs       # Argon2 & AES encryption logic
+│   ├── DependencyInjection.cs       # DI configurations
+│   ├── SingleInstanceManager.cs     # Single instance verification
+│   ├── Utils.cs                     # General helper methods
+│   └── ViewModelFactory.cs          # Dependency-Injected ViewModel instantiation factory
+│
+├── Features/                 # Core business logic feature slices
+│   ├── Clipboard_Manager/    # Clipboard Monitor hooks and SQLite sync services
+│   ├── Connection_Monitor/   # Online connection detection
+│   ├── Dialog_Manager/       # Modally spawned dialog controls (Confirmation, Reset Password)
+│   ├── Network_Services/     # REST Endpoint calls, Session validation, WebSocket streams
+│   ├── Notifications_Manager/# Desktop notifications services
+│   ├── Secrets_Manager/      # Platform-native secure secret stores
+│   ├── Settings_Manager/     # App configurations loader
+│   └── Startup_Manager/      # Platform-native autostart management
 │
 ├── ViewModels/               # MVVM ViewModels (Home, Settings, Account, Login, Dialogs)
 └── Views/                    # Avalonia XAML Views (MainWindow, Views per VM, Components)
@@ -140,8 +149,8 @@ To support pinning items to the top of the history list, Synclo implements a cli
 
 ### 5. API Routing & WebSocket Protocol Versioning
 To align with the versioned routes on the Synclo backend, the client utilizes structured, version-scoped communication paths:
-- **REST Endpoints**: Formatted with the `/api/v1/` prefix (e.g., `/api/v1/register`, `/api/v1/login`, `/api/v1/devices`, `/api/v1/clipboard/sync`), constructed dynamically in [APIService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/API/APIService.cs).
-- **WebSocket Route**: Connects securely to `/ws/v1/sync` in [WebSocketService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/API/WebSocketService.cs).
+- **REST Endpoints**: Formatted with the `/api/v1/` prefix (e.g., `/api/v1/register`, `/api/v1/login`, `/api/v1/devices`, `/api/v1/clipboard/sync`), constructed dynamically in [APIService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Network_Services/APIService.cs).
+- **WebSocket Route**: Connects securely to `/ws/v1/sync` in [WebSocketService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Network_Services/WebSocketService.cs).
 - **Device Lifecycle Sync Events**: The client captures real-time broadcasts pushed from the server WebSocket connection:
   - `device_added`: Raised when a new device is linked to the user account. Triggers `OnDeviceAdded` to dynamically refresh the active device cache.
   - `device_updated`: Raised when another active device updates its metadata (e.g., OS version during login). Triggers `OnDeviceUpdated`.
@@ -188,7 +197,7 @@ Rather than relying on third-party cross-platform frameworks which introduce per
 
 ### 1. Platform-Native Clipboard Hooking
 
-Clipboard monitoring is handled by [IClipboardMonitor](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/ClipboardMonitor/IClipboardMonitor.cs), with platform-specific implementations:
+Clipboard monitoring is handled by [IClipboardMonitor](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Clipboard_Manager/Clipboard_Monitor/IClipboardMonitor.cs), with platform-specific implementations:
 
 - **Windows (`ClipboardMonitorWindows.cs`)**:
   - Registers a Win32 message-only window using `RegisterClassEx` and `CreateWindowEx` targeting the special parent handle `HWND_MESSAGE` (`-3`).
@@ -232,7 +241,7 @@ A hybrid approach utilizing system keyring integration with an automated encrypt
 
 ### 3. Native Startup Registration
 
-Managed by [IStartupManager](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Startup/IStartupManager.cs):
+Managed by [IStartupManager](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Startup_Manager/IStartupManager.cs):
 
 - **Windows (`StartupManagerWindows.cs`)**:
   - Adds a string value named `Synclo` containing `"{ExecutablePath}" --autostart` inside the registry key `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`.
@@ -254,7 +263,7 @@ Managed by [IStartupManager](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop
 
 ## ⚙️ Application Settings Configuration
 
-Local client configurations are parsed from and serialized to a local `appsettings.json` file. This layout is managed by the [SettingsService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/SettingsService.cs) using a strongly typed [AppSettings](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Models/AppSettings.cs) model.
+Local client configurations are parsed from and serialized to a local `appsettings.json` file. This layout is managed by the [SettingsService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Settings_Manager/SettingsService.cs) using a strongly typed [AppSettings](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Models/AppSettings.cs) model.
 
 Key parameters include:
 - **`ServerUrl`**: The base HTTP/HTTPS URL of the target Synclo backend server. Custom URLs are normalized and validated for reachability before saving. To protect privacy, custom server URLs are stored in secure credentials stores using platform-native APIs.
@@ -268,7 +277,7 @@ Key parameters include:
 
 ## 🔒 Cryptographic Design
 
-Synclo's cryptographic architecture is built on the [CryptographyService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/CryptographyService.cs):
+Synclo's cryptographic architecture is built on the [CryptographyService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Utilities/CryptographyService.cs):
 
 
 ### Cryptographic Protocol & Lifecycle Details

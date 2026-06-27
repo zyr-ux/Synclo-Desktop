@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Synclo.Factory;
-using Synclo.Services.API;
-using Synclo.Services.Utilities;
-using Synclo.Services.SecretsManager;
+using Synclo.Utilities;
+using Synclo.Features.Network_Services;
+using Synclo.Features.Secrets_Manager;
+using Synclo.Features.Connection_Monitor;
+using Synclo.Features.Dialog_Manager;
+using Synclo.Features.Settings_Manager;
+using Synclo.Features.Notifications_Manager;
 using Synclo.Models;
 
 namespace Synclo.ViewModels;

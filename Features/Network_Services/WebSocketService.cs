@@ -1,0 +1,511 @@
+using System;
+using System.IO;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Synclo.Features.Secrets_Manager;
+using Synclo.Features.Settings_Manager;
+using Synclo.Utilities;
+using Synclo.Models;
+
+namespace Synclo.Features.Network_Services;
+
+public interface IWebSocketService : IDisposable
+{
+    bool IsConnected { get; }
+    Task ConnectAsync();
+    Task DisconnectAsync();
+    Task<bool> EnsureConnectedAsync(TimeSpan timeout);
+    Task SendMessageAsync<T>(T message);
+    Task SendAsync(string text);
+    event Action<string>? OnMessageReceived;
+    event Action? OnConnected;
+    event Action? OnDisconnected;
+    event Action<string>? OnError;
+    event Action<string?>? OnDeviceDeleted;
+    event Action<string>? OnDeviceAdded;
+    event Action<string>? OnDeviceUpdated;
+}
+
+public sealed class WebSocketService : IWebSocketService
+{
+    private readonly IApiService _apiService;
+    private readonly ISecretsManager _secretsManager;
+    private readonly IRefreshTokenService _refreshTokenService;
+    private readonly ISettingsService _settingsService;
+    private const int BufferSize = 8192;
+    private readonly SemaphoreSlim _connectLock = new(1, 1);
+    private CancellationTokenSource? _cts;
+    private bool _disposed;
+    private bool _manualDisconnect;
+    private int _retryCount;
+
+    private ClientWebSocket? _socket;
+    private Task? _pingTask;
+
+    public WebSocketService(
+        IApiService api, 
+        ISecretsManager secretsManager, 
+        IRefreshTokenService refreshTokenService,
+        ISettingsService settingsService)
+    {
+        _apiService = api;
+        _secretsManager = secretsManager;
+        _refreshTokenService = refreshTokenService;
+        _settingsService = settingsService;
+        
+        _refreshTokenService.TokenRefreshed += OnTokenRefreshed;
+    }
+
+    public bool IsConnected => _socket is { State: WebSocketState.Open };
+    public event Action<string>? OnMessageReceived;
+    public event Action? OnConnected;
+    public event Action? OnDisconnected;
+    public event Action<string>? OnError;
+    public event Action<string?>? OnDeviceDeleted;
+    public event Action<string>? OnDeviceAdded;
+    public event Action<string>? OnDeviceUpdated;
+
+    private void OnTokenRefreshed(string token)
+    {
+        if (_disposed || _manualDisconnect) return;
+        _ = ScheduleReconnectBackground();
+    }
+
+    public async Task ConnectAsync()
+    {
+        if (_disposed) return;
+
+        _manualDisconnect = false;
+
+        await _connectLock.WaitAsync();
+        try
+        {
+            await ConnectInternal();
+        }
+        finally
+        {
+            _connectLock.Release();
+        }
+    }
+
+    public async Task DisconnectAsync()
+    {
+        if (_disposed) return;
+
+        _manualDisconnect = true;
+        _retryCount = 0;
+
+        await DisconnectInternal();
+    }
+    
+    public async Task<bool> EnsureConnectedAsync(TimeSpan timeout)
+    {
+        if (IsConnected) return true;
+        
+        await ConnectAsync();
+        
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        while (!IsConnected && stopwatch.Elapsed < timeout)
+        {
+            await Task.Delay(100);
+        }
+        
+        return IsConnected;
+    }
+    
+    public async Task SendMessageAsync<T>(T message)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(message);
+        await SendAsync(json);
+    }
+
+    #region Internal Methods
+    
+    private async Task ConnectInternal()
+    {
+        if (_disposed || _manualDisconnect || IsConnected) return;
+
+        var attemptRefresh = true;
+
+        while (true)
+        {
+            var token = await _secretsManager.GetAccessTokenAsync();
+            if (string.IsNullOrWhiteSpace(token)) return;
+
+            await DisconnectInternal();
+
+            _socket = new ClientWebSocket();
+            _cts = new CancellationTokenSource();
+
+            // Use Authorization header instead of query parameter
+            _socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+            
+            var serverUrl = _settingsService.Settings.ServerUrl;
+            var trimmed = serverUrl.TrimEnd('/');
+            string url;
+            if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = $"wss://{trimmed[8..]}/ws/v1/sync";
+            }
+            else if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = $"ws://{trimmed[7..]}/ws/v1/sync";
+            }
+            else
+            {
+                url = $"wss://{trimmed}/ws/v1/sync";
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var wsUri))
+            {
+                return;
+            }
+
+            try
+            {
+                await _socket.ConnectAsync(wsUri, _cts.Token);
+                _retryCount = 0;
+                _ = ReceiveLoop();
+                _pingTask = StartPingLoop(_cts.Token);
+                OnConnected?.Invoke();
+                return;
+            }
+            catch (WebSocketException ex) when (attemptRefresh && (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket || ex.Message.Contains("403")))
+            {
+                // Only try to refresh once per connection attempt
+                attemptRefresh = false;
+                
+                // Notify that token expired - RefreshTokenService will handle it
+                _refreshTokenService.RaiseTokenExpired();
+                
+                // OnTokenRefreshed handler will trigger reconnection
+                return;
+            }
+            catch
+            {
+                _ = ScheduleReconnectBackground();
+                return;
+            }
+        }
+    }
+
+
+
+    private async Task ReceiveLoop()
+    {
+        var buffer = new byte[BufferSize];
+
+        try
+        {
+            while (!_disposed && !_manualDisconnect && IsConnected && _cts != null)
+            {
+                using var ms = new MemoryStream();
+                WebSocketReceiveResult result;
+
+                do
+                {
+                    result = await _socket!.ReceiveAsync(new ArraySegment<byte>(buffer), _cts.Token);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        await HandleClose(result.CloseStatus);
+                        return;
+                    }
+
+                    ms.Write(buffer, 0, result.Count);
+                } while (!result.EndOfMessage);
+
+                var message = Encoding.UTF8.GetString(ms.ToArray());
+                
+                // Handle protocol messages (ping/pong/error) before passing to subscribers
+                if (await HandleProtocolMessage(message))
+                {
+                    continue; // Protocol message handled, don't invoke OnMessageReceived
+                }
+                
+                // Only invoke for actual data messages
+                OnMessageReceived?.Invoke(message);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // normal exit on disconnect
+        }
+        catch
+        {
+            _ = ScheduleReconnectBackground();
+        }
+    }
+
+    /// <summary>
+    /// Handles WebSocket protocol messages (ping, pong, error).
+    /// </summary>
+    /// <param name="message">The received message</param>
+    /// <returns>True if message was a protocol message and was handled, false otherwise</returns>
+    private async Task<bool> HandleProtocolMessage(string message)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(message);
+            if (doc.RootElement.TryGetProperty("type", out var typeProperty))
+            {
+                var messageType = typeProperty.GetString();
+                
+                switch (messageType)
+                {
+                    case "ping":
+                        // Respond to server ping to keep connection alive
+                        await SendAsync("{\"type\":\"pong\"}");
+                        return true;
+                    
+                    case "pong":
+                        // Ignore pong responses (already tracked by ping loop)
+                        return true;
+                    
+                    case "error":
+                        // Extract and propagate error message
+                        var errorMsg = doc.RootElement.TryGetProperty("message", out var msgProp)
+                            ? msgProp.GetString() ?? "Unknown error"
+                            : "Unknown error";
+                        OnError?.Invoke(errorMsg);
+                        return true;
+                    
+                    case "device_deleted":
+                        // Device was deleted remotely - trigger logout
+                        // Try to extract device_id to see WHO was deleted
+                        var deviceId = doc.RootElement.TryGetProperty("device_id", out var idProp)
+                            ? idProp.GetString()
+                            : null;
+                            
+                        OnDeviceDeleted?.Invoke(deviceId);
+                        return true;
+
+                    case "device_added":
+                        var addedDevice = doc.RootElement.TryGetProperty("device", out var adProp)
+                            ? adProp.GetRawText()
+                            : null;
+                        if (addedDevice != null)
+                        {
+                            OnDeviceAdded?.Invoke(addedDevice);
+                        }
+                        return true;
+
+                    case "device_updated":
+                        var updatedDevice = doc.RootElement.TryGetProperty("device", out var udProp)
+                            ? udProp.GetRawText()
+                            : null;
+                        if (updatedDevice != null)
+                        {
+                            OnDeviceUpdated?.Invoke(updatedDevice);
+                        }
+                        return true;
+                }
+            }
+        }
+        catch
+        {
+            // Not a valid JSON or doesn't have type field - treat as data message
+        }
+        
+        return false; // Not a protocol message
+    }
+
+    private async Task HandleClose(WebSocketCloseStatus? status)
+    {
+        if (_disposed) return;
+
+        await DisconnectInternal();
+
+        if (_manualDisconnect) return;
+
+        if (status is WebSocketCloseStatus.PolicyViolation)
+        {
+            // Notify that token expired
+            _refreshTokenService.RaiseTokenExpired();
+            
+            // OnTokenRefreshed handler will trigger reconnection
+            return;
+        }
+
+        if (status is WebSocketCloseStatus.ProtocolError)
+        {
+            _ = ScheduleReconnectBackground();
+            return;
+        }
+
+        if (status.HasValue)
+        {
+            var code = (int)status.Value;
+            if (code == 4001)
+            {
+                // Notify that token expired
+                _refreshTokenService.RaiseTokenExpired();
+                
+                // OnTokenRefreshed handler will trigger reconnection
+                _ = ScheduleReconnectBackground();
+                return;
+            }
+
+            if (code == 4002)
+            {
+                _ = ScheduleReconnectBackground();
+                return;
+            }
+
+            if (code == 4003)
+            {
+                // Device deleted remotely - connection closed by server
+                // Note: The "device_deleted" message handler already triggered OnDeviceDeleted
+                // This close status is just the server closing the connection afterward
+                return;
+            }
+
+            if (code == 1008)
+            {
+                // Notify that token expired
+                _refreshTokenService.RaiseTokenExpired();
+                
+                // OnTokenRefreshed handler will trigger reconnection
+                return;
+            }
+        }
+    }
+
+    public async Task SendAsync(string text)
+    {
+        if (_disposed || _manualDisconnect || _cts == null) return;
+
+        var ws = _socket;
+        if (ws == null || ws.State != WebSocketState.Open) return;
+
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+            await ws.SendAsync(bytes, WebSocketMessageType.Text, true, _cts.Token);
+        }
+        catch
+        {
+            _ = ScheduleReconnectBackground();
+        }
+    }
+
+    private Task ScheduleReconnectBackground()
+    {
+        return Task.Run(async () => await ScheduleReconnect());
+    }
+
+    private async Task ScheduleReconnect()
+    {
+        if (_disposed || _manualDisconnect) return;
+        if (!await _connectLock.WaitAsync(0)) return;
+
+        try
+        {
+            if (_disposed || _manualDisconnect || IsConnected) return;
+
+            await DisconnectInternal();
+
+            var delay = Math.Min(1000 << Math.Min(_retryCount, 15), 30000);
+            await Task.Delay(delay);
+
+            if (_disposed || _manualDisconnect) return;
+
+            _retryCount = Math.Min(_retryCount + 1, 15);
+
+            await ConnectInternal();
+        }
+        finally
+        {
+            _connectLock.Release();
+        }
+    }
+
+    private async Task DisconnectInternal()
+    {
+        var wasConnected = IsConnected;
+        
+        try
+        {
+            _cts?.Cancel();
+
+            if (_socket != null)
+            {
+                if (_socket.State == WebSocketState.Open)
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    try
+                    {
+                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", timeout.Token);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                _socket.Dispose();
+            }
+
+            if (_pingTask != null)
+            {
+                try { await _pingTask; } catch { }
+                _pingTask = null;
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _socket = null;
+            _cts?.Dispose();
+            _cts = null;
+            
+            if (wasConnected && !_manualDisconnect)
+            {
+                OnDisconnected?.Invoke();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _refreshTokenService.TokenRefreshed -= OnTokenRefreshed;
+
+        _cts?.Cancel();
+        _ = DisconnectInternal();
+
+        _connectLock.Dispose();
+    }
+    
+    private Task StartPingLoop(CancellationToken token)
+    {
+        return Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), token);
+                    if (token.IsCancellationRequested) break;
+                    if (IsConnected)
+                    {
+                        try
+                        {
+                            await SendAsync("{\"type\":\"ping\"}");
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch { }
+        }, token);
+    }
+    
+    #endregion
+}

@@ -9,10 +9,10 @@ Read this file before making any code modifications, refactorings, or introducin
 ## 🧭 System Snapshot & Architecture Blueprint
 
 Synclo-Desktop is an offline-first, end-to-end encrypted clipboard synchronization utility. When initialized, it operates as follows:
-1. **Capturing (Local Copy)**: Platform-native [IClipboardMonitor](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/ClipboardMonitor/IClipboardMonitor.cs) detects an OS-level copy event.
-2. **Encryption (Client-Side)**: Plaintext is encrypted with **AES-256-GCM** using the derived local 32-byte master key inside [CryptographyService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/CryptographyService.cs).
-3. **Persistence (SQLite queue)**: The encrypted payload (with unique ID, tag, and nonce) is written to local SQLite via [ClipboardRepository](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/ClipboardService/ClipboardRepository.cs) scheduling on an exclusive single-thread.
-4. **Transmission (WS / REST)**: The client pushes the payload to the server over a persistent WebSocket [WebSocketService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/API/WebSocketService.cs) and awaits a server ACK.
+1. **Capturing (Local Copy)**: Platform-native [IClipboardMonitor](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Clipboard_Manager/Clipboard_Monitor/IClipboardMonitor.cs) detects an OS-level copy event.
+2. **Encryption (Client-Side)**: Plaintext is encrypted with **AES-256-GCM** using the derived local 32-byte master key inside [CryptographyService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Utilities/CryptographyService.cs).
+3. **Persistence (SQLite queue)**: The encrypted payload (with unique ID, tag, and nonce) is written to local SQLite via [ClipboardRepository](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Clipboard_Manager/Clipboard_Service/ClipboardRepository.cs) scheduling on an exclusive single-thread.
+4. **Transmission (WS / REST)**: The client pushes the payload to the server over a persistent WebSocket [WebSocketService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Network_Services/WebSocketService.cs) and awaits a server ACK.
 5. **Propagation (Remote Write)**: Synced devices receive the WebSocket payload, decrypt it client-side, persist it to SQLite, temporarily disable the local copy monitor using a **Suppression Guard**, and write the plaintext to the OS clipboard.
 6. **Pinning Synchronization**: Toggling the pin state updates the local DB entry, sets `isSynced = 0`, and broadcasts the update frame over WebSocket. Incoming remote updates containing pin status changes are processed and merged without skipping, ensuring the pinning state is synchronized across all devices.
 
@@ -23,17 +23,17 @@ Synclo-Desktop is an offline-first, end-to-end encrypted clipboard synchronizati
 To keep the application stable, you must strictly follow these structural constraints:
 
 ### 1. Interface-Based Dependency Injection (DI)
-- **Rule**: All services, managers, and viewmodels must be registered in [DependencyInjection.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/DependencyInjection.cs).
+- **Rule**: All services, managers, and viewmodels must be registered in [DependencyInjection.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Utilities/DependencyInjection.cs).
 - **Rule**: Never register a service directly as a concrete class if it implements an interface. Always register the service behind its interface (e.g. `services.AddSingleton<IClipboardRepository, ClipboardRepository>()`).
 - **Reason**: Breaks loose coupling, compromises mockability, and violates C# unit testing standards.
 
 ### 2. Stateless Cryptographic Infrastructure
-- **Rule**: [CryptographyService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/CryptographyService.cs) must remain **stateless**. Do not add static properties or static global variables storing decrypted master keys or passwords.
+- **Rule**: [CryptographyService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Utilities/CryptographyService.cs) must remain **stateless**. Do not add static properties or static global variables storing decrypted master keys or passwords.
 - **Rule**: Master keys must be derived dynamically or retrieved via secure DI parameters, and wiped from memory using `CryptographicOperations.ZeroMemory()` as soon as the AES-GCM operation completes.
 - **Reason**: Prevents heap leakage of high-value decryption keys, ensuring Zero-Knowledge confidentiality.
 
 ### 3. Database Single-Thread Concurrency Queue
-- **Rule**: Do not perform raw SQLite transactions from background threads outside of [ClipboardRepository](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/ClipboardService/ClipboardRepository.cs).
+- **Rule**: Do not perform raw SQLite transactions from background threads outside of [ClipboardRepository](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Clipboard_Manager/Clipboard_Service/ClipboardRepository.cs).
 - **Rule**: All repository operations must use the exclusive single-threaded task scheduler:
   ```csharp
   private static readonly TaskScheduler _dbScheduler =

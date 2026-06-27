@@ -6,7 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Material.Icons;
-using Synclo.Services.Utilities;
+using Synclo.Features.Connection_Monitor;
 
 namespace Synclo.Converters;
 

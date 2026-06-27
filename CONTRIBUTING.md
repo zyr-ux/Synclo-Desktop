@@ -75,7 +75,7 @@ To maintain codebase health and performance across Windows, macOS, and Linux, al
   }
   ```
 - **Generic File Paths**: Never hardcode file-path separators (`\`, `/`). Always use `System.IO.Path.Combine()` and OS-relative folders via `Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)`.
-- **Loose Coupling**: Register and inject all platform-specific classes behind interfaces (`ISecureStorage`, `IStartupManager`, `IClipboardMonitor`) inside [DependencyInjection.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/DependencyInjection.cs).
+- **Loose Coupling**: Register and inject all platform-specific classes behind interfaces (`ISecureStorage`, `IStartupManager`, `IClipboardMonitor`) inside [DependencyInjection.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Utilities/DependencyInjection.cs).
 
 ### 4. UI & Styling Rules
 - Avoid styling elements inline. Use shared resources or dynamic theme parameters located under the `Themes/` directory.

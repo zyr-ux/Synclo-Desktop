@@ -4,9 +4,8 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Synclo.Models;
-using Synclo.Services;
-using Synclo.Services.API;
-using Synclo.Services.Utilities;
+using Synclo.Features.Network_Services;
+using Synclo.Features.Notifications_Manager;
 
 namespace Synclo.ViewModels;
 

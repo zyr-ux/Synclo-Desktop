@@ -1,7 +1,6 @@
 using System;
 using Avalonia.Controls;
-using Synclo.Services;
-using Synclo.Services.Utilities;
+using Synclo.Utilities;
 
 namespace Synclo.Views;
 
