@@ -1,11 +1,13 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Synclo.Features.Secrets_Manager;
 
+[SupportedOSPlatform("windows")]
 public sealed class SecureStorageWindows : ISecureStorage
 {
     private static readonly SemaphoreSlim Lock = new(1, 1);

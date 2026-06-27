@@ -37,7 +37,10 @@ public sealed class SecureStorageLinux : ISecureStorage, IDisposable
 #if NET7_0_OR_GREATER
             try
             {
-                File.SetUnixFileMode(dir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                if (!OperatingSystem.IsWindows())
+                {
+                    File.SetUnixFileMode(dir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                }
             }
             catch
             {
@@ -245,7 +248,10 @@ public sealed class SecureStorageLinux : ISecureStorage, IDisposable
 #if NET7_0_OR_GREATER
         try
         {
-            File.SetUnixFileMode(tempFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(tempFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
         }
         catch
         {
