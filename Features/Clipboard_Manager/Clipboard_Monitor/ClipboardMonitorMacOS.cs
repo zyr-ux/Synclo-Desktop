@@ -7,6 +7,7 @@ using Synclo.Utilities;
 
 namespace Synclo.Features.Clipboard_Manager.Clipboard_Monitor;
 
+[System.Runtime.Versioning.SupportedOSPlatform("macos")]
 public sealed class ClipboardMonitorMacOS(
     IClipboardProvider clipboardProvider,
     ILogger<ClipboardMonitorMacOS> logger,
