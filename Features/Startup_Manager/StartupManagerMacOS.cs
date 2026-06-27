@@ -9,6 +9,7 @@ namespace Synclo.Features.Startup_Manager;
 /// macOS implementation of startup manager using LaunchAgent.
 /// Creates plist file in ~/Library/LaunchAgents/
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("macos")]
 public class StartupManagerMacOS : IStartupManager
 {
     private const string AppIdentifier = "dev.zyrux.synclo";

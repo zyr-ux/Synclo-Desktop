@@ -9,6 +9,7 @@ namespace Synclo.Features.Startup_Manager;
 /// Linux implementation of startup manager using .desktop file.
 /// Creates autostart entry in ~/.config/autostart/
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("linux")]
 public class StartupManagerLinux : IStartupManager
 {
     private const string AppName = "synclo";
