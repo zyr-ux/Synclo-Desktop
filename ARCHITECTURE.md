@@ -73,14 +73,14 @@ Synclo-Desktop/
 │   └── ViewModelFactory.cs          # Dependency-Injected ViewModel instantiation factory
 │
 ├── Features/                 # Core business logic feature slices
-│   ├── Clipboard_Manager/    # Clipboard Monitor hooks and SQLite sync services
+│   ├── Clipboard_Manager/    # Clipboard Monitor hooks, factories, and SQLite sync services
 │   ├── Connection_Monitor/   # Online connection detection
 │   ├── Dialog_Manager/       # Modally spawned dialog controls (Confirmation, Reset Password)
 │   ├── Network_Services/     # REST Endpoint calls, Session validation, WebSocket streams
 │   ├── Notifications_Manager/# Desktop notifications services
-│   ├── Secrets_Manager/      # Platform-native secure secret stores
+│   ├── Secrets_Manager/      # Platform-native secure secret stores & factory
 │   ├── Settings_Manager/     # App configurations loader
-│   └── Startup_Manager/      # Platform-native autostart management
+│   └── Startup_Manager/      # Platform-native autostart management & factory
 │
 ├── ViewModels/               # MVVM ViewModels (Home, Settings, Account, Login, Dialogs)
 └── Views/                    # Avalonia XAML Views (MainWindow, Views per VM, Components)
@@ -197,7 +197,7 @@ Rather than relying on third-party cross-platform frameworks which introduce per
 
 ### 1. Platform-Native Clipboard Hooking
 
-Clipboard monitoring is handled by [IClipboardMonitor](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Clipboard_Manager/Clipboard_Monitor/IClipboardMonitor.cs), with platform-specific implementations:
+Clipboard monitoring is governed by the [IClipboardMonitor](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Clipboard_Manager/Clipboard_Monitor/IClipboardMonitor.cs) interface. The correct platform-specific implementation is resolved at runtime using the static `ClipboardMonitorFactory`:
 
 - **Windows (`ClipboardMonitorWindows.cs`)**:
   - Registers a Win32 message-only window using `RegisterClassEx` and `CreateWindowEx` targeting the special parent handle `HWND_MESSAGE` (`-3`).
@@ -211,7 +211,7 @@ Clipboard monitoring is handled by [IClipboardMonitor](file:///e:/Files/Code-Stu
 
 ### 2. Platform-Native Secure Storage
 
-Synclo stores sensitive session tokens, Argon2id salts, and wrapped/unwrapped master encryption keys in platform-specific secure storage layers:
+Synclo stores sensitive session tokens, Argon2id salts, and wrapped/unwrapped master encryption keys in platform-specific secure storage layers. The appropriate storage engine is resolved at runtime via the static `SecretsManagerFactory`:
 
 #### Windows (`SecureStorageWindows.cs`)
 Invokes native Windows Credential Manager generic password APIs via `advapi32.dll`:
@@ -241,7 +241,7 @@ A hybrid approach utilizing system keyring integration with an automated encrypt
 
 ### 3. Native Startup Registration
 
-Managed by [IStartupManager](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Startup_Manager/IStartupManager.cs):
+Managed by [IStartupManager](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Startup_Manager/IStartupManager.cs) and resolved at runtime via the static `StartupManagerFactory`:
 
 - **Windows (`StartupManagerWindows.cs`)**:
   - Adds a string value named `Synclo` containing `"{ExecutablePath}" --autostart` inside the registry key `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`.
