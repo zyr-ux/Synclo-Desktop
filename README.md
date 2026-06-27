@@ -20,6 +20,10 @@ Built with **Avalonia UI** and **.NET 10**, Synclo is designed to feel lightweig
 
 Clipboard updates are synced across your connected devices in real time using persistent WebSocket connections.
 
+### 🌐 Custom Server & Self-Hosting
+
+Configure and sync to your own self-hosted Synclo backend server. The client automatically normalizes custom server URLs, performs reachability validation before saving, and stores the configuration securely within native platform credentials vaults.
+
 ### 🔒 End-to-End Encryption
 
 Your clipboard data is encrypted on-device before it ever leaves your system. Synclo servers never have access to your plaintext clipboard history or encryption keys.

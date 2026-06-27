@@ -138,6 +138,15 @@ To support pinning items to the top of the history list, Synclo implements a cli
   - **Pin Toggling**: The card includes a Pin/Unpin icon button that toggles the pinned state without selecting the card (preventing accidental copying). All icons use default foreground coloring (`{DynamicResource Foreground}`).
   - **Staggered Clear Animation**: When clearing history, a bottom-up stagger animation is applied only to unpinned items. Once the animation loop reaches the index of a pinned item, the animation halts. All pinned items remain visually static, moving together smoothly into their final positions.
 
+### 5. API Routing & WebSocket Protocol Versioning
+To align with the versioned routes on the Synclo backend, the client utilizes structured, version-scoped communication paths:
+- **REST Endpoints**: Formatted with the `/api/v1/` prefix (e.g., `/api/v1/register`, `/api/v1/login`, `/api/v1/devices`, `/api/v1/clipboard/sync`), constructed dynamically in [APIService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/API/APIService.cs).
+- **WebSocket Route**: Connects securely to `/ws/v1/sync` in [WebSocketService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/API/WebSocketService.cs).
+- **Device Lifecycle Sync Events**: The client captures real-time broadcasts pushed from the server WebSocket connection:
+  - `device_added`: Raised when a new device is linked to the user account. Triggers `OnDeviceAdded` to dynamically refresh the active device cache.
+  - `device_updated`: Raised when another active device updates its metadata (e.g., OS version during login). Triggers `OnDeviceUpdated`.
+  - `device_deleted`: Raised when the current device is removed remotely by the user. Triggers `OnDeviceDeleted`, which safely terminates the local session and redirects to the login screen.
+
 ---
 
 ## 💾 Thread-Safe Database Design
@@ -248,6 +257,7 @@ Managed by [IStartupManager](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop
 Local client configurations are parsed from and serialized to a local `appsettings.json` file. This layout is managed by the [SettingsService](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Services/Utilities/SettingsService.cs) using a strongly typed [AppSettings](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Models/AppSettings.cs) model.
 
 Key parameters include:
+- **`ServerUrl`**: The base HTTP/HTTPS URL of the target Synclo backend server. Custom URLs are normalized and validated for reachability before saving. To protect privacy, custom server URLs are stored in secure credentials stores using platform-native APIs.
 - **`Theme`**: Visual layout options (`Light`, `Dark`, `System`). Resolves automatically at startup.
 - **`sync_page_size`**: Universal page chunk size for pagination requests during delta synchronization checks (Default: `100`).
 - **`minimize_to_tray`**: Intercepts close button triggers on the window, minimizing the application to the tray rather than terminating the process (Default: `true`).
