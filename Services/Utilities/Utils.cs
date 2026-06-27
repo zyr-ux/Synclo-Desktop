@@ -133,13 +133,34 @@ public sealed class Utils(ISettingsService settingsService) : IUtils
 
         var host = tempUri.Host;
         if (host != "localhost" && 
-            !host.Contains('.') && 
             Uri.CheckHostName(host) != UriHostNameType.IPv4 && 
             Uri.CheckHostName(host) != UriHostNameType.IPv6)
         {
-            normalized = "";
-            error = "Invalid URL format. Please enter a valid HTTP/HTTPS URL.";
-            return false;
+            var parts = host.Split('.');
+            bool isValid = parts.Length >= 2;
+            if (isValid)
+            {
+                foreach (var part in parts)
+                {
+                    if (string.IsNullOrWhiteSpace(part))
+                    {
+                        isValid = false;
+                        break;
+                    }
+                }
+
+                if (isValid && parts[^1].Length < 2)
+                {
+                    isValid = false;
+                }
+            }
+
+            if (!isValid)
+            {
+                normalized = "";
+                error = "Invalid URL format. Please enter a valid HTTP/HTTPS URL.";
+                return false;
+            }
         }
 
         input = tempUri.ToString().TrimEnd('/');
