@@ -34,7 +34,7 @@ public static class DependencyInjection
         services.AddTransient<AccountDetailsViewModel>();
         services.AddTransient<AboutViewModel>();
 
-        // API related services
+        // Network related services
         services.AddSingleton<HttpClient>();
         services.AddSingleton<IApiService, ApiService>();
         services.AddSingleton<IDeviceService, DeviceService>();
@@ -56,45 +56,17 @@ public static class DependencyInjection
         // Clipboard subsystem (dependent services)
         services.AddSingleton<IClipboardRepository, ClipboardRepository>();
         services.AddSingleton<IClipboardProvider, AvaloniaClipboardProvider>();
-        services.AddSingleton<IClipboardMonitor>(sp =>
-        {
-            var clipboardProvider = sp.GetRequiredService<IClipboardProvider>();
-            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var utils = sp.GetRequiredService<IUtils>();
-            
-            if (OperatingSystem.IsWindows())
-                return new ClipboardMonitorWindows(clipboardProvider,
-                    loggerFactory.CreateLogger<ClipboardMonitorWindows>(), utils);
-            if (OperatingSystem.IsMacOS())
-                return new ClipboardMonitorMacOS(clipboardProvider,
-                    loggerFactory.CreateLogger<ClipboardMonitorMacOS>(), utils);
-            
-            return new ClipboardMonitorLinux(clipboardProvider,
-                loggerFactory.CreateLogger<ClipboardMonitorLinux>(), utils);
-        });
+        services.AddSingleton<IClipboardMonitor>(sp => ClipboardMonitorFactory.GetClipboardMonitor(
+            sp.GetRequiredService<IClipboardProvider>(),
+            sp.GetRequiredService<ILoggerFactory>(),
+            sp.GetRequiredService<IUtils>()));
         services.AddSingleton<IClipboardSyncService, ClipboardSyncService>();
         
-        services.AddSingleton<IStartupManager>(_ =>
-        {
-            if (OperatingSystem.IsWindows())
-                return new StartupManagerWindows();
-            if (OperatingSystem.IsMacOS())
-                return new StartupManagerMacOS();
-            return new StartupManagerLinux();
-        });
-
         // Startup subsystem
-        services.AddSingleton<ISecureStorage>(_ =>
-        {
-            if (OperatingSystem.IsWindows())
-                return new SecureStorageWindows();
-            if (OperatingSystem.IsMacOS())
-                return new SecureStorageMacOS();
-            if (OperatingSystem.IsLinux())
-                return new SecureStorageLinux();
-            throw new PlatformNotSupportedException("Unsupported operating system");
-        });
+        services.AddSingleton<IStartupManager>(_ => StartupManagerFactory.GetStartupManager());
 
+        // Secrets Manager
+        services.AddSingleton<ISecureStorage>(_ => SecretsManagerFactory.GetStorage());
         services.AddSingleton<ISecretsManager, Synclo.Features.Secrets_Manager.SecretsManager>();
 
         // Single instance manager
