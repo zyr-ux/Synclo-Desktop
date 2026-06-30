@@ -150,6 +150,7 @@ To support pinning items to the top of the history list, Synclo implements a cli
 ### 5. API Routing & WebSocket Protocol Versioning
 To align with the versioned routes on the Synclo backend, the client utilizes structured, version-scoped communication paths:
 - **REST Endpoints**: Formatted with the `/api/v1/` prefix (e.g., `/api/v1/register`, `/api/v1/login`, `/api/v1/devices`, `/api/v1/clipboard/sync`), constructed dynamically in [APIService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Network_Services/APIService.cs).
+- **Unversioned Verification Endpoint**: Hits `/api/health` in [APIService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Network_Services/APIService.cs) to verify server status and validate the presence of the `Synclo-Server: genuine` header and specific JSON payload before establishing connections.
 - **WebSocket Route**: Connects securely to `/ws/v1/sync` in [WebSocketService.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Network_Services/WebSocketService.cs).
 - **Device Lifecycle Sync Events**: The client captures real-time broadcasts pushed from the server WebSocket connection:
   - `device_added`: Raised when a new device is linked to the user account. Triggers `OnDeviceAdded` to dynamically refresh the active device cache.

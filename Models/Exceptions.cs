@@ -30,3 +30,6 @@ public sealed class RateLimitException(string message = "Too many attempts. Plea
 
 // NEW - Device not found (deleted remotely)
 public sealed class DeviceNotFoundException(string message = "Device registration not found. Please log in again.") : Exception(message);
+
+// NEW - Genuine server verification failure
+public sealed class InvalidServerException(string message = "The server is not a genuine Synclo server.") : Exception(message);

@@ -73,8 +73,44 @@ public sealed class ApiService : IApiService
     public async Task Health(string? baseUrl = null)
     {
         var url = (baseUrl ?? _settingsService.Settings.ServerUrl).TrimEnd('/');
-        var req = await _http.GetAsync($"{url}/health");
+        var req = await _http.GetAsync($"{url}/api/health");
         req.EnsureSuccessStatusCode();
+
+        // Verify custom HTTP response header
+        if (!req.Headers.TryGetValues("Synclo-Server", out var values))
+        {
+            throw new InvalidServerException();
+        }
+
+        var hasGenuineHeader = false;
+        foreach (var val in values)
+        {
+            if (val == "genuine")
+            {
+                hasGenuineHeader = true;
+                break;
+            }
+        }
+        if (!hasGenuineHeader)
+        {
+            throw new InvalidServerException();
+        }
+
+        // Verify JSON response payload
+        var content = await req.Content.ReadAsStringAsync();
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("server", out var serverProp) || serverProp.GetString() != "synclo")
+            {
+                throw new InvalidServerException();
+            }
+        }
+        catch (JsonException)
+        {
+            throw new InvalidServerException();
+        }
     }
 
     #region Helper Methods
