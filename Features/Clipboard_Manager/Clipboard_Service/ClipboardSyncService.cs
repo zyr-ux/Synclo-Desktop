@@ -38,11 +38,12 @@ public interface IClipboardSyncService : IDisposable
     Task<IReadOnlyList<HistoryItemModel>> RefreshFromServerAsync(int limit = 0);
     Task DeleteClipboardEntryAsync(string clipboardId);
     Task TogglePinClipboardEntryAsync(string clipboardId);
-    Task ClearHistoryAsync();
+    Task<bool> ClearHistoryAsync();
     Task<bool> HasUnpinnedAsync();
     Task PurgeUnpinnedTombstonesAsync();
     Task ShutdownAsync();
     event Action? OnHistoryUpdated;
+    event Action<string>? OnSyncError;
 }
 
 public class ClipboardSyncService(
@@ -51,7 +52,6 @@ public class ClipboardSyncService(
     IClipboardRepository repository,
     IWebSocketService webSocketService,
     ISettingsService settingsService,
-    INotificationService notificationService,
     IAccountService accountService,
     ICryptographyService cryptographyService,
     ISecretsManager secretsManager,
@@ -73,8 +73,7 @@ public class ClipboardSyncService(
     private readonly ILogger<ClipboardSyncService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IClipboardMonitor _monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
 
-    private readonly INotificationService _notificationService =
-        notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+    public event Action<string>? OnSyncError;
 
     private readonly IAccountService _accountService =
         accountService ?? throw new ArgumentNullException(nameof(accountService));
@@ -314,7 +313,6 @@ public class ClipboardSyncService(
         }
         catch (Exception ex)
         {
-            _notificationService.ShowError($"Failed to delete clipboard entry: {ex.Message}");
             _logger.LogError(ex, $"Failed to delete clipboard entry {clipboardId}");
             throw;
         }
@@ -346,13 +344,12 @@ public class ClipboardSyncService(
         }
         catch (Exception ex)
         {
-            _notificationService.ShowError($"Failed to pin/unpin entry: {ex.Message}");
             _logger.LogError(ex, $"Failed to toggle pin on entry {clipboardId}");
             throw;
         }
     }
 
-    public async Task ClearHistoryAsync()
+    public async Task<bool> ClearHistoryAsync()
     {
         try
         {
@@ -368,12 +365,12 @@ public class ClipboardSyncService(
                 _settingsService.Settings.last_sync = null;
                 _settingsService.Save();
 
-                _notificationService.ShowSuccess(response.message);
+                return true; // Cleared online and locally
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to clear clipboard history on server immediately. Will sync in background later.");
-                _notificationService.ShowWarning("Offline: Cleared history locally. Server will be updated when online.");
+                return false; // Cleared locally only (offline)
             }
         }
         catch (Exception ex)
@@ -860,7 +857,7 @@ public class ClipboardSyncService(
         catch (Exception ex)
         {
             _logger.LogError(ex, "Clipboard processing error");
-            _notificationService.ShowError($"Clipboard processing error: {ex.Message}");
+            OnSyncError?.Invoke($"Clipboard processing error: {ex.Message}");
         }
     }
 

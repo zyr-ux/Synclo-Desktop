@@ -56,6 +56,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         _settingsService = settingsService;
 
         _clipboardSyncService.OnHistoryUpdated += OnHistoryUpdated;
+        _clipboardSyncService.OnSyncError += OnSyncErrorHandler;
         _accountService.OnLogin += () => Dispatcher.UIThread.InvokeAsync(UpdateHomeStatusAsync);
         _accountService.OnLogout += () => Dispatcher.UIThread.InvokeAsync(async () =>
         {
@@ -264,8 +265,19 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             }
 
             // After the visual cascade completes, clear server + local DB
-            await _clipboardSyncService.ClearHistoryAsync();
-            await Dispatcher.UIThread.InvokeAsync(UpdateHomeStatusAsync);
+            var clearedFully = await _clipboardSyncService.ClearHistoryAsync();
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (clearedFully)
+                {
+                    _notificationService.ShowSuccess("Clipboard history cleared.");
+                }
+                else
+                {
+                    _notificationService.ShowWarning("Offline: Cleared history locally. Server will be updated when online.");
+                }
+                await UpdateHomeStatusAsync();
+            });
         }
         catch (Exception ex)
         {
@@ -381,9 +393,10 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             
             await _clipboardSyncService.DeleteClipboardEntryAsync(entry.Id);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             entry.IsDeleting = false;
+            _notificationService.ShowError($"Failed to delete clipboard entry: {ex.Message}");
         }
     }
 
@@ -419,6 +432,11 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void OnSyncErrorHandler(string message)
+    {
+        Dispatcher.UIThread.Post(() => _notificationService.ShowError(message));
+    }
+
     // Cleans up resources and unregisters event handlers
     public void Dispose()
     {
@@ -426,5 +444,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         _updateCts?.Dispose();
         _updateLock.Dispose();
         _clipboardSyncService.OnHistoryUpdated -= OnHistoryUpdated;
+        _clipboardSyncService.OnSyncError -= OnSyncErrorHandler;
     }
 }

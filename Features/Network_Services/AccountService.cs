@@ -25,6 +25,7 @@ public interface IAccountService
     Task DeleteAccountAsync(CancellationToken ct = default);
     event Func<Task>? OnLogin;
     event Func<Task>? OnLogout;
+    event Action? OnLoggedOutRemotely;
 }
 
 public sealed class AccountService : IAccountService
@@ -38,11 +39,12 @@ public sealed class AccountService : IAccountService
     private readonly IUtils _utils;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IWebSocketService _webSocketService;
-    private readonly INotificationService _notificationService;
     private readonly IClipboardRepository _clipboardRepository;
     
     // Flag to immediately reflect logout state before secure storage is cleared
     private volatile bool _isLoggingOut;
+
+    public event Action? OnLoggedOutRemotely;
 
     public AccountService(
         IApiService api,
@@ -54,7 +56,6 @@ public sealed class AccountService : IAccountService
         IUtils utils,
         IRefreshTokenService refreshTokenService,
         IWebSocketService webSocketService,
-        INotificationService notificationService,
         IClipboardRepository clipboardRepository)
     {
         _api = api;
@@ -66,7 +67,6 @@ public sealed class AccountService : IAccountService
         _utils = utils;
         _refreshTokenService = refreshTokenService;
         _webSocketService = webSocketService;
-        _notificationService = notificationService;
         _clipboardRepository = clipboardRepository;
 
         // Subscribe to device deletion event
@@ -107,13 +107,11 @@ public sealed class AccountService : IAccountService
         {
             try
             {
-                // Ensure UI notification runs on the UI thread
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
-                    _notificationService.ShowWarning("This device has been logged out remotely"));
+                OnLoggedOutRemotely?.Invoke();
             }
             catch
             {
-                // Swallow exceptions during notification (e.g. if app is closing)
+                // Swallow handler exceptions
             }
             
             try

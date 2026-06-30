@@ -181,6 +181,12 @@ public class App : Application
         // Wire up event connections
         refreshTokenService.SessionExpired += OnSessionExpired;
         accountService.OnLogout += webSocketService.DisconnectAsync;
+        accountService.OnLoggedOutRemotely += () =>
+        {
+            var notificationService = services.GetRequiredService<INotificationService>();
+            Dispatcher.UIThread.Post(() => 
+                notificationService.ShowWarning("This device has been logged out remotely"));
+        };
 
         // 1. Restore ServerUrl from secure secrets manager
         var serverUrl = await secretsManager.GetServerUrlAsync().ConfigureAwait(false);

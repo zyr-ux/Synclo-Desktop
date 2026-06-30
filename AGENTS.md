@@ -79,6 +79,12 @@ To keep the application stable, you must strictly follow these structural constr
 - **Rule**: Clear animations in the UI must stagger-animate unpinned items from the bottom-up and halt immediately when a pinned item is encountered, leaving pinned items static.
 - **Reason**: Maintains ordering consistency, ensures remote pin updates propagate, avoids unwanted data loss of pinned history, and prevents visual jarring.
 
+### 8. Separation of Service Logic from UI Notifications
+- **Rule**: Service layers (such as `ClipboardSyncService` and `AccountService`) must never directly resolve or invoke the visual `INotificationService` to show user-facing messages or alerts.
+- **Rule**: If a service layer method is user-initiated (e.g. `DeleteClipboardEntryAsync`, `TogglePinClipboardEntryAsync`, `ClearHistoryAsync`), any exceptions must bubble up to the ViewModel layer to be caught and reported.
+- **Rule**: If an event occurs asynchronously in a background worker (e.g. remote logouts, WebSocket status errors, local processing errors), the service should raise an event (`OnSyncError`, `OnLoggedOutRemotely`) that UI-bound managers (like `HomeViewModel` or `App.axaml.cs`) listen to and marshal onto the UI thread for presentation.
+- **Reason**: Decouples business logic from presentation, prevents duplicated notifications, allows headless testing, and protects against background-thread visual marshaling errors.
+
 ---
 
 ## 🪵 Known Engineering Gotchas
@@ -110,4 +116,5 @@ Before submitting any code modifications, verify your implementation against thi
 - [ ] **Pin Sync Safety**: Did you ensure that incoming sync events verify and merge `is_pinned` updates even if the content matches?
 - [ ] **History Clear Behavior**: Does `ClearHistoryAsync` call `ClearUnpinnedAsync` to keep pinned items intact?
 - [ ] **Tray & UI Icon Colors**: Do UI buttons and icons use `{DynamicResource Foreground}` to respect theme styling instead of static colors?
+- [ ] **Notification Separation**: Did you avoid calling `INotificationService` directly inside service layer files, propagating errors via events or exceptions instead?
 
