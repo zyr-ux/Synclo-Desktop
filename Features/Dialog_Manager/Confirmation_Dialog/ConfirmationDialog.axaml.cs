@@ -17,12 +17,18 @@ public partial class ConfirmationDialog : Window
         string title,
         string message,
         string confirmText,
-        string cancelText) : this()
+        string cancelText,
+        bool isDangerous = false) : this()
     {
         TitleText.Text = title;
         MessageText.Text = message;
         YesButton.Content = confirmText;
         NoButton.Content = cancelText;
+
+        if (isDangerous)
+        {
+            YesButton.Classes.Add("dangerous");
+        }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

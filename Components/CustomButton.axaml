@@ -23,6 +23,21 @@
         <Setter Property="BorderBrush" Value="Black"/>
         <Setter Property="BorderThickness" Value="1"/>
     </Style>
+
+    <Style Selector="Button.custom-button.dangerous">
+        <Setter Property="Background" Value="Red"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="Red"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <Style Selector="Button.custom-button.dangerous:pointerover /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="Red"/>
+    </Style>
+
+    <Style Selector="Button.custom-button.dangerous:pressed /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="Red"/>
+    </Style>
 </Styles>
 
 

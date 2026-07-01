@@ -15,7 +15,8 @@ public interface IDialogService
         string title,
         string message = "Are you sure you want to proceed with this action?",
         string confirmText = "Yes",
-        string cancelText = "No");
+        string cancelText = "No",
+        bool isDangerous = false);
 
     Task<bool?> ShowResetPasswordAsync();
 
@@ -62,7 +63,8 @@ public class DialogService : IDialogService
         string title,
         string message,
         string confirmText,
-        string cancelText)
+        string cancelText,
+        bool isDangerous = false)
     {
         if (Application.Current?.ApplicationLifetime
                 is not IClassicDesktopStyleApplicationLifetime desktop ||
@@ -74,7 +76,7 @@ public class DialogService : IDialogService
         IncrementDialogCount();
         try
         {
-            var dialog = new ConfirmationDialog(title, message, confirmText, cancelText);
+            var dialog = new ConfirmationDialog(title, message, confirmText, cancelText, isDangerous);
             return await dialog.ShowDialog<bool>(desktop.MainWindow);
         }
         finally

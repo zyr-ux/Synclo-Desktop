@@ -101,7 +101,12 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task LogoutAsync()
     {
-        var confirmed = await _dialogService.ShowConfirmationAsync("Logout");
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            title: "Logout",
+            message: "Are you sure you want to log out of Synclo on this device?",
+            confirmText: "Logout",
+            cancelText: "Cancel",
+            isDangerous: true);
         if (!confirmed)
             return;
         
@@ -148,7 +153,12 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task DeleteAccountAsync()
     {
-        var confirmed = await _dialogService.ShowConfirmationAsync("Delete Account");
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            title: "Delete Account",
+            message: "Are you sure you want to permanently delete your account?",
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            isDangerous: true);
         if (!confirmed)
             return;
 
