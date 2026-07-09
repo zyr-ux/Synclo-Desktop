@@ -17,24 +17,37 @@ public enum ConnectionStatus
 public interface IConnectionMonitor : IDisposable
 {
     ConnectionStatus ConnectionStatus { get; }
+    long? LatencyMs { get; }
     event Action<ConnectionStatus>? ConnectionStatusChanged;
+    event Action<long?>? LatencyChanged;
     Task CheckStatusAsync();
 }
 
 public sealed class ConnectionMonitor : IConnectionMonitor
 {
     private readonly IApiService _apiService;
+    private readonly IWebSocketService _webSocketService;
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(10));
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _pollingTask;
 
     private ConnectionStatus _connectionStatus = ConnectionStatus.Online;
+    private long? _latencyMs;
+    private bool _useWebSocketLatency;
     public ConnectionStatus ConnectionStatus => _connectionStatus;
+    public long? LatencyMs => _latencyMs;
     public event Action<ConnectionStatus>? ConnectionStatusChanged;
+    public event Action<long?>? LatencyChanged;
 
-    public ConnectionMonitor(IApiService apiService)
+    public ConnectionMonitor(IApiService apiService, IWebSocketService webSocketService)
     {
         _apiService = apiService;
+        _webSocketService = webSocketService;
+
+        _webSocketService.LatencyChanged += HandleWebSocketLatency;
+        _webSocketService.OnConnected += HandleWebSocketConnected;
+        _webSocketService.OnDisconnected += HandleWebSocketDisconnected;
+
         _pollingTask = PollingLoop();
     }
 
@@ -58,6 +71,7 @@ public sealed class ConnectionMonitor : IConnectionMonitor
     public async Task CheckStatusAsync()
     {
         ConnectionStatus targetStatus;
+        long? targetLatency = null;
         if (!await CheckInternet())
         {
             targetStatus = ConnectionStatus.NoInternet;
@@ -66,7 +80,19 @@ public sealed class ConnectionMonitor : IConnectionMonitor
         {
             try
             {
-                await _apiService.Health();
+                if (_useWebSocketLatency)
+                {
+                    // WS is handling latency; just verify server reachability
+                    await _apiService.Health();
+                }
+                else
+                {
+                    // No WS connection — measure HTTP round-trip as fallback latency
+                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    await _apiService.Health();
+                    stopwatch.Stop();
+                    targetLatency = stopwatch.ElapsedMilliseconds;
+                }
                 targetStatus = ConnectionStatus.Online;
             }
             catch
@@ -80,6 +106,42 @@ public sealed class ConnectionMonitor : IConnectionMonitor
             _connectionStatus = targetStatus;
             ConnectionStatusChanged?.Invoke(_connectionStatus);
         }
+
+        // Only update latency from HTTP when WS isn't providing it
+        if (!_useWebSocketLatency)
+        {
+            var latencyChanged = _latencyMs != targetLatency;
+            _latencyMs = targetLatency;
+            if (latencyChanged)
+            {
+                LatencyChanged?.Invoke(_latencyMs);
+            }
+        }
+    }
+
+    private void HandleWebSocketLatency(long? latencyMs)
+    {
+        if (latencyMs == null)
+        {
+            _useWebSocketLatency = false;
+        }
+
+        var changed = _latencyMs != latencyMs;
+        _latencyMs = latencyMs;
+        if (changed)
+        {
+            LatencyChanged?.Invoke(_latencyMs);
+        }
+    }
+
+    private void HandleWebSocketConnected()
+    {
+        _useWebSocketLatency = true;
+    }
+
+    private void HandleWebSocketDisconnected()
+    {
+        _useWebSocketLatency = false;
     }
 
     private static async Task<bool> CheckInternet()
@@ -110,6 +172,10 @@ public sealed class ConnectionMonitor : IConnectionMonitor
 
     public void Dispose()
     {
+        _webSocketService.LatencyChanged -= HandleWebSocketLatency;
+        _webSocketService.OnConnected -= HandleWebSocketConnected;
+        _webSocketService.OnDisconnected -= HandleWebSocketDisconnected;
+
         _cts.Cancel();
         _timer.Dispose();
         _cts.Dispose();

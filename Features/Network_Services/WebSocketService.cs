@@ -26,6 +26,7 @@ public interface IWebSocketService : IDisposable
     event Action<string?>? OnDeviceDeleted;
     event Action<string>? OnDeviceAdded;
     event Action<string>? OnDeviceUpdated;
+    event Action<long?>? LatencyChanged;
 }
 
 public sealed class WebSocketService : IWebSocketService
@@ -43,6 +44,7 @@ public sealed class WebSocketService : IWebSocketService
 
     private ClientWebSocket? _socket;
     private Task? _pingTask;
+    private System.Diagnostics.Stopwatch? _pingStopwatch;
 
     public WebSocketService(
         IApiService api, 
@@ -66,6 +68,7 @@ public sealed class WebSocketService : IWebSocketService
     public event Action<string?>? OnDeviceDeleted;
     public event Action<string>? OnDeviceAdded;
     public event Action<string>? OnDeviceUpdated;
+    public event Action<long?>? LatencyChanged;
 
     private void OnTokenRefreshed(string token)
     {
@@ -261,7 +264,11 @@ public sealed class WebSocketService : IWebSocketService
                         return true;
                     
                     case "pong":
-                        // Ignore pong responses (already tracked by ping loop)
+                        if (_pingStopwatch != null && _pingStopwatch.IsRunning)
+                        {
+                            _pingStopwatch.Stop();
+                            LatencyChanged?.Invoke(_pingStopwatch.ElapsedMilliseconds);
+                        }
                         return true;
                     
                     case "error":
@@ -466,6 +473,8 @@ public sealed class WebSocketService : IWebSocketService
             {
                 OnDisconnected?.Invoke();
             }
+            
+            LatencyChanged?.Invoke(null);
         }
     }
 
@@ -488,14 +497,26 @@ public sealed class WebSocketService : IWebSocketService
         {
             try
             {
+                // Immediate first ping so latency is available right away
+                if (!token.IsCancellationRequested && IsConnected)
+                {
+                    try
+                    {
+                        _pingStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                        await SendAsync("{\"type\":\"ping\"}");
+                    }
+                    catch { }
+                }
+
                 while (!token.IsCancellationRequested)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(30), token);
+                    await Task.Delay(TimeSpan.FromSeconds(10), token);
                     if (token.IsCancellationRequested) break;
                     if (IsConnected)
                     {
                         try
                         {
+                            _pingStopwatch = System.Diagnostics.Stopwatch.StartNew();
                             await SendAsync("{\"type\":\"ping\"}");
                         }
                         catch { }
