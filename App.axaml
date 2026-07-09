@@ -39,12 +39,8 @@
             <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
             <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
 
-            <FontFamily x:Key="Inconsolata-Bold">
-                avares://Synclo/Assets/Fonts/Inconsolata-Bold.ttf#Inconsolata
-            </FontFamily>
-
-            <FontFamily x:Key="Inconsolata-Medium">
-                avares://Synclo/Assets/Fonts/Inconsolata-Medium.ttf#Inconsolata
+            <FontFamily x:Key="Inconsolata">
+                avares://Synclo/Assets/Fonts/Inconsolata#Inconsolata
             </FontFamily>
 
         </ResourceDictionary>

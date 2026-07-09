@@ -14,23 +14,23 @@
 
         <StackPanel Grid.Row="0" Spacing="20" Margin="0 0 0 50">
             <TextBlock Text="E-mail"
-                       FontFamily="{DynamicResource Inconsolata-Bold}"
+                       FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                        FontSize="24" />
             <TextBox Width="300"
                      FontSize="18"
-                     FontFamily="{DynamicResource Inconsolata-Medium}"
+                     FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                      Text="{Binding Email}" />
         </StackPanel>
 
         <StackPanel Grid.Row="1" Spacing="20" Margin="0 0 0 10">
             <TextBlock Text="Password"
-                       FontFamily="{DynamicResource Inconsolata-Bold}"
+                       FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                        FontSize="24" />
             <TextBox Classes="revealPasswordButton"
                      PasswordChar="*"
                      Width="300"
                      FontSize="18"
-                     FontFamily="{DynamicResource Inconsolata-Medium}"
+                     FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                      Text="{Binding Password}" />
         </StackPanel>
 
@@ -38,7 +38,7 @@
                    Text="{Binding StatusMessage}"
                    IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    Foreground="{DynamicResource Accent}"
-                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                    FontSize="14"
                    TextWrapping="Wrap"
                    MaxWidth="300"

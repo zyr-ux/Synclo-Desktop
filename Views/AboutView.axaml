@@ -45,11 +45,11 @@
                         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
                             <TextBlock Text="Synclo"
                                        FontSize="28"
-                                       FontFamily="{DynamicResource Inconsolata-Bold}"
+                                       FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                        Foreground="{DynamicResource Foreground}" />
                             <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
                                        FontSize="16"
-                                       FontFamily="{DynamicResource Inconsolata-Medium}"
+                                       FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                        Foreground="{DynamicResource Foreground}"
                                        Opacity="0.6"
                                        VerticalAlignment="Bottom"
@@ -57,7 +57,7 @@
                         </StackPanel>
                         <TextBlock Text="Secure, end-to-end encrypted clipboard synchronization."
                                    FontSize="15"
-                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.7"
                                    TextWrapping="Wrap" />
@@ -79,14 +79,14 @@
                             <!-- Left side: Status Text and Status Icon inline -->
                             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <TextBlock Text="Server Status:"
-                                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                                           FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                            FontSize="16"
                                            Foreground="{DynamicResource Foreground}"
                                            VerticalAlignment="Center" />
                                 
                                 <TextBlock Name="StatusText"
                                            Text="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusToTextConverter}}"
-                                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                                           FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                            FontSize="16"
                                            VerticalAlignment="Center">
                                     <TextBlock.Foreground>
@@ -140,11 +140,11 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="4" VerticalAlignment="Center">
                                 <TextBlock Text="Links &amp; Resources"
-                                           FontFamily="{DynamicResource Inconsolata-Bold}"
+                                           FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                            FontSize="16"
                                            Foreground="{DynamicResource Foreground}" />
                                 <TextBlock Text="Find documentation, source code, or report bugs."
-                                           FontFamily="{DynamicResource Inconsolata-Medium}"
+                                           FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                            FontSize="13"
                                            Foreground="{DynamicResource Foreground}"
                                            Opacity="0.7" />
@@ -193,7 +193,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <TextBlock Text="Powered by"
                                    FontSize="16"
-                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                    Foreground="{DynamicResource Foreground}"
                                    VerticalAlignment="Center" />
                         <Svg Path="avares://Synclo/Assets/avalonia.svg"
@@ -205,13 +205,13 @@
                     <!-- Right: License/Footer -->
                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
                         <TextBlock Text="Released under the GPL-3.0 License"
-                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                    FontSize="14"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.5"
                                    HorizontalAlignment="Right" />
                         <!-- <TextBlock Text="Copyright © 2026 Synclo Contributors"
-                                   FontFamily="{DynamicResource Inconsolata-Medium}"
+                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                    FontSize="12"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.5"

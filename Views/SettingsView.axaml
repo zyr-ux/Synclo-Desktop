@@ -21,7 +21,7 @@
                 <Border> 
                     <StackPanel Spacing="10">
                         <TextBlock Text="Appearance"
-                                   FontFamily="{StaticResource Inconsolata-Bold}"
+                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                    FontSize="18"
                                    Foreground="{DynamicResource Foreground}"
                                    Margin="0,8,0,4" />
@@ -40,12 +40,12 @@
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="Theme"
-                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                                FontSize="16"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Select theme to apply"
-                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                                FontSize="13"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
@@ -57,7 +57,7 @@
                                           VerticalAlignment="Center"
                                           HorizontalContentAlignment="Left"
                                           Padding="2"
-                                          FontFamily="{DynamicResource Inconsolata-Medium}"
+                                          FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                           ItemsSource="{Binding AvailableThemes}"
                                           SelectedItem="{Binding SelectedTheme}" />
                             </Grid>
@@ -80,13 +80,13 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Mica Backdrop"
-                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                                FontSize="16"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Enable Windows 11 Mica translucent window effect"
-                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                                FontSize="13"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
@@ -97,7 +97,7 @@
                                 <ToggleSwitch Grid.Column="2"
                                               IsChecked="{Binding IsMicaEnabled}"
                                               VerticalAlignment="Center"
-                                              FontFamily="{DynamicResource Inconsolata-Medium}"
+                                              FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                               Foreground="{DynamicResource Foreground}" />
                             </Grid>
                         </Border>
@@ -108,7 +108,7 @@
                 <Border> 
                     <StackPanel Spacing="10">
                         <TextBlock Text="General"
-                                   FontFamily="{StaticResource Inconsolata-Bold}"
+                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                    FontSize="18"
                                    Foreground="{DynamicResource Foreground}"
                                    Margin="0,20,0,4" />
@@ -129,12 +129,12 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Close Behaviour"
-                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                                FontSize="16"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="What happens when you close the window?"
-                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                                FontSize="13"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
@@ -146,7 +146,7 @@
                                           VerticalAlignment="Center"
                                           HorizontalContentAlignment="Left"
                                           Padding="2"
-                                          FontFamily="{DynamicResource Inconsolata-Medium}"
+                                          FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                           ItemsSource="{Binding AvailableCloseBehaviors}"
                                           SelectedItem="{Binding SelectedCloseBehavior}" />
                             </Grid>
@@ -166,18 +166,18 @@
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Server URL"
-                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                                FontSize="16"
                                                Foreground="{DynamicResource Foreground}" />
                                     <TextBlock Text="Set a custom self-hosted instance URL"
-                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                                FontSize="13"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7"
                                                TextWrapping="Wrap"/>
                                     <TextBlock Text="Changing this URL will log you out and clear local history"
-                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                                FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="OrangeRed"
@@ -191,7 +191,7 @@
                                     <TextBox x:Name="ServerUrlTextBox"
                                              Width="200"
                                              VerticalAlignment="Center"
-                                             FontFamily="{DynamicResource Inconsolata-Medium}"
+                                             FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                              Text="{Binding ServerUrlInput, Mode=TwoWay}"
                                              KeyDown="ServerUrl_KeyDown"
                                              Watermark="https://synclo.zyrux.dev" />
@@ -235,13 +235,13 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Launch at Startup"
-                                               FontFamily="{StaticResource Inconsolata-Bold}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
                                                FontSize="16"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Whether the app should automatically launch when you log in"
-                                               FontFamily="{StaticResource Inconsolata-Medium}"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                                FontSize="13"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
@@ -252,7 +252,7 @@
                                 <ToggleSwitch Grid.Column="2"
                                               IsChecked="{Binding IsStartOnBootEnabled}"
                                               VerticalAlignment="Center"
-                                              FontFamily="{DynamicResource Inconsolata-Medium}"
+                                              FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
                                               Foreground="{DynamicResource Foreground}" />
                             </Grid>
                         </Border>
