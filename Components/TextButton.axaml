@@ -24,7 +24,6 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FontSize" Value="18" />
         <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
     </Style>
     <Style Selector="Button.textButton:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent" />

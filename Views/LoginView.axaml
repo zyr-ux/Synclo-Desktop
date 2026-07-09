@@ -18,7 +18,7 @@
                        FontSize="24" />
             <TextBox Width="300"
                      FontSize="18"
-                     FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
+                     FontFamily="{StaticResource Inconsolata}"
                      Text="{Binding Email}" />
         </StackPanel>
 
@@ -30,7 +30,7 @@
                      PasswordChar="*"
                      Width="300"
                      FontSize="18"
-                     FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
+                     FontFamily="{StaticResource Inconsolata}"
                      Text="{Binding Password}" />
         </StackPanel>
 
@@ -38,7 +38,7 @@
                    Text="{Binding StatusMessage}"
                    IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    Foreground="{DynamicResource Accent}"
-                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
+                   FontFamily="{StaticResource Inconsolata}"
                    FontSize="14"
                    TextWrapping="Wrap"
                    MaxWidth="300"

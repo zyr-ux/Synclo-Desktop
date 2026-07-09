@@ -35,7 +35,7 @@
                        TextWrapping="Wrap"
                        TextAlignment="Left"
                        FontSize="16"
-                       FontFamily="{StaticResource Inconsolata}" FontWeight="Medium"
+                       FontFamily="{StaticResource Inconsolata}"
                        VerticalAlignment="Center" 
                        Margin="0,35"/>
 

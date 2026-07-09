@@ -29,7 +29,7 @@
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
                                    Foreground="{DynamicResource Accent}"
-                                   FontFamily="{StaticResource Inconsolata}" FontWeight="Medium" />
+                                   FontFamily="{StaticResource Inconsolata}" />
                     </StackPanel>
                     
                     <Border Height="1"
