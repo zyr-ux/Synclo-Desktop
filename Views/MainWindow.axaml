@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
         xmlns:converters="using:Synclo.Converters"
+        xmlns:behaviors="using:Synclo.Behaviors"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
         x:Class="Synclo.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -169,7 +170,11 @@
                 ClipToBounds="True"
                 BorderBrush="{DynamicResource Border}"
                 BorderThickness="1">
-            <ContentControl Content="{Binding CurrentViewModel}" />
+            <TransitioningContentControl Content="{Binding CurrentViewModel}">
+    <TransitioningContentControl.PageTransition>
+        <behaviors:PageTransition />
+    </TransitioningContentControl.PageTransition>
+</TransitioningContentControl>
         </Border>
 
         <!-- Dialog Overlay for Dimming/Fade Effect -->
