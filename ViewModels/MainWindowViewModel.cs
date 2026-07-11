@@ -100,6 +100,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ShowHome()
     {
+        if (CurrentPage == NavigationPage.Home) return;
         CurrentPage = NavigationPage.Home;
         _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<HomeViewModel>();
@@ -108,6 +109,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ShowSettings()
     {
+        if (CurrentPage == NavigationPage.Settings) return;
         CurrentPage = NavigationPage.Settings;
         _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<SettingsViewModel>();
@@ -116,6 +118,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ShowAccount()
     {
+        if (CurrentPage == NavigationPage.Account) return;
         CurrentPage = NavigationPage.Account;
         _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<AccountViewModel>();
@@ -124,6 +127,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ShowAbout()
     {
+        if (CurrentPage == NavigationPage.About) return;
         CurrentPage = NavigationPage.About;
         _factory.Release(CurrentViewModel);
         CurrentViewModel = _factory.Create<AboutViewModel>();
