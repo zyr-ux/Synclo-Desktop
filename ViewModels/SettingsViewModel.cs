@@ -36,6 +36,7 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _serverUrl = "";
     [ObservableProperty] private string _serverUrlInput = "";
     [ObservableProperty] private string _selectedCloseBehavior="";
+    [ObservableProperty] private string _selectedRightClickAction = "Context Menu";
     
     private string _previousServerUrl = "";
     private bool _isUpdatingServerUrl;
@@ -43,6 +44,7 @@ public partial class SettingsViewModel : ViewModelBase
     public bool IsMicaToggleVisible => OperatingSystem.IsWindows() && Environment.OSVersion.Version.Build >= 22000;
     public List<string> AvailableThemes { get; } = ["System", "Light", "Dark"];
     public List<string> AvailableCloseBehaviors { get; } = ["Quit Application", "Minimize to System Tray", "Run in Background (Hidden)"];
+    public List<string> AvailableRightClickActions { get; } = ["Context Menu", "Pin / Unpin", "Delete"];
 
     public SettingsViewModel(
         ISettingsService settings, 
@@ -74,6 +76,7 @@ public partial class SettingsViewModel : ViewModelBase
         
         // Load other settings
         InitializeCloseBehavior();
+        InitializeRightClickAction();
     }
 
     partial void OnIsMicaEnabledChanged(bool value)
@@ -186,6 +189,35 @@ public partial class SettingsViewModel : ViewModelBase
         {
             SelectedCloseBehavior = "Quit Application";
         }
+    }
+
+    private void InitializeRightClickAction()
+    {
+        var action = _settings.Settings.RightClickAction;
+        SelectedRightClickAction = action switch
+        {
+            "Pin" => "Pin / Unpin",
+            "Delete" => "Delete",
+            _ => "Context Menu"
+        };
+    }
+
+    partial void OnSelectedRightClickActionChanged(string value)
+    {
+        switch (value)
+        {
+            case "Context Menu":
+                _settings.Settings.RightClickAction = "ContextMenu";
+                break;
+            case "Pin / Unpin":
+                _settings.Settings.RightClickAction = "Pin";
+                break;
+            case "Delete":
+                _settings.Settings.RightClickAction = "Delete";
+                break;
+        }
+
+        _settings.Save();
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteServerUrlCommand))]

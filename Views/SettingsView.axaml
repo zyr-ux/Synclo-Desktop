@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              xmlns:vm="using:Synclo.ViewModels"
+             xmlns:ia="using:Xaml.Behaviors.Interactions.Animated"
              mc:Ignorable="d"
              d:DesignWidth="800"
              d:DesignHeight="450"
@@ -13,6 +14,9 @@
     
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
+        <Interaction.Behaviors>
+            <ia:VerticalScrollViewerAnimatedBehavior />
+        </Interaction.Behaviors>
 
         <Border Padding="24,16,24,16">
             <StackPanel Orientation="Vertical" Spacing="10">
@@ -149,6 +153,45 @@
                                           FontFamily="{StaticResource Inconsolata}"
                                           ItemsSource="{Binding AvailableCloseBehaviors}"
                                           SelectedItem="{Binding SelectedCloseBehavior}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Right-Click Action Selector -->
+                        <Border Classes="SettingsItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+
+                                <materialIcons:MaterialIcon
+                                    Kind="Mouse"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Foreground}" />
+
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center">
+
+                                    <TextBlock Text="Right-Click Action"
+                                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
+                                               FontSize="16"
+                                               Foreground="{DynamicResource Foreground}" />
+
+                                    <TextBlock Text="Choose what happens when you right-click a clipboard history entry"
+                                               FontFamily="{StaticResource Inconsolata}"
+                                               FontSize="13"
+                                               Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Foreground}"
+                                               Opacity="0.7" />
+                                </StackPanel>
+
+                                <ComboBox Grid.Column="2"
+                                          Width="250"
+                                          VerticalAlignment="Center"
+                                          HorizontalContentAlignment="Left"
+                                          Padding="2"
+                                          FontFamily="{StaticResource Inconsolata}"
+                                          ItemsSource="{Binding AvailableRightClickActions}"
+                                          SelectedItem="{Binding SelectedRightClickAction}" />
                             </Grid>
                         </Border>
                         

@@ -34,6 +34,7 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string? _homeStatusMessage;
     
     private int PageSize => _settingsService.Settings.sync_page_size;
+    public string RightClickAction => _settingsService.Settings.RightClickAction ?? "ContextMenu";
     private bool _isLoadingMore;
     
 
@@ -386,11 +387,19 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
         }
     }
 
-    // Handles right-click on a history item. future functionality (e.g. showing a context menu).
-    [RelayCommand]
-    private void ItemRightClicked(HistoryItemModel entry)
+    // Handles right-click on a history item to execute dynamic settings action.
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task ItemRightClicked(HistoryItemModel entry)
     {
-        // TODO: implement right-click behavior (context menu, etc.)
+        var action = RightClickAction;
+        if (action == "Pin")
+        {
+            await TogglePin(entry);
+        }
+        else if (action == "Delete")
+        {
+            await DeleteItemClicked(entry);
+        }
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

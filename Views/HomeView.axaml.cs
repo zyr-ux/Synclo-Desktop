@@ -18,6 +18,11 @@ public partial class HomeView : UserControl
 
     private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (DataContext is HomeViewModel vm && vm.RightClickAction != "ContextMenu")
+        {
+            e.Cancel = true;
+            return;
+        }
         _isContextMenuOpen = true;
     }
 
@@ -48,7 +53,11 @@ public partial class HomeView : UserControl
         {
             if (DataContext is HomeViewModel vm)
             {
-                vm.ItemRightClickedCommand.Execute(entry);
+                if (vm.RightClickAction != "ContextMenu")
+                {
+                    vm.ItemRightClickedCommand.Execute(entry);
+                    e.Handled = true;
+                }
             }
         }
     }

@@ -26,4 +26,5 @@ public sealed class AppSettings
     public bool is_mica_enabled { get; set; } = true;
     public bool is_sidebar_collapsed { get; set; } = false;
     public int sync_page_size { get; set; } = 100;
+    public string RightClickAction { get; set; } = "ContextMenu";
 }
