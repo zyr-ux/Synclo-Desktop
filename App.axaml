@@ -36,6 +36,7 @@
             <converters:ClipboardItemTypeToIconConverter x:Key="ClipboardItemTypeToIconConverter" />
             <converters:PinStateToIconConverter x:Key="PinStateToIconConverter" />
             <converters:PinStateToToolTipConverter x:Key="PinStateToToolTipConverter" />
+            <converters:PinStateToMenuHeaderConverter x:Key="PinStateToMenuHeaderConverter" />
             <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
             <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
 

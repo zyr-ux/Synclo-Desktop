@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
@@ -12,10 +11,7 @@ using Synclo.Models;
 using Synclo.Features.Network_Services;
 using Synclo.Features.Clipboard_Manager.Clipboard_Monitor;
 using Synclo.Features.Clipboard_Manager.Clipboard_Service;
-using Synclo.Utilities;
 using Synclo.Features.Notifications_Manager;
-using Synclo.Features.Connection_Monitor;
-using Synclo.Features.Dialog_Manager;
 using Synclo.Features.Settings_Manager;
 
 namespace Synclo.ViewModels;
@@ -36,7 +32,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isClearing;
     [ObservableProperty] private AvaloniaList<HistoryItemModel> _historyEntries = new();
     [ObservableProperty] private string? _homeStatusMessage;
-    [ObservableProperty] private HistoryItemModel? _selectedEntry;
     
     private int PageSize => _settingsService.Settings.sync_page_size;
     private bool _isLoadingMore;
@@ -108,15 +103,6 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
                 _updateLock.Release();
             }
         });
-    }
-
-    partial void OnSelectedEntryChanged(HistoryItemModel? value)
-    {
-        if (value != null)
-        {
-            _ = ItemClicked(value);
-            SelectedEntry = null; // Clear selection to allow re-click
-        }
     }
 
     // Efficiently syncs the UI collection with new entries, handling insertions, updates, moves, and removals
@@ -398,6 +384,13 @@ public partial class HomeViewModel : ViewModelBase, IDisposable
             entry.IsDeleting = false;
             _notificationService.ShowError($"Failed to delete clipboard entry: {ex.Message}");
         }
+    }
+
+    // Handles right-click on a history item. future functionality (e.g. showing a context menu).
+    [RelayCommand]
+    private void ItemRightClicked(HistoryItemModel entry)
+    {
+        // TODO: implement right-click behavior (context menu, etc.)
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

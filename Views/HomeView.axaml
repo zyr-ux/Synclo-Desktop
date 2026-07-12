@@ -68,8 +68,7 @@
         <!-- Clipboard Items ListBox -->
         <ListBox Grid.Row="1"
                  Classes="HistoryList"
-                 ItemsSource="{Binding HistoryEntries}"
-                 SelectedItem="{Binding SelectedEntry}">
+                 ItemsSource="{Binding HistoryEntries}">
 
             <Interaction.Behaviors>
                 <!-- Infinite Scroll Behavior adapted for ListBox internal ScrollViewer -->
@@ -82,7 +81,33 @@
                 <DataTemplate DataType="models:HistoryItemModel">
                     <Border Classes="HistoryItem"
                             Classes.clearing="{Binding IsBeingCleared}"
-                            ClipToBounds="True">
+                            ClipToBounds="True"
+                            PointerPressed="OnHistoryItemPointerPressed">
+                        <Border.ContextMenu>
+                            <ContextMenu Opening="OnContextMenuOpening" Closing="OnContextMenuClosing">
+                                <MenuItem Header="Copy"
+                                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <materialIcons:MaterialIcon Kind="ContentCopy" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding IsPinned, Converter={StaticResource PinStateToMenuHeaderConverter}}"
+                                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).TogglePinCommand}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <materialIcons:MaterialIcon Kind="{Binding IsPinned, Converter={StaticResource PinStateToIconConverter}}" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Delete"
+                                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <materialIcons:MaterialIcon Kind="Delete" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Border.ContextMenu>
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                             <Border Grid.Column="0"
                                     Margin="0,0,15,0"
