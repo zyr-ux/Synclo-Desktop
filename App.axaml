@@ -21,6 +21,17 @@
         <StyleInclude Source="avares://Synclo/Components/HistoryListBoxItem.axaml" />
         <StyleInclude Source="avares://Synclo/Features/Settings_Manager/SettingsItem.axaml" />
         <StyleInclude Source="avares://Synclo/Features/Connection_Monitor/ConnectionOrb.axaml" />
+
+        <Style Selector="ToolTip">
+            <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="ContextMenu">
+            <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}" />
+        </Style>
+        <Style Selector="MenuItem">
+            <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}" />
+        </Style>
     </Application.Styles>
 
     <Application.Resources>
