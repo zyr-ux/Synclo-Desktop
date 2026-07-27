@@ -45,11 +45,11 @@
                         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
                             <TextBlock Text="Synclo"
                                        FontSize="28"
-                                       FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
+                                       FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold"
                                        Foreground="{DynamicResource Foreground}" />
                             <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
                                        FontSize="16"
-                                       FontFamily="{StaticResource Inconsolata}"
+                                       FontFamily="{DynamicResource AppFontFamily}"
                                        Foreground="{DynamicResource Foreground}"
                                        Opacity="0.6"
                                        VerticalAlignment="Bottom"
@@ -57,7 +57,7 @@
                         </StackPanel>
                         <TextBlock Text="Secure, end-to-end encrypted clipboard synchronization."
                                    FontSize="15"
-                                   FontFamily="{StaticResource Inconsolata}"
+                                   FontFamily="{DynamicResource AppFontFamily}"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.7"
                                    TextWrapping="Wrap" />
@@ -80,7 +80,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                     <TextBlock Text="Server Status"
-                                               FontFamily="{StaticResource Inconsolata}"
+                                               FontFamily="{DynamicResource AppFontFamily}"
                                                FontWeight="Bold"
                                                FontSize="16"
                                                Foreground="{DynamicResource Foreground}"
@@ -88,7 +88,7 @@
                                     
                                     <TextBlock Name="StatusText"
                                                Text="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusToTextConverter}}"
-                                               FontFamily="{StaticResource Inconsolata}"
+                                               FontFamily="{DynamicResource AppFontFamily}"
                                                FontSize="15"
                                                FontWeight="Bold"
                                                VerticalAlignment="Center"
@@ -137,27 +137,27 @@
                             <!-- Details Grid -->
                             <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,*,Auto,Auto,*" Margin="4,0,4,0">
                                 <!-- Row 0: Server Type (Left) & Real-time Sync (Right) -->
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Server Type" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="0,4,0,4"/>
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text=":" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
-                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ServerType}" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Server Type" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text=":" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ServerType}" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
 
-                                <TextBlock Grid.Row="0" Grid.Column="3" Text="Real-time Sync" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="24,4,0,4"/>
-                                <TextBlock Grid.Row="0" Grid.Column="4" Text=":" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
-                                <TextBlock Grid.Row="0" Grid.Column="5" Text="{Binding WebSocketStatusText}" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="3" Text="Real-time Sync" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="24,4,0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="4" Text=":" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="5" Text="{Binding WebSocketStatusText}" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
 
                                 <!-- Row 1: Server URL (Left) & Ping Latency (Right) -->
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Server URL" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="0,4,0,4"/>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text=":" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
-                                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ServerUrl}" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ServerUrl}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Server URL" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text=":" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ServerUrl}" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ServerUrl}"/>
 
-                                <TextBlock Grid.Row="1" Grid.Column="3" Text="Ping Latency" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="24,4,0,4"/>
-                                <TextBlock Grid.Row="1" Grid.Column="4" Text=":" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
-                                <TextBlock Grid.Row="1" Grid.Column="5" Text="{Binding LatencyText}" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="3" Text="Ping Latency" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="24,4,0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="4" Text=":" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="5" Text="{Binding LatencyText}" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
 
                                 <!-- Row 2: Last Sync -->
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Last Sync" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="0,4,0,4"/>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text=":" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
-                                <TextBlock Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="4" Text="{Binding LastSyncText}" FontFamily="{StaticResource Inconsolata}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Last Sync" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="0,4,0,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text=":" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" Opacity="0.6" Margin="8,4,12,4"/>
+                                <TextBlock Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="4" Text="{Binding LastSyncText}" FontFamily="{DynamicResource AppFontFamily}" FontSize="14" Foreground="{DynamicResource Foreground}" FontWeight="SemiBold" Margin="0,4,0,4"/>
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -173,11 +173,11 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="4" VerticalAlignment="Center">
                                 <TextBlock Text="Links &amp; Resources"
-                                           FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
+                                           FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold"
                                            FontSize="16"
                                            Foreground="{DynamicResource Foreground}" />
                                 <TextBlock Text="Find documentation, source code, or report bugs."
-                                           FontFamily="{StaticResource Inconsolata}"
+                                           FontFamily="{DynamicResource AppFontFamily}"
                                            FontSize="13"
                                            Foreground="{DynamicResource Foreground}"
                                            Opacity="0.7" />
@@ -226,7 +226,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <TextBlock Text="Powered by"
                                    FontSize="16"
-                                   FontFamily="{StaticResource Inconsolata}"
+                                   FontFamily="{DynamicResource AppFontFamily}"
                                    Foreground="{DynamicResource Foreground}"
                                    VerticalAlignment="Center" />
                         <Svg Path="avares://Synclo/Assets/avalonia.svg"
@@ -238,13 +238,13 @@
                     <!-- Right: License/Footer -->
                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
                         <TextBlock Text="Released under the GPL-3.0 License"
-                                   FontFamily="{StaticResource Inconsolata}"
+                                   FontFamily="{DynamicResource AppFontFamily}"
                                    FontSize="14"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.5"
                                    HorizontalAlignment="Right" />
                         <!-- <TextBlock Text="Copyright © 2026 Synclo Contributors"
-                                   FontFamily="{StaticResource Inconsolata}"
+                                   FontFamily="{DynamicResource AppFontFamily}"
                                    FontSize="12"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.5"

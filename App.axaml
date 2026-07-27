@@ -23,14 +23,14 @@
         <StyleInclude Source="avares://Synclo/Features/Connection_Monitor/ConnectionOrb.axaml" />
 
         <Style Selector="ToolTip">
-            <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
             <Setter Property="FontSize" Value="13" />
         </Style>
         <Style Selector="ContextMenu">
-            <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         </Style>
         <Style Selector="MenuItem">
-            <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         </Style>
     </Application.Styles>
 
@@ -51,10 +51,7 @@
             <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
             <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
 
-            <FontFamily x:Key="Inconsolata">
-                avares://Synclo/Assets/Fonts/Inconsolata#Inconsolata
-            </FontFamily>
-
+            <FontFamily x:Key="AppFontFamily">avares://Synclo/Assets/Fonts/Inconsolata#Inconsolata</FontFamily>
         </ResourceDictionary>
 
     </Application.Resources>

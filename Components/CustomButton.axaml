@@ -13,7 +13,7 @@
 
     <!-- Add Styles Here -->
     <Style Selector="Button.custom-button">
-        <Setter Property="FontFamily" Value="{DynamicResource Inconsolata}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="FontSize" Value="18"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>

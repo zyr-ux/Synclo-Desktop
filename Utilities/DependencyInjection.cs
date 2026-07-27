@@ -12,6 +12,7 @@ using Synclo.Features.Dialog_Manager.Reset_Password_Dialog;
 using Synclo.Features.Connection_Monitor;
 using Synclo.Features.Network_Services;
 using Synclo.Features.Notifications_Manager;
+using Synclo.Features.Font_Manager;
 using Synclo.Features.Secrets_Manager;
 using Synclo.Features.Settings_Manager;
 using Synclo.Features.Startup_Manager;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IFontManager, FontManager>();
         services.AddSingleton<IApplicationControlService, ApplicationControlService>();
         services.AddSingleton<IUtils, Utils>();
         services.AddSingleton<IConnectionMonitor, ConnectionMonitor>();

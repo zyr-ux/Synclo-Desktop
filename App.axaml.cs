@@ -13,6 +13,7 @@ using Synclo.Features.Clipboard_Manager.Clipboard_Service;
 using Synclo.Features.Secrets_Manager;
 using Synclo.Utilities;
 using Synclo.Features.Settings_Manager;
+using Synclo.Features.Font_Manager;
 using Synclo.Features.Notifications_Manager;
 using Synclo.Features.Connection_Monitor;
 using Synclo.Features.Dialog_Manager;
@@ -53,9 +54,11 @@ public class App : Application
         _appControl = _services.GetRequiredService<IApplicationControlService>();
         var settingsService = _services.GetRequiredService<ISettingsService>();
         var themeService = _services.GetRequiredService<IThemeService>();
+        var fontManager = _services.GetRequiredService<IFontManager>();
 
-        // Apply visual theme
+        // Apply visual theme and font
         themeService.ApplyTheme(settingsService.Settings.Theme);
+        fontManager.ApplyFont(settingsService.Settings.FontFamily);
 
         // Handle Tray Icon Visibility
         settingsService.SettingsChanged += s =>

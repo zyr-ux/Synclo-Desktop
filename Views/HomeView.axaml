@@ -21,7 +21,7 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                     <TextBlock Text="History"
                                FontSize="36"
-                               FontFamily="{StaticResource Inconsolata}" FontWeight="Bold"
+                               FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold"
                                Foreground="{DynamicResource Foreground}" />
 
                     <Button Classes="icon-button"
@@ -60,7 +60,7 @@
                    VerticalAlignment="Center"
                    TextAlignment="Center"
                    FontSize="20"
-                   FontFamily="{StaticResource Inconsolata}"
+                   FontFamily="{DynamicResource AppFontFamily}"
                    Foreground="{DynamicResource Foreground}"
                    IsVisible="{Binding HomeStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    IsHitTestVisible="False" />
@@ -125,7 +125,7 @@
                                        Margin="0,0,15,0"
                                        Foreground="{DynamicResource Foreground}"
                                        FontSize="16"
-                                       FontFamily="{StaticResource Inconsolata}"
+                                       FontFamily="{DynamicResource AppFontFamily}"
                                        TextTrimming="CharacterEllipsis" />
 
                             <TextBlock Grid.Column="2"
@@ -134,7 +134,7 @@
                                        Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
                                        Foreground="{DynamicResource Foreground}"
                                        FontSize="14"
-                                       FontFamily="{StaticResource Inconsolata}" />
+                                       FontFamily="{DynamicResource AppFontFamily}" />
 
                             <StackPanel Grid.Column="3"
                                         Orientation="Horizontal"
