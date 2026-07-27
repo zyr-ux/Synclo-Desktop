@@ -22,6 +22,8 @@ public partial class MainWindow : Window
                 titleBarContainer.Margin = new Avalonia.Thickness(0);
             }
         }
+
+        Win32TaskbarHelper.EnableTaskbarAutoHideFix(this); // Avalonia 11 taskbar fix. Remove this and the Helper class when switching to Avalonia 12.
     }
 
     public void Initialize(IApplicationControlService appControl)
