@@ -4,6 +4,7 @@ using Avalonia.Controls;
 
 namespace Synclo.Utilities;
 
+// Remove this when upgrading to Avalonia 12x sdk.
 internal static class Win32TaskbarHelper
 {
     private const uint ABM_GETSTATE = 0x00000004;
@@ -79,11 +80,6 @@ internal static class Win32TaskbarHelper
     [DllImport("user32.dll")]
     public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-    /// <summary>
-    /// Enables the Windows taskbar auto-hide fix for the specified Avalonia Window.
-    /// Encapsulates WndProc hooking and lifecycle management cleanly.
-    /// Safe to call on any platform.
-    /// </summary>
     public static void EnableTaskbarAutoHideFix(Window window)
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -166,10 +162,7 @@ internal static class Win32TaskbarHelper
         return IntPtr.Zero;
     }
 
-    /// <summary>
     /// Checks if Windows Taskbar Auto-Hide is currently enabled and returns the taskbar edge.
-    /// Edge values: 0 = Left, 1 = Top, 2 = Right, 3 = Bottom
-    /// </summary>
     public static bool GetTaskbarAutoHideEdge(out uint edge)
     {
         edge = 3; // Default Bottom
