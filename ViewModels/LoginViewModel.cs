@@ -19,12 +19,38 @@ public partial class LoginViewModel : ViewModelBase
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SubmitButtonText))]
+    private bool _isRegisterMode;
+
+    public string SubmitButtonText => IsRegisterMode ? "Register" : "Login";
+
     public event Action? LoginSucceeded;
 
     public LoginViewModel(IAccountService accountService, INotificationService notificationService)
     {
         _accountService = accountService;
         _notificationService = notificationService;
+    }
+
+    [RelayCommand]
+    private void SwitchMode()
+    {
+        IsRegisterMode = !IsRegisterMode;
+        StatusMessage = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task SubmitAsync()
+    {
+        if (IsRegisterMode)
+        {
+            await RegisterAsync();
+        }
+        else
+        {
+            await LoginAsync();
+        }
     }
 
     [RelayCommand]

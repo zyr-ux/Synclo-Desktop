@@ -50,17 +50,44 @@
                 Classes="custom-button"
                 Width="200"
                 Height="50"
-                Content="Login"
+                Content="{Binding SubmitButtonText}"
                 HorizontalAlignment="Center"
                 IsEnabled="{Binding !IsBusy}"
-                Command="{Binding LoginCommand}" />
+                Command="{Binding SubmitCommand}" />
 
-        <Button Grid.Row="4"
-                Content="No account? Register instead"
-                Classes="textButton"
-                Margin="0 35 0 0"
-                HorizontalAlignment="Center"
-                Command="{Binding RegisterCommand}" />
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0 35 0 0"
+                    Spacing="6">
+            <!-- Login Mode Footer -->
+            <TextBlock Text="Don't have an account?"
+                       IsVisible="{Binding !IsRegisterMode}"
+                       FontFamily="{DynamicResource AppFontFamily}"
+                       FontSize="16"
+                       Foreground="{DynamicResource Foreground}"
+                       VerticalAlignment="Center" />
+            <Button Content="Register now"
+                    IsVisible="{Binding !IsRegisterMode}"
+                    Classes="hyperlinkButton"
+                    VerticalAlignment="Center"
+                    IsEnabled="{Binding !IsBusy}"
+                    Command="{Binding SwitchModeCommand}" />
+
+            <!-- Register Mode Footer -->
+            <TextBlock Text="Already have an account?"
+                       IsVisible="{Binding IsRegisterMode}"
+                       FontFamily="{DynamicResource AppFontFamily}"
+                       FontSize="16"
+                       Foreground="{DynamicResource Foreground}"
+                       VerticalAlignment="Center" />
+            <Button Content="Log in"
+                    IsVisible="{Binding IsRegisterMode}"
+                    Classes="hyperlinkButton"
+                    VerticalAlignment="Center"
+                    IsEnabled="{Binding !IsBusy}"
+                    Command="{Binding SwitchModeCommand}" />
+        </StackPanel>
     </Grid>
 </UserControl>
 
