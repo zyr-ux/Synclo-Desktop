@@ -2,92 +2,307 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:converters="using:Synclo.Converters"
              xmlns:vm="using:Synclo.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
              x:Class="Synclo.Views.LoginView"
              x:DataType="vm:LoginViewModel">
 
+    <UserControl.Resources>
+        <converters:ConnectionStatusToBrushConverter x:Key="ConnectionStatusToBrushConverter" />
+    </UserControl.Resources>
+
     <Grid HorizontalAlignment="Center"
           VerticalAlignment="Center"
-          RowDefinitions="Auto, Auto, 50, Auto, Auto"
-          Margin="0 20 0 0">
+          Margin="0 10 0 10">
 
-        <StackPanel Grid.Row="0" Spacing="20" Margin="0 0 0 50">
-            <TextBlock Text="E-mail"
-                       FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold"
-                       FontSize="24" />
-            <TextBox Width="300"
-                     FontSize="18"
-                     FontFamily="{DynamicResource AppFontFamily}"
-                     Text="{Binding Email}" />
+        <StackPanel Spacing="0">
+
+            <!-- App Header Branding -->
+            <StackPanel HorizontalAlignment="Center" Spacing="4" Margin="0 0 0 28">
+                <!-- Mode Title -->
+                <TextBlock Text="Welcome Back"
+                           IsVisible="{Binding !IsRegisterMode}"
+                           FontSize="24"
+                           FontFamily="{DynamicResource AppFontFamily}"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource Foreground}"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="Create Account"
+                           IsVisible="{Binding IsRegisterMode}"
+                           FontSize="24"
+                           FontFamily="{DynamicResource AppFontFamily}"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource Foreground}"
+                           HorizontalAlignment="Center" />
+
+                <!-- Mode Subtitle -->
+                <TextBlock Text="Sign in to your Synclo account to start syncing"
+                           IsVisible="{Binding !IsRegisterMode}"
+                           FontSize="13"
+                           FontFamily="{DynamicResource AppFontFamily}"
+                           Foreground="{DynamicResource Foreground}"
+                           Opacity="0.6"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="Join Synclo to synchronize your clipboard seamlessly"
+                           IsVisible="{Binding IsRegisterMode}"
+                           FontSize="13"
+                           FontFamily="{DynamicResource AppFontFamily}"
+                           Foreground="{DynamicResource Foreground}"
+                           Opacity="0.6"
+                           HorizontalAlignment="Center" />
+
+                <!-- Server Details Badge -->
+                <Border HorizontalAlignment="Center"
+                        Margin="0 14 0 0"
+                        Padding="14 8"
+                        CornerRadius="8"
+                        BorderBrush="{DynamicResource Border}"
+                        BorderThickness="1">
+                    <Border.Background>
+                        <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.05" />
+                    </Border.Background>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <!-- Dynamic Server Status Indicator Dot -->
+                        <Border Width="8"
+                                Height="8"
+                                CornerRadius="4"
+                                VerticalAlignment="Center">
+                            <Border.Background>
+                                <MultiBinding Converter="{StaticResource ConnectionStatusToBrushConverter}">
+                                    <Binding Path="ConnectionStatus" />
+                                    <Binding Path="ActualThemeVariant" Source="{x:Static Application.Current}" />
+                                </MultiBinding>
+                            </Border.Background>
+                        </Border>
+
+                        <!-- Server Type (Public Server / Self-hosted Server) -->
+                        <TextBlock Text="{Binding ServerType}"
+                                   FontFamily="{DynamicResource AppFontFamily}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Foreground}"
+                                   VerticalAlignment="Center" />
+
+                        <TextBlock Text="•"
+                                   FontFamily="{DynamicResource AppFontFamily}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Opacity="0.4"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Server URL -->
+                        <TextBlock Text="{Binding ServerUrl}"
+                                   FontFamily="{DynamicResource AppFontFamily}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Foreground}"
+                                   Opacity="0.6"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ================= LOGIN MODE (Single Column) ================= -->
+            <StackPanel IsVisible="{Binding !IsRegisterMode}"
+                        Spacing="18"
+                        HorizontalAlignment="Center"
+                        Width="300">
+
+                <!-- E-mail -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="E-mail"
+                               FontFamily="{DynamicResource AppFontFamily}"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Foreground="{DynamicResource Foreground}"
+                               Opacity="0.85" />
+                    <TextBox Width="300"
+                             FontSize="16"
+                             FontFamily="{DynamicResource AppFontFamily}"
+                             Text="{Binding Email}" />
+                </StackPanel>
+
+                <!-- Password -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Password"
+                               FontFamily="{DynamicResource AppFontFamily}"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Foreground="{DynamicResource Foreground}"
+                               Opacity="0.85" />
+                    <TextBox Classes="revealPasswordButton"
+                             PasswordChar="*"
+                             Width="300"
+                             FontSize="16"
+                             FontFamily="{DynamicResource AppFontFamily}"
+                             Text="{Binding Password}" />
+                </StackPanel>
+
+                <!-- Status Notice -->
+                <TextBlock Text="{Binding StatusMessage}"
+                           IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Foreground="{DynamicResource Accent}"
+                           FontFamily="{DynamicResource AppFontFamily}"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           MaxWidth="300"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           Margin="0 4 0 0" />
+
+                <!-- Login Action Button -->
+                <Button Classes="custom-button"
+                        Width="200"
+                        Height="46"
+                        Content="Login"
+                        HorizontalAlignment="Center"
+                        Margin="0 6 0 0"
+                        IsEnabled="{Binding !IsBusy}"
+                        Command="{Binding SubmitCommand}" />
+
+                <!-- Hyperlink Footer -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0 14 0 0"
+                            Spacing="6">
+                    <TextBlock Text="Don't have an account?"
+                               FontFamily="{DynamicResource AppFontFamily}"
+                               FontSize="15"
+                               Foreground="{DynamicResource Foreground}"
+                               Opacity="0.8"
+                               VerticalAlignment="Center" />
+                    <Button Content="Register now"
+                            Classes="hyperlinkButton"
+                            VerticalAlignment="Center"
+                            IsEnabled="{Binding !IsBusy}"
+                            Command="{Binding SwitchModeCommand}" />
+                </StackPanel>
+
+            </StackPanel>
+
+            <!-- ================= REGISTER MODE (2 Columns) ================= -->
+            <StackPanel IsVisible="{Binding IsRegisterMode}"
+                        Spacing="18"
+                        HorizontalAlignment="Center">
+
+                <!-- 2-Column Grid with generous spacing -->
+                <Grid ColumnDefinitions="300, 70, 300">
+
+                    <!-- Left Column: Username & E-mail -->
+                    <StackPanel Grid.Column="0" Spacing="18">
+                        <!-- Username -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Username"
+                                       FontFamily="{DynamicResource AppFontFamily}"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource Foreground}"
+                                       Opacity="0.85" />
+                            <TextBox Width="300"
+                                     FontSize="16"
+                                     FontFamily="{DynamicResource AppFontFamily}"
+                                     Text="{Binding Username}" />
+                        </StackPanel>
+
+                        <!-- E-mail -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="E-mail"
+                                       FontFamily="{DynamicResource AppFontFamily}"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource Foreground}"
+                                       Opacity="0.85" />
+                            <TextBox Width="300"
+                                     FontSize="16"
+                                     FontFamily="{DynamicResource AppFontFamily}"
+                                     Text="{Binding Email}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Right Column: Password & Retype Password -->
+                    <StackPanel Grid.Column="2" Spacing="18">
+                        <!-- Password -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Password"
+                                       FontFamily="{DynamicResource AppFontFamily}"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource Foreground}"
+                                       Opacity="0.85" />
+                            <TextBox Classes="revealPasswordButton"
+                                     PasswordChar="*"
+                                     Width="300"
+                                     FontSize="16"
+                                     FontFamily="{DynamicResource AppFontFamily}"
+                                     Text="{Binding Password}" />
+                        </StackPanel>
+
+                        <!-- Retype Password -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Re-type Password"
+                                       FontFamily="{DynamicResource AppFontFamily}"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource Foreground}"
+                                       Opacity="0.85" />
+                            <TextBox Classes="revealPasswordButton"
+                                     PasswordChar="*"
+                                     Width="300"
+                                     FontSize="16"
+                                     FontFamily="{DynamicResource AppFontFamily}"
+                                     Text="{Binding ConfirmPassword}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                </Grid>
+
+                <!-- Status Notice -->
+                <TextBlock Text="{Binding StatusMessage}"
+                           IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Foreground="{DynamicResource Accent}"
+                           FontFamily="{DynamicResource AppFontFamily}"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           MaxWidth="636"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           Margin="0 4 0 0" />
+
+                <!-- Register Action Button -->
+                <Button Classes="custom-button"
+                        Width="200"
+                        Height="46"
+                        Content="Register"
+                        HorizontalAlignment="Center"
+                        Margin="0 6 0 0"
+                        IsEnabled="{Binding !IsBusy}"
+                        Command="{Binding SubmitCommand}" />
+
+                <!-- Hyperlink Area: Already have an account? Log in -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0 14 0 0"
+                            Spacing="6">
+                    <TextBlock Text="Already have an account?"
+                               FontFamily="{DynamicResource AppFontFamily}"
+                               FontSize="15"
+                               Foreground="{DynamicResource Foreground}"
+                               Opacity="0.8"
+                               VerticalAlignment="Center" />
+                    <Button Content="Log in"
+                            Classes="hyperlinkButton"
+                            VerticalAlignment="Center"
+                            IsEnabled="{Binding !IsBusy}"
+                            Command="{Binding SwitchModeCommand}" />
+                </StackPanel>
+
+            </StackPanel>
+
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Spacing="20" Margin="0 0 0 10">
-            <TextBlock Text="Password"
-                       FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold"
-                       FontSize="24" />
-            <TextBox Classes="revealPasswordButton"
-                     PasswordChar="*"
-                     Width="300"
-                     FontSize="18"
-                     FontFamily="{DynamicResource AppFontFamily}"
-                     Text="{Binding Password}" />
-        </StackPanel>
-
-        <TextBlock Grid.Row="2"
-                   Text="{Binding StatusMessage}"
-                   IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                   Foreground="{DynamicResource Accent}"
-                   FontFamily="{DynamicResource AppFontFamily}"
-                   FontSize="14"
-                   TextWrapping="Wrap"
-                   MaxWidth="300"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   TextAlignment="Center" />
-
-        <Button Grid.Row="3"
-                Classes="custom-button"
-                Width="200"
-                Height="50"
-                Content="{Binding SubmitButtonText}"
-                HorizontalAlignment="Center"
-                IsEnabled="{Binding !IsBusy}"
-                Command="{Binding SubmitCommand}" />
-
-        <StackPanel Grid.Row="4"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Center"
-                    Margin="0 35 0 0"
-                    Spacing="6">
-            <!-- Login Mode Footer -->
-            <TextBlock Text="Don't have an account?"
-                       IsVisible="{Binding !IsRegisterMode}"
-                       FontFamily="{DynamicResource AppFontFamily}"
-                       FontSize="16"
-                       Foreground="{DynamicResource Foreground}"
-                       VerticalAlignment="Center" />
-            <Button Content="Register now"
-                    IsVisible="{Binding !IsRegisterMode}"
-                    Classes="hyperlinkButton"
-                    VerticalAlignment="Center"
-                    IsEnabled="{Binding !IsBusy}"
-                    Command="{Binding SwitchModeCommand}" />
-
-            <!-- Register Mode Footer -->
-            <TextBlock Text="Already have an account?"
-                       IsVisible="{Binding IsRegisterMode}"
-                       FontFamily="{DynamicResource AppFontFamily}"
-                       FontSize="16"
-                       Foreground="{DynamicResource Foreground}"
-                       VerticalAlignment="Center" />
-            <Button Content="Log in"
-                    IsVisible="{Binding IsRegisterMode}"
-                    Classes="hyperlinkButton"
-                    VerticalAlignment="Center"
-                    IsEnabled="{Binding !IsBusy}"
-                    Command="{Binding SwitchModeCommand}" />
-        </StackPanel>
     </Grid>
 </UserControl>
 

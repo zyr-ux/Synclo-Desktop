@@ -54,9 +54,17 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
     
     private async Task InitializeAsync()
     {
-        var email = await _accountService.GetStoredEmailAsync() ?? "";
-        var at = email.IndexOf('@');
-        Username = at > 0 ? email[..at] : email;
+        var storedUsername = await _accountService.GetStoredUsernameAsync();
+        if (!string.IsNullOrWhiteSpace(storedUsername))
+        {
+            Username = storedUsername;
+        }
+        else
+        {
+            var email = await _accountService.GetStoredEmailAsync() ?? "";
+            var at = email.IndexOf('@');
+            Username = at > 0 ? email[..at] : email;
+        }
         
         await LoadDevicesAsync();
     }

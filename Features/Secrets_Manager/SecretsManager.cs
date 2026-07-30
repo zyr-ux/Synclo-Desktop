@@ -16,6 +16,10 @@ public interface ISecretsManager
     Task SaveUserEmailAsync(string email);
     Task DeleteUserEmailAsync();
 
+    Task<string?> GetUserUsernameAsync();
+    Task SaveUserUsernameAsync(string username);
+    Task DeleteUserUsernameAsync();
+
     Task<string?> GetMasterKeyAsync();
     Task SaveMasterKeyAsync(string masterKeyBase64);
     Task DeleteMasterKeyAsync();
@@ -42,6 +46,7 @@ public sealed class SecretsManager : ISecretsManager
     private const string AccessToken      = $"{Prefix}.auth.access_token";
     private const string RefreshToken     = $"{Prefix}.auth.refresh_token";
     private const string UserEmail        = $"{Prefix}.user.email";
+    private const string UserUsername     = $"{Prefix}.user.username";
     private const string MasterKey        = $"{Prefix}.crypto.master_key";
     private const string Salt             = $"{Prefix}.crypto.salt";
     private const string KdfVersion       = $"{Prefix}.crypto.kdf_version";
@@ -65,6 +70,10 @@ public sealed class SecretsManager : ISecretsManager
     public Task<string?> GetUserEmailAsync() => _secureStorage.LoadAsync(UserEmail);
     public Task SaveUserEmailAsync(string email) => _secureStorage.SaveAsync(UserEmail, email);
     public Task DeleteUserEmailAsync() => _secureStorage.DeleteAsync(UserEmail);
+
+    public Task<string?> GetUserUsernameAsync() => _secureStorage.LoadAsync(UserUsername);
+    public Task SaveUserUsernameAsync(string username) => _secureStorage.SaveAsync(UserUsername, username);
+    public Task DeleteUserUsernameAsync() => _secureStorage.DeleteAsync(UserUsername);
 
     public Task<string?> GetMasterKeyAsync() => _secureStorage.LoadAsync(MasterKey);
     public Task SaveMasterKeyAsync(string masterKeyBase64) => _secureStorage.SaveAsync(MasterKey, masterKeyBase64);
@@ -91,6 +100,7 @@ public sealed class SecretsManager : ISecretsManager
         await _secureStorage.DeleteAsync(AccessToken).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(RefreshToken).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(UserEmail).ConfigureAwait(false);
+        await _secureStorage.DeleteAsync(UserUsername).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(MasterKey).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(Salt).ConfigureAwait(false);
         await _secureStorage.DeleteAsync(KdfVersion).ConfigureAwait(false);

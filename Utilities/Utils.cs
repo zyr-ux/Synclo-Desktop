@@ -17,6 +17,7 @@ public interface IUtils
     DateTime TruncateToMilliseconds(DateTime dateTime);
     void OpenUrl(string url);
     bool TryNormalizeServerUrl(string? raw, out string normalized, out string? error);
+    bool ValidatePassword(string password, string confirmPassword, out string? errorMessage);
 }
 
 public sealed class Utils(ISettingsService settingsService) : IUtils
@@ -180,6 +181,34 @@ public sealed class Utils(ISettingsService settingsService) : IUtils
 
         normalized = finalUri.ToString().TrimEnd('/');
         error = null;
+        return true;
+    }
+
+    public bool ValidatePassword(string password, string confirmPassword, out string? errorMessage)
+    {
+        if (!string.IsNullOrEmpty(confirmPassword))
+        {
+            if (password != confirmPassword)
+            {
+                errorMessage = "Passwords do not match";
+                return false;
+            }
+            if (password.Length < 8)
+            {
+                errorMessage = "Password must be at least 8 characters";
+                return false;
+            }
+            errorMessage = null;
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(password) && password.Length < 8)
+        {
+            errorMessage = "Password must be at least 8 characters";
+            return false;
+        }
+
+        errorMessage = null;
         return true;
     }
 }

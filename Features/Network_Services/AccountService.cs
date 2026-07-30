@@ -17,9 +17,10 @@ public interface IAccountService
 {
     Task<bool> IsAuthenticatedAsync();
     Task<string?> GetStoredEmailAsync();
+    Task<string?> GetStoredUsernameAsync();
     Task EnforceLocalKdfVersionAsync();
     Task LoginAsync(string email, string password, CancellationToken ct = default);
-    Task RegisterAsync(string email, string password, CancellationToken ct = default);
+    Task RegisterAsync(string email, string password, string? username = null, CancellationToken ct = default);
     Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default);
     Task LogoutAsync();
     Task DeleteAccountAsync(CancellationToken ct = default);
@@ -88,6 +89,7 @@ public sealed class AccountService : IAccountService
     }
 
     public async Task<string?> GetStoredEmailAsync() => await _secretsManager.GetUserEmailAsync();
+    public async Task<string?> GetStoredUsernameAsync() => await _secretsManager.GetUserUsernameAsync();
 
     private void OnDeviceDeletedHandler(string? deletedDeviceId)
     {
@@ -202,6 +204,8 @@ public sealed class AccountService : IAccountService
             await _secretsManager.SaveAccessTokenAsync(data.access_token);
             await _secretsManager.SaveRefreshTokenAsync(data.refresh_token);
             await _secretsManager.SaveUserEmailAsync(email);
+            if (!string.IsNullOrWhiteSpace(data.username))
+                await _secretsManager.SaveUserUsernameAsync(data.username);
             await _secretsManager.SaveMasterKeyAsync(_cryptographyService.ToBase64(masterKey));
             await _secretsManager.SaveKdfVersionAsync(SupportedKdfVersion);
             await _secretsManager.SaveServerUrlAsync(_settings.Settings.ServerUrl);
@@ -244,7 +248,7 @@ public sealed class AccountService : IAccountService
 
     // -------------------- REGISTER --------------------
 
-    public async Task RegisterAsync(string email, string password, CancellationToken ct = default)
+    public async Task RegisterAsync(string email, string password, string? username = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             throw new InvalidRequestException("Email and password are required");
@@ -263,6 +267,7 @@ public sealed class AccountService : IAccountService
             var req = new RegisterRequest
             {
                 email = email,
+                username = username,
                 auth_key = _cryptographyService.ToBase64(authKey),
                 encrypted_master_key = _cryptographyService.ToBase64(wrappedMk),
                 salt = _cryptographyService.ToBase64(salt),
@@ -297,6 +302,10 @@ public sealed class AccountService : IAccountService
             await _secretsManager.SaveAccessTokenAsync(data.access_token);
             await _secretsManager.SaveRefreshTokenAsync(data.refresh_token);
             await _secretsManager.SaveUserEmailAsync(email);
+            if (!string.IsNullOrWhiteSpace(data.username))
+                await _secretsManager.SaveUserUsernameAsync(data.username);
+            else if (!string.IsNullOrWhiteSpace(username))
+                await _secretsManager.SaveUserUsernameAsync(username);
             await _secretsManager.SaveMasterKeyAsync(_cryptographyService.ToBase64(masterKey));
             await _secretsManager.SaveSaltAsync(_cryptographyService.ToBase64(salt));
             await _secretsManager.SaveKdfVersionAsync(SupportedKdfVersion);
