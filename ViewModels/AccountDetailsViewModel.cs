@@ -48,6 +48,7 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         _webSocketService.OnDeviceAdded += OnDeviceAddedHandler;
         _webSocketService.OnDeviceUpdated += OnDeviceUpdatedHandler;
         _webSocketService.OnDeviceDeleted += OnDeviceDeletedHandler;
+        _webSocketService.OnUsernameUpdated += OnUsernameUpdatedHandler;
 
         _ = InitializeAsync();
     }
@@ -65,7 +66,20 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
             var at = email.IndexOf('@');
             Username = at > 0 ? email[..at] : email;
         }
-        
+
+        try
+        {
+            var profile = await _accountService.GetUserProfileAsync();
+            if (profile != null && !string.IsNullOrWhiteSpace(profile.username))
+            {
+                Username = profile.username;
+            }
+        }
+        catch
+        {
+            // Network failure - fallback to stored username/email
+        }
+
         await LoadDevicesAsync();
     }
 
@@ -217,10 +231,22 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void OnUsernameUpdatedHandler(string newUsername)
+    {
+        if (!string.IsNullOrWhiteSpace(newUsername))
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                Username = newUsername;
+            });
+        }
+    }
+
     public void Dispose()
     {
         _webSocketService.OnDeviceAdded -= OnDeviceAddedHandler;
         _webSocketService.OnDeviceUpdated -= OnDeviceUpdatedHandler;
         _webSocketService.OnDeviceDeleted -= OnDeviceDeletedHandler;
+        _webSocketService.OnUsernameUpdated -= OnUsernameUpdatedHandler;
     }
 }

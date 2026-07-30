@@ -26,6 +26,7 @@ public interface IWebSocketService : IDisposable
     event Action<string?>? OnDeviceDeleted;
     event Action<string>? OnDeviceAdded;
     event Action<string>? OnDeviceUpdated;
+    event Action<string>? OnUsernameUpdated;
     event Action<long?>? LatencyChanged;
 }
 
@@ -68,6 +69,7 @@ public sealed class WebSocketService : IWebSocketService
     public event Action<string?>? OnDeviceDeleted;
     public event Action<string>? OnDeviceAdded;
     public event Action<string>? OnDeviceUpdated;
+    public event Action<string>? OnUsernameUpdated;
     public event Action<long?>? LatencyChanged;
 
     private void OnTokenRefreshed(string token)
@@ -306,6 +308,16 @@ public sealed class WebSocketService : IWebSocketService
                         if (updatedDevice != null)
                         {
                             OnDeviceUpdated?.Invoke(updatedDevice);
+                        }
+                        return true;
+
+                    case "username_updated":
+                        var newUsername = doc.RootElement.TryGetProperty("username", out var unProp)
+                            ? unProp.GetString()
+                            : null;
+                        if (!string.IsNullOrWhiteSpace(newUsername))
+                        {
+                            OnUsernameUpdated?.Invoke(newUsername);
                         }
                         return true;
                 }

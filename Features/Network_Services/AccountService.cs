@@ -18,6 +18,7 @@ public interface IAccountService
     Task<bool> IsAuthenticatedAsync();
     Task<string?> GetStoredEmailAsync();
     Task<string?> GetStoredUsernameAsync();
+    Task<UserResponse?> GetUserProfileAsync(CancellationToken ct = default);
     Task EnforceLocalKdfVersionAsync();
     Task LoginAsync(string email, string password, CancellationToken ct = default);
     Task RegisterAsync(string email, string password, string? username = null, CancellationToken ct = default);
@@ -490,5 +491,39 @@ public sealed class AccountService : IAccountService
         }
 
         await LogoutAsync();
+    }
+
+    // -------------------- USER PROFILE --------------------
+
+    public async Task<UserResponse?> GetUserProfileAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var res = await _api.GetAsync("user", ct);
+            if (!res.IsSuccessStatusCode)
+                return null;
+
+            var content = await res.Content.ReadAsStringAsync(ct);
+            var userProfile = _api.Deserialize<UserResponse>(content);
+
+            if (userProfile != null)
+            {
+                if (!string.IsNullOrWhiteSpace(userProfile.username))
+                {
+                    await _secretsManager.SaveUserUsernameAsync(userProfile.username);
+                }
+
+                if (!string.IsNullOrWhiteSpace(userProfile.email))
+                {
+                    await _secretsManager.SaveUserEmailAsync(userProfile.email);
+                }
+            }
+
+            return userProfile;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
