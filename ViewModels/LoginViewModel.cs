@@ -12,7 +12,7 @@ using Synclo.Utilities;
 
 namespace Synclo.ViewModels;
 
-public partial class LoginViewModel : ViewModelBase
+public partial class LoginViewModel : ViewModelBase, IDisposable
 {
     private readonly IAccountService _accountService;
     private readonly INotificationService _notificationService;
@@ -271,5 +271,11 @@ public partial class LoginViewModel : ViewModelBase
         // Simple email validation regex
         var pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
         return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        _connectionMonitor.ConnectionStatusChanged -= HandleConnectionStatusChanged;
+        _settingsService.SettingsChanged -= HandleSettingsChanged;
     }
 }
