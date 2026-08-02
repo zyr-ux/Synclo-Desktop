@@ -67,20 +67,25 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
             Username = at > 0 ? email[..at] : email;
         }
 
+        _ = RefreshUserProfileInBackgroundAsync();
+
+        await LoadDevicesAsync();
+    }
+
+    private async Task RefreshUserProfileInBackgroundAsync()
+    {
         try
         {
             var profile = await _accountService.GetUserProfileAsync();
             if (profile != null && !string.IsNullOrWhiteSpace(profile.username))
             {
-                Username = profile.username;
+                Dispatcher.UIThread.Post(() => Username = profile.username);
             }
         }
         catch
         {
             // Network failure - fallback to stored username/email
         }
-
-        await LoadDevicesAsync();
     }
 
     private void UpdateDevices(IEnumerable<DeviceModel> list)
