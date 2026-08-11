@@ -77,18 +77,16 @@
                              DockPanel.Dock="Bottom"
                              IsChecked="{Binding IsAboutPage}"
                              Command="{Binding ShowAboutCommand}"
-                             HorizontalContentAlignment="Left"
-                             Padding="10 0 5 0"
+                             HorizontalContentAlignment="Stretch"
+                             Padding="0"
                              ToolTip.Placement="Right"
                              ToolTip.Tip="About"
                              ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
-                    <StackPanel Orientation="Horizontal" Spacing="15">
-                        <avalonia:MaterialIcon Kind="AboutCircleOutline" Width="20" Height="20" />
-                        <TextBlock Text="About" IsVisible="{Binding !IsSidebarCollapsed}" />
-                    </StackPanel>
+                    <Grid ColumnDefinitions="40,*">
+                        <avalonia:MaterialIcon Grid.Column="0" Kind="AboutCircleOutline" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="About" VerticalAlignment="Center" IsVisible="{Binding !IsSidebarCollapsed}" />
+                    </Grid>
                 </RadioButton>
-
-
 
                 <!-- Sidebar content -->
                 <StackPanel Spacing="5" Orientation="Vertical">
@@ -117,45 +115,45 @@
                                  GroupName="Sidebar"
                                  IsChecked="{Binding IsHomePage}"
                                  Command="{Binding ShowHomeCommand}"
-                                 HorizontalContentAlignment="Left"
-                                 Padding="10 0 5 0"
+                                 HorizontalContentAlignment="Stretch"
+                                 Padding="0"
                                  ToolTip.Placement="Right"
                                  ToolTip.Tip="Home"
                                  ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
-                        <StackPanel Orientation="Horizontal" Spacing="15">
-                            <avalonia:MaterialIcon Kind="HomeVariantOutline" Width="20" Height="20" />
-                            <TextBlock Text="Home" IsVisible="{Binding !IsSidebarCollapsed}" />
-                        </StackPanel>
+                        <Grid ColumnDefinitions="40,*">
+                            <avalonia:MaterialIcon Grid.Column="0" Kind="HomeVariantOutline" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="Home" VerticalAlignment="Center" IsVisible="{Binding !IsSidebarCollapsed}" />
+                        </Grid>
                     </RadioButton>
 
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
                                  IsChecked="{Binding IsAccountPage}"
                                  Command="{Binding ShowAccountCommand}"
-                                 HorizontalContentAlignment="Left"
-                                 Padding="10 0 5 0"
+                                 HorizontalContentAlignment="Stretch"
+                                 Padding="0"
                                  ToolTip.Placement="Right"
                                  ToolTip.Tip="Account"
                                  ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
-                        <StackPanel Orientation="Horizontal" Spacing="15">
-                            <avalonia:MaterialIcon Kind="AccountOutline" Width="20" Height="20" />
-                            <TextBlock Text="Account" IsVisible="{Binding !IsSidebarCollapsed}" />
-                        </StackPanel>
+                        <Grid ColumnDefinitions="40,*">
+                            <avalonia:MaterialIcon Grid.Column="0" Kind="AccountOutline" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="Account" VerticalAlignment="Center" IsVisible="{Binding !IsSidebarCollapsed}" />
+                        </Grid>
                     </RadioButton>
 
                     <RadioButton Classes="sidebar"
                                  GroupName="Sidebar"
                                  IsChecked="{Binding IsSettingsPage}"
                                  Command="{Binding ShowSettingsCommand}"
-                                 HorizontalContentAlignment="Left"
-                                 Padding="10 0 5 0"
+                                 HorizontalContentAlignment="Stretch"
+                                 Padding="0"
                                  ToolTip.Placement="Right"
                                  ToolTip.Tip="Settings"
                                  ToolTip.ServiceEnabled="{Binding IsSidebarCollapsed}">
-                        <StackPanel Orientation="Horizontal" Spacing="15">
-                            <avalonia:MaterialIcon Kind="SettingsOutline" Width="20" Height="20" />
-                            <TextBlock Text="Settings" IsVisible="{Binding !IsSidebarCollapsed}" />
-                        </StackPanel>
+                        <Grid ColumnDefinitions="40,*">
+                            <avalonia:MaterialIcon Grid.Column="0" Kind="SettingsOutline" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="Settings" VerticalAlignment="Center" IsVisible="{Binding !IsSidebarCollapsed}" />
+                        </Grid>
                     </RadioButton>
                 </StackPanel>
             </DockPanel>

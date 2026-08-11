@@ -37,7 +37,7 @@
             </ControlTemplate>
         </Setter>
 
-        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontSize" Value="14" />
         <Setter Property="Height" Value="40" />
         <Setter Property="CornerRadius" Value="5" />
         <Setter Property="Margin" Value="7 0 7 0" />
