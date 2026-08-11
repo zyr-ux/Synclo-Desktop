@@ -18,7 +18,6 @@
         <Setter Property="RenderTransformOrigin" Value="50%,50%" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Background" Value="{DynamicResource SecondaryBackground}"/>
-        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="CornerRadius" Value="5" />
         <Setter Property="Template">
             <ControlTemplate>

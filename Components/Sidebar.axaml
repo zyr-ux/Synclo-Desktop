@@ -37,7 +37,6 @@
             </ControlTemplate>
         </Setter>
 
-        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="FontSize" Value="20" />
         <Setter Property="Height" Value="40" />
         <Setter Property="CornerRadius" Value="5" />
@@ -81,7 +80,6 @@
             </ControlTemplate>
         </Setter>
 
-        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="FontSize" Value="20" />
         <Setter Property="Height" Value="40" />
         <Setter Property="CornerRadius" Value="5" />

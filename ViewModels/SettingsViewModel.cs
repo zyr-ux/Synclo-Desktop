@@ -14,7 +14,6 @@ using Synclo.Utilities;
 using Synclo.Features.Secrets_Manager;
 using Synclo.Features.Notifications_Manager;
 using Synclo.Features.Dialog_Manager;
-using Synclo.Features.Font_Manager;
 using Synclo.Themes;
 
 namespace Synclo.ViewModels;
@@ -24,7 +23,6 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ISettingsService _settings;
     private readonly IApiService _apiService;
     private readonly IThemeService _themeService;
-    private readonly IFontManager _fontManager;
     private readonly IStartupManager _startupManager;
     private readonly IAccountService _accountService;
     private readonly INotificationService _notificationService;
@@ -32,7 +30,6 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IUtils _utils;
 
     [ObservableProperty] private string _selectedTheme = "System";
-    [ObservableProperty] private string _selectedFont = "Inconsolata";
     [ObservableProperty] private bool _showResult;
     [ObservableProperty] private bool _isStartOnBootEnabled;
     [ObservableProperty] private bool _isMicaEnabled;
@@ -46,7 +43,6 @@ public partial class SettingsViewModel : ViewModelBase
     private bool CanExecuteServerUrlCommand() => !_isUpdatingServerUrl;
     public bool IsMicaToggleVisible => OperatingSystem.IsWindows() && Environment.OSVersion.Version.Build >= 22000;
     public List<string> AvailableThemes { get; } = ["System", "Light", "Dark"];
-    public List<string> AvailableFonts { get; } = [..Enum.GetNames<AppFonts>()];
     public List<string> AvailableCloseBehaviors { get; } = ["Quit Application", "Minimize to System Tray", "Run in Background (Hidden)"];
     public List<string> AvailableRightClickActions { get; } = ["Context Menu", "Pin / Unpin", "Delete"];
 
@@ -54,7 +50,6 @@ public partial class SettingsViewModel : ViewModelBase
         ISettingsService settings, 
         IApiService apiService, 
         IThemeService themeService,
-        IFontManager fontManager,
         IStartupManager startupManager,
         IAccountService accountService,
         INotificationService notificationService,
@@ -64,7 +59,6 @@ public partial class SettingsViewModel : ViewModelBase
         _settings = settings;
         _apiService = apiService;
         _themeService = themeService;
-        _fontManager = fontManager;
         _startupManager = startupManager;
         _accountService = accountService;
         _notificationService = notificationService;
@@ -72,7 +66,6 @@ public partial class SettingsViewModel : ViewModelBase
         _utils = utils;
         
         SelectedTheme = _settings.Settings.Theme;
-        SelectedFont = string.IsNullOrWhiteSpace(_settings.Settings.FontFamily) ? "Inconsolata" : _settings.Settings.FontFamily;
         IsMicaEnabled = _settings.Settings.is_mica_enabled;
         ServerUrl = _settings.Settings.ServerUrl;
         ServerUrlInput = ServerUrl;
@@ -86,12 +79,6 @@ public partial class SettingsViewModel : ViewModelBase
         InitializeRightClickAction();
     }
 
-    partial void OnSelectedFontChanged(string value)
-    {
-        _fontManager.ApplyFont(value);
-        _settings.Settings.FontFamily = value;
-        _settings.Save();
-    }
 
     partial void OnIsMicaEnabledChanged(bool value)
     {

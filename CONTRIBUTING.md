@@ -81,7 +81,7 @@ To maintain codebase health and performance across Windows, macOS, and Linux, al
 - Avoid styling elements inline. Use shared resources or dynamic theme parameters located under the `Themes/` directory.
 - Avoid defining UI status colors directly inside ViewModels. Use converters (e.g., [OSToIconConverter.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Converters/OSToIconConverter.cs), [ClipboardItemTypeToIconConverter.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Converters/ClipboardItemTypeToIconConverter.cs), or [PinConverters.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Converters/PinConverters.cs)) inside the XAML View layer to resolve visual representations.
 - All action buttons and icons must respect theme definitions (e.g., using `Foreground="{DynamicResource Foreground}"`) to ensure seamless readability across dark and light visual modes.
-- For typography styling, use `FontFamily="{DynamicResource AppFontFamily}"` rather than hardcoding static fonts like `Inconsolata` to support real-time user font preference updates.
+- For typography styling, rely on system default fonts rather than hardcoding static fonts.
 - Register all reusable value converters as application resources inside [App.axaml](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/App.axaml).
 
 ---

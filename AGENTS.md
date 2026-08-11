@@ -116,6 +116,6 @@ Before submitting any code modifications, verify your implementation against thi
 - [ ] **Pin Sync Safety**: Did you ensure that incoming sync events verify and merge `is_pinned` updates even if the content matches?
 - [ ] **History Clear Behavior**: Does `ClearHistoryAsync` call `ClearUnpinnedAsync` to keep pinned items intact?
 - [ ] **Tray & UI Icon Colors**: Do UI buttons and icons use `{DynamicResource Foreground}` to respect theme styling instead of static colors?
-- [ ] **Dynamic Typography**: Do text elements, controls, and XAML styles use `FontFamily="{DynamicResource AppFontFamily}"` rather than static font resources to allow live font switching?
+- [ ] **System Typography**: Do text elements and controls rely on system default fonts rather than hardcoding static font resources?
 - [ ] **Notification Separation**: Did you avoid calling `INotificationService` directly inside service layer files, propagating errors via events or exceptions instead?
 

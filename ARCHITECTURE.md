@@ -76,7 +76,6 @@ Synclo-Desktop/
 │   ├── Clipboard_Manager/    # Clipboard Monitor hooks, factories, and SQLite sync services
 │   ├── Connection_Monitor/   # Online connection detection
 │   ├── Dialog_Manager/       # Modally spawned dialog controls (Confirmation, Reset Password)
-│   ├── Font_Manager/         # Dynamic app typography & font manager (Inconsolata, System font)
 │   ├── Network_Services/     # REST Endpoint calls, Session validation, WebSocket streams
 │   ├── Notifications_Manager/# Desktop notifications services
 │   ├── Secrets_Manager/      # Platform-native secure secret stores & factory
@@ -270,7 +269,6 @@ Local client configurations are parsed from and serialized to a local `appsettin
 Key parameters include:
 - **`ServerUrl`**: The base HTTP/HTTPS URL of the target Synclo backend server. Custom URLs are normalized and validated for reachability before saving. To protect privacy, custom server URLs are stored in secure credentials stores using platform-native APIs.
 - **`Theme`**: Visual layout options (`Light`, `Dark`, `System`). Resolves automatically at startup.
-- **`Font`**: Selected app typography (`Inconsolata`, `System`). Resolved automatically via `IFontManager` at startup.
 - **`sync_page_size`**: Universal page chunk size for pagination requests during delta synchronization checks (Default: `100`).
 - **`minimize_to_tray`**: Intercepts close button triggers on the window, minimizing the application to the tray rather than terminating the process (Default: `true`).
 - **`background_sync_enabled`**: Allows synchronization channels and WebSocket pipelines to remain operational even when the visual window is closed or hidden (Default: `true`).
@@ -278,17 +276,6 @@ Key parameters include:
 
 ---
 
-## 🔤 Dynamic Typography & Font Management
-
-Synclo supports dynamic application-wide font switching without requiring an application restart.
-
-### Key Components & Architecture:
-- **`IFontManager` / `FontManager`** (`Features/Font_Manager/`): Registered as a singleton interface in Dependency Injection ([DependencyInjection.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Utilities/DependencyInjection.cs)). Resolves options defined in the [AppFonts](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/Features/Font_Manager/AppFonts.cs) enum (`Inconsolata`, `System`) to Avalonia `FontFamily` instances (`avares://Synclo/Assets/Fonts/Inconsolata#Inconsolata` for Inconsolata, `FontFamily.Default` for system default).
-- **Dynamic Resource Binding**: When `fontManager.ApplyFont(...)` is invoked, it mutates `Application.Current.Resources["AppFontFamily"]`.
-- **UI Binding Strategy**: XAML views, components, tooltips, context menus, and styles bind using `FontFamily="{DynamicResource AppFontFamily}"`. Updating the global resource instantly refreshes the visual typography across all instantiated controls.
-- **Persistence & Startup**: User preference is stored in `AppSettings.Font` and applied during initial framework setup in [App.axaml.cs](file:///e:/Files/Code-Stuff/Projects/Synclo-Desktop/App.axaml.cs).
-
----
 
 ## 🔒 Cryptographic Design
 

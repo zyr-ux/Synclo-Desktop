@@ -8,7 +8,6 @@ public sealed class AppSettings
     public const string DefaultServerUrl = "https://synclo.zyrux.dev";
 
     public string Theme { get; set; } = "System";
-    public string FontFamily { get; set; } = "Inconsolata";
     public string? device_id { get; set; }
     public string? device_name { get; set; }
     private string _serverUrl = DefaultServerUrl;

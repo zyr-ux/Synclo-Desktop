@@ -96,7 +96,7 @@
                     <!-- <TextBlock Text="Synclo" -->
                     <!--            Foreground="{DynamicResource Accent}" -->
                     <!--            FontSize="43" -->
-                    <!--            FontFamily="{StaticResource Inconsolata}" FontWeight="Bold" -->
+                    <!--            FontWeight="Bold" -->
                     <!--            HorizontalAlignment="Left" -->
                     <!--            Margin="20,10,20,0" /> -->
                     <!-- -->

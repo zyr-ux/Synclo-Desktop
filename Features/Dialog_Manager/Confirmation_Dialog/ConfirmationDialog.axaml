@@ -25,7 +25,7 @@
                        Text="Confirm Action" 
                        FontSize="28"
                        TextAlignment="Center"
-                       FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold" 
+                       FontWeight="Bold" 
                        Foreground="{DynamicResource Foreground}"/>
 
             <TextBlock Grid.Row="1" 
@@ -35,7 +35,7 @@
                        TextWrapping="Wrap"
                        TextAlignment="Left"
                        FontSize="16"
-                       FontFamily="{DynamicResource AppFontFamily}"
+                      
                        VerticalAlignment="Center" 
                        Margin="0,35"/>
 

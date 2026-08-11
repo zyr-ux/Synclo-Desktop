@@ -25,11 +25,11 @@
                         <TextBlock Text="Welcome,"
                                    FontSize="36"
                                    Foreground="{DynamicResource Foreground}"
-                                   FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold" />
+                                   FontWeight="Bold" />
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
                                    Foreground="{DynamicResource Accent}"
-                                   FontFamily="{DynamicResource AppFontFamily}" />
+                                   />
                     </StackPanel>
                     
                     <Border Height="1"
@@ -44,7 +44,7 @@
                            Text="Manage Devices"
                            FontSize="36"
                            Foreground="{DynamicResource Foreground}"
-                           FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold"
+                           FontWeight="Bold"
                            Margin="0,0,0,20" />
 
                 <!-- Devices card -->
@@ -92,12 +92,12 @@
                                                 <TextBlock Text="{Binding device_name}"
                                                            FontSize="18"
                                                            Foreground="{DynamicResource Foreground}"
-                                                           FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold" />
+                                                           FontWeight="Bold" />
                                                 <TextBlock Text=" - this device"
                                                            FontSize="18"
                                                            Foreground="#666666"
                                                            IsVisible="{Binding IsThisDevice}"
-                                                           FontFamily="{DynamicResource AppFontFamily}" FontWeight="Bold" />
+                                                           FontWeight="Bold" />
                                             </StackPanel>
 
                                             <Button Grid.Column="1"

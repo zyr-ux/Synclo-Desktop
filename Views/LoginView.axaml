@@ -25,14 +25,14 @@
                 <TextBlock Text="Welcome Back"
                            IsVisible="{Binding !IsRegisterMode}"
                            FontSize="24"
-                           FontFamily="{DynamicResource AppFontFamily}"
+                          
                            FontWeight="Bold"
                            Foreground="{DynamicResource Foreground}"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="Create Account"
                            IsVisible="{Binding IsRegisterMode}"
                            FontSize="24"
-                           FontFamily="{DynamicResource AppFontFamily}"
+                          
                            FontWeight="Bold"
                            Foreground="{DynamicResource Foreground}"
                            HorizontalAlignment="Center" />
@@ -41,14 +41,14 @@
                 <TextBlock Text="Sign in to your Synclo account to start syncing"
                            IsVisible="{Binding !IsRegisterMode}"
                            FontSize="13"
-                           FontFamily="{DynamicResource AppFontFamily}"
+                          
                            Foreground="{DynamicResource Foreground}"
                            Opacity="0.6"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="Join Synclo to synchronize your clipboard seamlessly"
                            IsVisible="{Binding IsRegisterMode}"
                            FontSize="13"
-                           FontFamily="{DynamicResource AppFontFamily}"
+                          
                            Foreground="{DynamicResource Foreground}"
                            Opacity="0.6"
                            HorizontalAlignment="Center" />
@@ -79,14 +79,14 @@
 
                         <!-- Server Type (Public Server / Self-hosted Server) -->
                         <TextBlock Text="{Binding ServerType}"
-                                   FontFamily="{DynamicResource AppFontFamily}"
+                                  
                                    FontSize="12"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource Foreground}"
                                    VerticalAlignment="Center" />
 
                         <TextBlock Text="•"
-                                   FontFamily="{DynamicResource AppFontFamily}"
+                                  
                                    FontSize="12"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.4"
@@ -94,7 +94,7 @@
 
                         <!-- Server URL -->
                         <TextBlock Text="{Binding ServerUrl}"
-                                   FontFamily="{DynamicResource AppFontFamily}"
+                                  
                                    FontSize="12"
                                    Foreground="{DynamicResource Foreground}"
                                    Opacity="0.6"
@@ -112,21 +112,21 @@
                 <!-- E-mail -->
                 <StackPanel Spacing="6">
                     <TextBlock Text="E-mail"
-                               FontFamily="{DynamicResource AppFontFamily}"
+                              
                                FontWeight="SemiBold"
                                FontSize="14"
                                Foreground="{DynamicResource Foreground}"
                                Opacity="0.85" />
                     <TextBox Width="300"
                              FontSize="16"
-                             FontFamily="{DynamicResource AppFontFamily}"
+                            
                              Text="{Binding Email}" />
                 </StackPanel>
 
                 <!-- Password -->
                 <StackPanel Spacing="6">
                     <TextBlock Text="Password"
-                               FontFamily="{DynamicResource AppFontFamily}"
+                              
                                FontWeight="SemiBold"
                                FontSize="14"
                                Foreground="{DynamicResource Foreground}"
@@ -135,7 +135,7 @@
                              PasswordChar="*"
                              Width="300"
                              FontSize="16"
-                             FontFamily="{DynamicResource AppFontFamily}"
+                            
                              Text="{Binding Password}" />
                 </StackPanel>
 
@@ -143,7 +143,7 @@
                 <TextBlock Text="{Binding StatusMessage}"
                            IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                            Foreground="{DynamicResource Accent}"
-                           FontFamily="{DynamicResource AppFontFamily}"
+                          
                            FontSize="13"
                            TextWrapping="Wrap"
                            MaxWidth="300"
@@ -168,7 +168,7 @@
                             Margin="0 14 0 0"
                             Spacing="6">
                     <TextBlock Text="Don't have an account?"
-                               FontFamily="{DynamicResource AppFontFamily}"
+                              
                                FontSize="15"
                                Foreground="{DynamicResource Foreground}"
                                Opacity="0.8"
@@ -195,28 +195,28 @@
                         <!-- Username -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="Username"
-                                       FontFamily="{DynamicResource AppFontFamily}"
+                                      
                                        FontWeight="SemiBold"
                                        FontSize="14"
                                        Foreground="{DynamicResource Foreground}"
                                        Opacity="0.85" />
                             <TextBox Width="300"
                                      FontSize="16"
-                                     FontFamily="{DynamicResource AppFontFamily}"
+                                    
                                      Text="{Binding Username}" />
                         </StackPanel>
 
                         <!-- E-mail -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="E-mail"
-                                       FontFamily="{DynamicResource AppFontFamily}"
+                                      
                                        FontWeight="SemiBold"
                                        FontSize="14"
                                        Foreground="{DynamicResource Foreground}"
                                        Opacity="0.85" />
                             <TextBox Width="300"
                                      FontSize="16"
-                                     FontFamily="{DynamicResource AppFontFamily}"
+                                    
                                      Text="{Binding Email}" />
                         </StackPanel>
                     </StackPanel>
@@ -226,7 +226,7 @@
                         <!-- Password -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="Password"
-                                       FontFamily="{DynamicResource AppFontFamily}"
+                                      
                                        FontWeight="SemiBold"
                                        FontSize="14"
                                        Foreground="{DynamicResource Foreground}"
@@ -235,14 +235,14 @@
                                      PasswordChar="*"
                                      Width="300"
                                      FontSize="16"
-                                     FontFamily="{DynamicResource AppFontFamily}"
+                                    
                                      Text="{Binding Password}" />
                         </StackPanel>
 
                         <!-- Retype Password -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="Re-type Password"
-                                       FontFamily="{DynamicResource AppFontFamily}"
+                                      
                                        FontWeight="SemiBold"
                                        FontSize="14"
                                        Foreground="{DynamicResource Foreground}"
@@ -251,7 +251,7 @@
                                      PasswordChar="*"
                                      Width="300"
                                      FontSize="16"
-                                     FontFamily="{DynamicResource AppFontFamily}"
+                                    
                                      Text="{Binding ConfirmPassword}" />
                         </StackPanel>
                     </StackPanel>
@@ -262,7 +262,7 @@
                 <TextBlock Text="{Binding StatusMessage}"
                            IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                            Foreground="{DynamicResource Accent}"
-                           FontFamily="{DynamicResource AppFontFamily}"
+                          
                            FontSize="13"
                            TextWrapping="Wrap"
                            MaxWidth="636"
@@ -287,7 +287,7 @@
                             Margin="0 14 0 0"
                             Spacing="6">
                     <TextBlock Text="Already have an account?"
-                               FontFamily="{DynamicResource AppFontFamily}"
+                              
                                FontSize="15"
                                Foreground="{DynamicResource Foreground}"
                                Opacity="0.8"
