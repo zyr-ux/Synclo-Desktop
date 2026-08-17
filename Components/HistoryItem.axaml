@@ -1,0 +1,201 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:Synclo.Models"
+        xmlns:vm="clr-namespace:Synclo.ViewModels"
+        xmlns:behaviors="clr-namespace:Synclo.Behaviors"
+        xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia">
+    
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <ListBox>
+                <ListBoxItem Content="1"/>
+                <ListBoxItem Content="2"/>
+                <ListBoxItem Content="3"/>
+            </ListBox>
+        </Border>
+    </Design.PreviewWith>
+    
+    <!-- Scope to ListBox with class "HistoryList" -->
+    <Style Selector="ListBox.HistoryList">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="25,30,25,10"/>
+        <Setter Property="SelectionMode" Value="Single"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+
+        <Setter Property="ItemTemplate">
+            <DataTemplate DataType="models:HistoryItemModel">
+                <Border Classes="HistoryItem"
+                        Classes.clearing="{Binding IsBeingCleared}"
+                        ClipToBounds="True">
+                    <Interaction.Behaviors>
+                        <behaviors:HistoryItemInteractionBehavior />
+                    </Interaction.Behaviors>
+                    <Border.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Copy"
+                                      Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
+                                      CommandParameter="{Binding}">
+                                <MenuItem.Icon>
+                                    <materialIcons:MaterialIcon Kind="ContentCopy" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="{Binding IsPinned, Converter={StaticResource PinStateToMenuHeaderConverter}}"
+                                      Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).TogglePinCommand}"
+                                      CommandParameter="{Binding}">
+                                <MenuItem.Icon>
+                                    <materialIcons:MaterialIcon Kind="{Binding IsPinned, Converter={StaticResource PinStateToIconConverter}}" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Delete"
+                                      Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                      CommandParameter="{Binding}">
+                                <MenuItem.Icon>
+                                    <materialIcons:MaterialIcon Kind="Delete" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                        <Border Grid.Column="0"
+                                Margin="0,0,15,0"
+                                Padding="4"
+                                VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="{Binding Type, Converter={StaticResource ClipboardItemTypeToIconConverter}}"
+                                                        Width="16"
+                                                        Height="16"
+                                                        Foreground="{DynamicResource Foreground}" />
+                        </Border>
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding PreviewText}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,15,0"
+                                   Foreground="{DynamicResource Foreground}"
+                                   FontSize="14"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <TextBlock Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,30,0"
+                                   Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
+                                   Foreground="{DynamicResource Foreground}"
+                                   FontSize="12" />
+
+                        <StackPanel Grid.Column="3"
+                                    Orientation="Horizontal"
+                                    Spacing="15">
+
+                            <Button Classes="icon-button"
+                                    VerticalAlignment="Center"
+                                    Width="30" Height="30"
+                                    Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).TogglePinCommand}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="{Binding IsPinned, Converter={StaticResource PinStateToToolTipConverter}}">
+                                <materialIcons:MaterialIcon Kind="{Binding IsPinned, Converter={StaticResource PinStateToIconConverter}}"
+                                                            Width="18"
+                                                            Height="18"
+                                                            Foreground="{DynamicResource Foreground}" />
+                            </Button>
+
+                            <Button Classes="icon-button"
+                                    VerticalAlignment="Center"
+                                    Width="30" Height="30"
+                                    IsEnabled="{Binding !IsDeleting}"
+                                    Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
+                                    CommandParameter="{Binding}">
+                                <materialIcons:MaterialIcon Kind="Close"
+                                                            Width="20"
+                                                            Height="20"
+                                                            Foreground="{DynamicResource Foreground}" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </Setter>
+    </Style>
+    
+    <!-- ListBoxItem styles -->
+    <Style Selector="ListBox.HistoryList ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,10"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter Name="PART_ContentPresenter"
+                                   Background="{TemplateBinding Background}"
+                                   BorderBrush="{TemplateBinding BorderBrush}"
+                                   BorderThickness="{TemplateBinding BorderThickness}"
+                                   CornerRadius="{TemplateBinding CornerRadius}"
+                                   ContentTemplate="{TemplateBinding ContentTemplate}"
+                                   Content="{TemplateBinding Content}"
+                                   Padding="{TemplateBinding Padding}"
+                                   VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                   HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- Remove hover/focus/selection visuals -->
+    <Style Selector="ListBox.HistoryList ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:focus /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:selected:focus /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.HistoryList ListBoxItem:selected:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- Merged from ItemCard.axaml -->
+    <Style Selector="Border.HistoryItem">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="15,10" />
+        <Setter Property="Cursor" Value="Hand" />
+
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.06" />
+        </Setter>
+
+        <Setter Property="BorderBrush">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.2" />
+        </Setter>
+
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15" />
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                <DoubleTransition Property="Opacity" Duration="0:0:0.3" Easing="CubicEaseIn" />
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="CubicEaseIn" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.HistoryItem:pointerover">
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.12" />
+        </Setter>
+
+        <Setter Property="BorderBrush">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.5" />
+        </Setter>
+    </Style>
+    
+    <!-- Slide-out animation for cascading clear -->
+    <Style Selector="Border.HistoryItem.clearing">
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="RenderTransform" Value="translateX(400px)" />
+    </Style>
+
+</Styles>

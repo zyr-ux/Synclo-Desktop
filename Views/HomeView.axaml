@@ -20,9 +20,9 @@
             <Grid ColumnDefinitions="*, Auto">
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                     <TextBlock Text="History"
-                               FontSize="36"
+                               FontSize="32"
                                FontWeight="Bold"
-                               Foreground="{DynamicResource Foreground}" />
+                               Foreground="{DynamicResource Foreground}"/>
 
                     <Button Classes="icon-button"
                             Margin="20 0 0 0"
@@ -76,98 +76,6 @@
                 <!-- Smooth Scrolling Behavior wrapper -->
                 <behaviors:ListBoxSmoothScrollBehavior />
             </Interaction.Behaviors>
-
-            <ListBox.ItemTemplate>
-                <DataTemplate DataType="models:HistoryItemModel">
-                    <Border Classes="HistoryItem"
-                            Classes.clearing="{Binding IsBeingCleared}"
-                            ClipToBounds="True"
-                            PointerPressed="OnHistoryItemPointerPressed">
-                        <Border.ContextMenu>
-                            <ContextMenu Opening="OnContextMenuOpening" Closing="OnContextMenuClosing">
-                                <MenuItem Header="Copy"
-                                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).ItemClickedCommand}"
-                                          CommandParameter="{Binding}">
-                                    <MenuItem.Icon>
-                                        <materialIcons:MaterialIcon Kind="ContentCopy" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                                <MenuItem Header="{Binding IsPinned, Converter={StaticResource PinStateToMenuHeaderConverter}}"
-                                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).TogglePinCommand}"
-                                          CommandParameter="{Binding}">
-                                    <MenuItem.Icon>
-                                        <materialIcons:MaterialIcon Kind="{Binding IsPinned, Converter={StaticResource PinStateToIconConverter}}" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                                <MenuItem Header="Delete"
-                                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
-                                          CommandParameter="{Binding}">
-                                    <MenuItem.Icon>
-                                        <materialIcons:MaterialIcon Kind="Delete" Width="16" Height="16" Foreground="{DynamicResource Foreground}"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                            </ContextMenu>
-                        </Border.ContextMenu>
-                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                            <Border Grid.Column="0"
-                                    Margin="0,0,15,0"
-                                    Padding="4"
-                                    VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="{Binding Type, Converter={StaticResource ClipboardItemTypeToIconConverter}}"
-                                                            Width="16"
-                                                            Height="16"
-                                                            Foreground="{DynamicResource Foreground}" />
-                            </Border>
-
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding PreviewText}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,15,0"
-                                       Foreground="{DynamicResource Foreground}"
-                                       FontSize="16"
-                                      
-                                       TextTrimming="CharacterEllipsis" />
-
-                            <TextBlock Grid.Column="2"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,30,0"
-                                       Text="{Binding CreatedAtLocal, StringFormat='{}{0:dd MMM, hh:mm tt}'}"
-                                       Foreground="{DynamicResource Foreground}"
-                                       FontSize="14"
-                                       />
-
-                            <StackPanel Grid.Column="3"
-                                        Orientation="Horizontal"
-                                        Spacing="15">
-
-                                <Button Classes="icon-button"
-                                        VerticalAlignment="Center"
-                                        Width="30" Height="30"
-                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).TogglePinCommand}"
-                                        CommandParameter="{Binding}"
-                                        ToolTip.Tip="{Binding IsPinned, Converter={StaticResource PinStateToToolTipConverter}}">
-                                    <materialIcons:MaterialIcon Kind="{Binding IsPinned, Converter={StaticResource PinStateToIconConverter}}"
-                                                                Width="18"
-                                                                Height="18"
-                                                                Foreground="{DynamicResource Foreground}" />
-                                </Button>
-
-                                <Button Classes="icon-button"
-                                        VerticalAlignment="Center"
-                                        Width="30" Height="30"
-                                        IsEnabled="{Binding !IsDeleting}"
-                                        Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).DeleteItemClickedCommand}"
-                                        CommandParameter="{Binding}">
-                                    <materialIcons:MaterialIcon Kind="Close"
-                                                                Width="20"
-                                                                Height="20"
-                                                                Foreground="{DynamicResource Foreground}" />
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
         </ListBox>
     </Grid>
 </UserControl>
