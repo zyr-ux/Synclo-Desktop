@@ -18,7 +18,7 @@
         <StyleInclude Source="avares://Synclo/Components/TextButton.axaml" />
         <StyleInclude Source="avares://Synclo/Components/CustomButton.axaml" />
         <StyleInclude Source="avares://Synclo/Components/IconButton.axaml" />
-        <StyleInclude Source="avares://Synclo/Components/HistoryListBoxItem.axaml" />
+        <StyleInclude Source="avares://Synclo/Components/HistoryItem.axaml" />
         <StyleInclude Source="avares://Synclo/Features/Settings_Manager/SettingsItem.axaml" />
         <StyleInclude Source="avares://Synclo/Features/Connection_Monitor/ConnectionOrb.axaml" />
 
