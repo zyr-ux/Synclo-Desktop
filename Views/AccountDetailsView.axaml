@@ -23,11 +23,13 @@
                         Orientation="Horizontal"
                         Spacing="10">
                         <TextBlock Text="Welcome,"
-                                   FontSize="36"
+                                   FontSize="32"
                                    Foreground="{DynamicResource Foreground}"
                                    FontWeight="Bold" />
                         <TextBlock Text="{Binding Username}"
                                    FontSize="36"
+                                   FontWeight="Bold"
+                                   FontFamily="{StaticResource Inconsolata}"
                                    Foreground="{DynamicResource Accent}"
                                    />
                     </StackPanel>
@@ -42,7 +44,7 @@
                 <!-- Title -->
                 <TextBlock Grid.Row="1"
                            Text="Manage Devices"
-                           FontSize="36"
+                           FontSize="32"
                            Foreground="{DynamicResource Foreground}"
                            FontWeight="Bold"
                            Margin="0,0,0,20" />
