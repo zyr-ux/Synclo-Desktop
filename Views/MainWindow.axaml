@@ -177,7 +177,7 @@
 
         <!-- Dialog Overlay for Dimming/Fade Effect -->
         <Panel Grid.Column="0" Grid.ColumnSpan="2"
-               Background="#000000"
+               Background="{DynamicResource DialogOverlay}"
                IsHitTestVisible="{Binding IsDialogOpen}">
             <Panel.Styles>
                 <Style Selector="Panel">

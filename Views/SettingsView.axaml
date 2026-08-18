@@ -215,10 +215,9 @@
                                                Opacity="0.7"
                                                TextWrapping="Wrap"/>
                                     <TextBlock Text="Changing this URL will log you out and clear local history"
-                                              
                                                FontSize="12"
                                                Margin="0,4,0,0"
-                                               Foreground="OrangeRed"
+                                               Foreground="{DynamicResource TextWarning}"
                                                TextWrapping="Wrap"/>
                                 </StackPanel>
 

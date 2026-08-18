@@ -29,11 +29,11 @@
         
     </Style>
     <Style Selector="Button.icon-button:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#1A000000" />
+        <Setter Property="Background" Value="{DynamicResource IconButtonPointerOver}" />
     </Style>
 
     <Style Selector="Button.icon-button:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="#33000000" />
+        <Setter Property="Background" Value="{DynamicResource IconButtonPressed}" />
     </Style>
 
     <Style Selector="Button.icon-button:disabled /template/ ContentPresenter">

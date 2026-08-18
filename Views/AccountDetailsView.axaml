@@ -96,7 +96,7 @@
                                                            FontWeight="Bold" />
                                                 <TextBlock Text=" - this device"
                                                            FontSize="18"
-                                                           Foreground="#666666"
+                                                           Foreground="{DynamicResource TextMuted}"
                                                            IsVisible="{Binding IsThisDevice}"
                                                            FontWeight="Bold" />
                                             </StackPanel>

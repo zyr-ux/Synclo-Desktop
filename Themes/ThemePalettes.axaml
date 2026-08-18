@@ -32,4 +32,17 @@
 
     </ResourceDictionary.ThemeDictionaries>
 
+    <!-- Static / Theme-Independent Colors & Brushes -->
+    <SolidColorBrush x:Key="BrandAvalonia" Color="#007DF9" />
+    <SolidColorBrush x:Key="Hyperlink" Color="#3B82F6" />
+    <SolidColorBrush x:Key="HyperlinkPointerOver" Color="#60A5FA" />
+    <SolidColorBrush x:Key="DialogOverlay" Color="#000000" />
+    <SolidColorBrush x:Key="IconButtonPointerOver" Color="#1A000000" />
+    <SolidColorBrush x:Key="IconButtonPressed" Color="#33000000" />
+    <SolidColorBrush x:Key="TextMuted" Color="#666666" />
+    <SolidColorBrush x:Key="TextError" Color="#FF5555" />
+    <SolidColorBrush x:Key="TextWarning" Color="OrangeRed" />
+    <SolidColorBrush x:Key="Danger" Color="Red" />
+    <SolidColorBrush x:Key="DangerForeground" Color="White" />
+
 </ResourceDictionary>

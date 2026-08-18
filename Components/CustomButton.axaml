@@ -20,23 +20,23 @@
         <Setter Property="CornerRadius" Value="5"/>
         <Setter Property="Background" Value="{DynamicResource Accent}"/>
         <Setter Property="Foreground" Value="{DynamicResource ForegroundD}"/>
-        <Setter Property="BorderBrush" Value="Black"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
         <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
     <Style Selector="Button.custom-button.dangerous">
-        <Setter Property="Background" Value="Red"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="BorderBrush" Value="Red"/>
+        <Setter Property="Background" Value="{DynamicResource Danger}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DangerForeground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Danger}"/>
         <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
     <Style Selector="Button.custom-button.dangerous:pointerover /template/ ContentPresenter">
-        <Setter Property="Foreground" Value="Red"/>
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
     </Style>
 
     <Style Selector="Button.custom-button.dangerous:pressed /template/ ContentPresenter">
-        <Setter Property="Foreground" Value="Red"/>
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
     </Style>
 </Styles>
 
