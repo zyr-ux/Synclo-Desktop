@@ -159,18 +159,14 @@
 
     <!-- Merged from ItemCard.axaml -->
     <Style Selector="Border.HistoryItem">
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="5" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="15,10" />
         <Setter Property="Cursor" Value="Hand" />
 
-        <Setter Property="Background">
-            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.06" />
-        </Setter>
+        <Setter Property="Background" Value="{DynamicResource Gray}" />
 
-        <Setter Property="BorderBrush">
-            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.2" />
-        </Setter>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
 
         <Setter Property="Transitions">
             <Transitions>

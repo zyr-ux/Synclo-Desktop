@@ -44,7 +44,6 @@
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="Theme"
-                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
 
@@ -84,7 +83,6 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Mica Backdrop"
-                                               FontWeight="Bold"
                                                FontSize="14"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Foreground}" />
@@ -133,7 +131,6 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Close Behaviour"
-                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
 
@@ -172,7 +169,6 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Right-Click Action"
-                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
 
@@ -209,7 +205,6 @@
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Server URL"
-                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
                                     <TextBlock Text="Set a custom self-hosted instance URL"
@@ -278,7 +273,6 @@
                                             VerticalAlignment="Center">
 
                                     <TextBlock Text="Launch at Startup"
-                                               FontWeight="Bold"
                                                FontSize="14"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Foreground}" />

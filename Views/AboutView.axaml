@@ -67,13 +67,11 @@
                 <!-- Cards section -->
                 <StackPanel Spacing="12">
                     <!-- Status Card -->
-                    <Border CornerRadius="8"
+                    <Border CornerRadius="5"
                             BorderThickness="1"
                             Padding="16"
+                            Background="{DynamicResource Gray}"
                             BorderBrush="{DynamicResource Border}">
-                        <Border.Background>
-                            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.05" />
-                        </Border.Background>
 
                         <StackPanel Spacing="16">
                             <!-- Header Row: Title, Status Badge, Refresh Button -->
@@ -163,13 +161,11 @@
                     </Border>
 
                     <!-- Links Card -->
-                    <Border CornerRadius="8"
+                    <Border CornerRadius="5"
                             BorderThickness="1"
                             Padding="12"
+                            Background="{DynamicResource Gray}"
                             BorderBrush="{DynamicResource Border}">
-                        <Border.Background>
-                            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.05" />
-                        </Border.Background>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="4" VerticalAlignment="Center">
                                 <TextBlock Text="Links &amp; Resources"

@@ -12,6 +12,9 @@
     <SolidColorBrush x:Key="Border" 
                      Color="{DynamicResource SystemBaseHighColor}" 
                      Opacity="0.06" />
+    <SolidColorBrush x:Key="Gray" 
+                     Color="{DynamicResource SystemBaseHighColor}" 
+                     Opacity="0.05" />
     <SolidColorBrush x:Key="MicaWindowBackground" Color="#F3F3F3" Opacity="0.70" />
     <SolidColorBrush x:Key="MicaContentBackground" Color="#F9F9F9" Opacity="0.85" />
 

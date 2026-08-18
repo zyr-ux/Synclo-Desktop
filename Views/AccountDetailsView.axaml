@@ -52,9 +52,8 @@
                 <!-- Devices card -->
                 <Grid Grid.Row="2">
                     <!-- background -->
-                    <Border Background="{DynamicResource SystemBaseHighColor}"
-                            CornerRadius="5"
-                            Opacity="0.05" />
+                    <Border Background="{DynamicResource Gray}"
+                            CornerRadius="5" />
 
                     <!-- content -->
                     <Border Padding="20"
