@@ -11,6 +11,7 @@ using Synclo.Models;
 using Synclo.Features.Network_Services;
 using Synclo.Features.Notifications_Manager;
 using Synclo.Features.Dialog_Manager;
+using Synclo.Features.Clipboard_Manager.Clipboard_Monitor;
 
 namespace Synclo.ViewModels;
 
@@ -22,8 +23,11 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
     private readonly INotificationService _notificationService;
     private readonly IDialogService _dialogService;
     private readonly IWebSocketService _webSocketService;
+    private readonly IClipboardMonitor _clipboardMonitor;
 
     [ObservableProperty] private string _username = string.Empty;
+    [ObservableProperty] private string _email = string.Empty;
+    [ObservableProperty] private string _userId = string.Empty;
     [ObservableProperty] private bool _isBusy;
 
     public ObservableCollection<DeviceModel> Devices { get; } = new();
@@ -36,7 +40,8 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         IViewModelFactory factory,
         INotificationService notificationService,
         IDialogService dialogService,
-        IWebSocketService webSocketService)
+        IWebSocketService webSocketService,
+        IClipboardMonitor clipboardMonitor)
     {
         _factory = factory;
         _accountService = accountService;
@@ -44,6 +49,7 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         _notificationService = notificationService;
         _dialogService = dialogService;
         _webSocketService = webSocketService;
+        _clipboardMonitor = clipboardMonitor;
 
         _webSocketService.OnDeviceAdded += OnDeviceAddedHandler;
         _webSocketService.OnDeviceUpdated += OnDeviceUpdatedHandler;
@@ -55,16 +61,27 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
     
     private async Task InitializeAsync()
     {
+        var storedEmail = await _accountService.GetStoredEmailAsync();
+        if (!string.IsNullOrWhiteSpace(storedEmail))
+        {
+            Email = storedEmail;
+        }
+
         var storedUsername = await _accountService.GetStoredUsernameAsync();
         if (!string.IsNullOrWhiteSpace(storedUsername))
         {
             Username = storedUsername;
         }
-        else
+        else if (!string.IsNullOrWhiteSpace(storedEmail))
         {
-            var email = await _accountService.GetStoredEmailAsync() ?? "";
-            var at = email.IndexOf('@');
-            Username = at > 0 ? email[..at] : email;
+            var at = storedEmail.IndexOf('@');
+            Username = at > 0 ? storedEmail[..at] : storedEmail;
+        }
+
+        var storedUserId = await _accountService.GetStoredUserIdAsync();
+        if (!string.IsNullOrWhiteSpace(storedUserId))
+        {
+            UserId = storedUserId;
         }
 
         _ = RefreshUserProfileInBackgroundAsync();
@@ -77,14 +94,22 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         try
         {
             var profile = await _accountService.GetUserProfileAsync();
-            if (profile != null && !string.IsNullOrWhiteSpace(profile.username))
+            if (profile != null)
             {
-                Dispatcher.UIThread.Post(() => Username = profile.username);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!string.IsNullOrWhiteSpace(profile.username))
+                        Username = profile.username;
+                    if (!string.IsNullOrWhiteSpace(profile.email))
+                        Email = profile.email;
+                    if (!string.IsNullOrWhiteSpace(profile.user_id))
+                        UserId = profile.user_id;
+                });
             }
         }
         catch
         {
-            // Network failure - fallback to stored username/email
+            // Network failure - fallback to stored credentials
         }
     }
 
@@ -123,6 +148,32 @@ public partial class AccountDetailsViewModel : ViewModelBase, IDisposable
         {
             // Network or server error - fallback silently to cached list
         }
+    }
+
+    [RelayCommand]
+    private void EditAccount()
+    {
+        // TODO: Implement edit account information logic
+    }
+
+    [RelayCommand]
+    private async Task CopyUserIdAsync()
+    {
+        if (string.IsNullOrWhiteSpace(UserId))
+            return;
+
+        await _clipboardMonitor.SetClipboardTextAsync(UserId);
+        _notificationService.ShowSuccess("Account ID copied to clipboard.");
+    }
+
+    [RelayCommand]
+    private async Task CopyEmailAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Email))
+            return;
+
+        await _clipboardMonitor.SetClipboardTextAsync(Email);
+        _notificationService.ShowSuccess("Email copied to clipboard.");
     }
 
     [RelayCommand]

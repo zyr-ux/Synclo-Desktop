@@ -19,9 +19,8 @@
                 <StackPanel Grid.Row="0"
                             Margin="0,0,0,20"
                             Orientation="Vertical">
-                    <StackPanel
-                        Orientation="Horizontal"
-                        Spacing="10">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
                         <TextBlock Text="Welcome,"
                                    FontSize="32"
                                    Foreground="{DynamicResource Foreground}"
@@ -30,8 +29,7 @@
                                    FontSize="36"
                                    FontWeight="Bold"
                                    FontFamily="{StaticResource Inconsolata}"
-                                   Foreground="{DynamicResource Accent}"
-                                   />
+                                   Foreground="{DynamicResource Accent}" />
                     </StackPanel>
                     
                     <Border Height="1"
@@ -40,88 +38,192 @@
                             Margin="-5 18 -5 0" />
                 </StackPanel>
 
+                <!-- Account Information Section -->
+                <StackPanel Grid.Row="1"
+                            Margin="0,0,0,16">
+                    <Grid ColumnDefinitions="*,Auto"
+                          Margin="0,0,0,10">
+                        <TextBlock Text="Account Information"
+                                   FontSize="20"
+                                   Foreground="{DynamicResource Foreground}"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center" />
 
-                <!-- Title -->
-                <TextBlock Grid.Row="1"
-                           Text="Manage Devices"
-                           FontSize="32"
-                           Foreground="{DynamicResource Foreground}"
-                           FontWeight="Bold"
-                           Margin="0,0,0,20" />
+                        <Button Grid.Column="1"
+                                Classes="custom-button secondary"
+                                Command="{Binding EditAccountCommand}"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="6"
+                                        VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="Pencil"
+                                                            Width="16"
+                                                            Height="16"
+                                                            Foreground="{DynamicResource Foreground}"
+                                                            VerticalAlignment="Center" />
+                                <TextBlock Text="Edit"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Foreground}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
 
-                <!-- Devices card -->
-                <Grid Grid.Row="2">
-                    <!-- background -->
-                    <Border Background="{DynamicResource Gray}"
-                            CornerRadius="5" />
+                    <Grid>
+                        <Border Background="{DynamicResource Gray}"
+                                CornerRadius="5" />
 
-                    <!-- content -->
-                    <Border Padding="20"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1"
-                            CornerRadius="5">
+                        <Border Padding="16,10"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
+                                CornerRadius="5">
+                            <StackPanel Spacing="0">
+                                <!-- Email Row -->
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Email Address"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource Foreground}"
+                                                   Opacity="0.6" />
+                                        <TextBlock Text="{Binding Email}"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Foreground}"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
 
-                        <!-- ONLY scrollable area -->
-                        <ScrollViewer MaxHeight="250"
-                                      VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled">
-                            <Interaction.Behaviors>
-                                <ia:VerticalScrollViewerAnimatedBehavior />
-                            </Interaction.Behaviors>
+                                    <Button Grid.Column="1"
+                                            Classes="icon-button"
+                                            Command="{Binding CopyEmailCommand}"
+                                            ToolTip.Tip="Copy Email"
+                                            VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="ContentCopy"
+                                                                    Width="18"
+                                                                    Height="18"
+                                                                    Foreground="{DynamicResource Foreground}" />
+                                    </Button>
+                                </Grid>
 
-                            <ItemsControl ItemsSource="{Binding Devices}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Spacing="15" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
+                                <!-- Divider -->
+                                <Border Height="1"
+                                        Background="{DynamicResource Border}"
+                                        Margin="0,8" />
 
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="10"
-                                                        VerticalAlignment="Center">
-                                                
-                                                <!-- OS Icon -->
-                                                <materialIcons:MaterialIcon Kind="{Binding os, Converter={StaticResource OsToIconConverter}}"
-                                                                            Width="18"
-                                                                            Height="18"
-                                                                            Foreground="{DynamicResource Foreground}" />
-                                                
-                                                <TextBlock Text="{Binding device_name}"
-                                                           FontSize="18"
-                                                           Foreground="{DynamicResource Foreground}"
-                                                           FontWeight="Bold" />
-                                                <TextBlock Text=" - this device"
-                                                           FontSize="18"
-                                                           Foreground="{DynamicResource TextMuted}"
-                                                           IsVisible="{Binding IsThisDevice}"
-                                                           FontWeight="Bold" />
-                                            </StackPanel>
+                                <!-- Account ID (UUID) Row -->
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Account ID"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource Foreground}"
+                                                   Opacity="0.6" />
+                                        <TextBlock Text="{Binding UserId}"
+                                                   FontSize="14"
+                                                   FontFamily="{StaticResource Inconsolata}"
+                                                   Foreground="{DynamicResource Foreground}"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
 
-                                            <Button Grid.Column="1"
-                                                    Content="Logout"
-                                                    Classes="textButton"
-                                                    IsVisible="{Binding !IsThisDevice}"
-                                                    Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
-                                                    CommandParameter="{Binding device_id}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </Border>
-                </Grid>
+                                    <Button Grid.Column="1"
+                                            Classes="icon-button"
+                                            Command="{Binding CopyUserIdCommand}"
+                                            ToolTip.Tip="Copy Account ID"
+                                            VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="ContentCopy"
+                                                                    Width="18"
+                                                                    Height="18"
+                                                                    Foreground="{DynamicResource Foreground}" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
 
-                <!-- Actions -->
+                <!-- Manage Devices Section -->
+                <StackPanel Grid.Row="2"
+                            Margin="0,0,0,16">
+                    <TextBlock Text="Manage Devices"
+                               FontSize="20"
+                               Foreground="{DynamicResource Foreground}"
+                               FontWeight="Bold"
+                               Margin="0,0,0,10" />
+
+                    <!-- Devices card -->
+                    <Grid>
+                        <!-- background -->
+                        <Border Background="{DynamicResource Gray}"
+                                CornerRadius="5" />
+
+                        <!-- content -->
+                        <Border Padding="20"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1"
+                                CornerRadius="5">
+
+                            <!-- ONLY scrollable area -->
+                            <ScrollViewer MaxHeight="180"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <Interaction.Behaviors>
+                                    <ia:VerticalScrollViewerAnimatedBehavior />
+                                </Interaction.Behaviors>
+
+                                <ItemsControl ItemsSource="{Binding Devices}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="15" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="10"
+                                                            VerticalAlignment="Center">
+                                                    
+                                                    <!-- OS Icon -->
+                                                    <materialIcons:MaterialIcon Kind="{Binding os, Converter={StaticResource OsToIconConverter}}"
+                                                                                Width="18"
+                                                                                Height="18"
+                                                                                Foreground="{DynamicResource Foreground}" />
+                                                    
+                                                    <TextBlock Text="{Binding device_name}"
+                                                               FontSize="18"
+                                                               Foreground="{DynamicResource Foreground}"
+                                                               FontWeight="Bold" />
+                                                    <TextBlock Text=" - this device"
+                                                               FontSize="18"
+                                                               Foreground="{DynamicResource TextMuted}"
+                                                               IsVisible="{Binding IsThisDevice}"
+                                                               FontWeight="Bold" />
+                                                </StackPanel>
+
+                                                <Button Grid.Column="1"
+                                                        Content="Logout"
+                                                        Classes="textButton"
+                                                        IsVisible="{Binding !IsThisDevice}"
+                                                        Command="{Binding $parent[UserControl].((vm:AccountDetailsViewModel)DataContext).LogoutDeviceCommand}"
+                                                        CommandParameter="{Binding device_id}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Actions (Anchored to Bottom-Right) -->
                 <StackPanel Grid.Row="3"
                             Orientation="Horizontal"
                             VerticalAlignment="Bottom"
                             HorizontalAlignment="Right"
                             Spacing="20"
-                            Margin="0,20,0,0">
+                            Margin="0,16,0,0">
 
                     <Button Classes="custom-button"
                             Content="Delete Account"
@@ -146,8 +248,6 @@
                 </StackPanel>
 
             </Grid>
-
         </Border>
-
     </Grid>
 </UserControl>
