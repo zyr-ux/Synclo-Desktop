@@ -32,8 +32,13 @@
         <Setter Property="Background" Value="{DynamicResource IconButtonPointerOver}" />
     </Style>
 
+    <Style Selector="Button.icon-button:pressed">
+        <Setter Property="RenderTransform" Value="none" />
+    </Style>
+
     <Style Selector="Button.icon-button:pressed /template/ ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource IconButtonPressed}" />
+        <Setter Property="RenderTransform" Value="none" />
     </Style>
 
     <Style Selector="Button.icon-button:disabled /template/ ContentPresenter">

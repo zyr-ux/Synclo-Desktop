@@ -22,6 +22,15 @@
         <Setter Property="Foreground" Value="{DynamicResource ForegroundD}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Button.custom-button:pressed">
+        <Setter Property="RenderTransform" Value="none" />
+    </Style>
+
+    <Style Selector="Button.custom-button:pressed /template/ ContentPresenter">
+        <Setter Property="RenderTransform" Value="none" />
     </Style>
 
     <Style Selector="Button.custom-button.dangerous">
@@ -37,6 +46,35 @@
 
     <Style Selector="Button.custom-button.dangerous:pressed /template/ ContentPresenter">
         <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        <Setter Property="RenderTransform" Value="none" />
+    </Style>
+
+    <!-- Secondary Custom Button -->
+    <Style Selector="Button.custom-button.secondary">
+        <Setter Property="Background" Value="{DynamicResource Gray}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Foreground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Button.custom-button.secondary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.10" />
+        </Setter>
+        <Setter Property="BorderBrush">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.5" />
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.custom-button.secondary:pressed /template/ ContentPresenter">
+        <Setter Property="Background">
+            <SolidColorBrush Color="{DynamicResource SystemBaseHighColor}" Opacity="0.15" />
+        </Setter>
+        <Setter Property="RenderTransform" Value="none" />
     </Style>
 </Styles>
 
