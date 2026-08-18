@@ -6,6 +6,7 @@ public class AuthResponse
     public string refresh_token { get; set; } = string.Empty;
     public string token_type { get; set; } = string.Empty;
     public string? username { get; set; }
+    public string? user_id { get; set; }
     
     // NEW - Only present in login response
     public string? encrypted_master_key { get; set; }

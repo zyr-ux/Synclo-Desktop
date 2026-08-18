@@ -16,6 +16,7 @@ namespace Synclo.Features.Network_Services;
 public interface IAccountService
 {
     Task<bool> IsAuthenticatedAsync();
+    Task<string?> GetStoredUserIdAsync();
     Task<string?> GetStoredEmailAsync();
     Task<string?> GetStoredUsernameAsync();
     Task<UserResponse?> GetUserProfileAsync(CancellationToken ct = default);
@@ -89,6 +90,7 @@ public sealed class AccountService : IAccountService
         return !string.IsNullOrWhiteSpace(token);
     }
 
+    public async Task<string?> GetStoredUserIdAsync() => await _secretsManager.GetUserIdAsync();
     public async Task<string?> GetStoredEmailAsync() => await _secretsManager.GetUserEmailAsync();
     public async Task<string?> GetStoredUsernameAsync() => await _secretsManager.GetUserUsernameAsync();
 
@@ -204,6 +206,8 @@ public sealed class AccountService : IAccountService
 
             await _secretsManager.SaveAccessTokenAsync(data.access_token);
             await _secretsManager.SaveRefreshTokenAsync(data.refresh_token);
+            if (!string.IsNullOrWhiteSpace(data.user_id))
+                await _secretsManager.SaveUserIdAsync(data.user_id);
             await _secretsManager.SaveUserEmailAsync(email);
             if (!string.IsNullOrWhiteSpace(data.username))
                 await _secretsManager.SaveUserUsernameAsync(data.username);
@@ -302,6 +306,8 @@ public sealed class AccountService : IAccountService
 
             await _secretsManager.SaveAccessTokenAsync(data.access_token);
             await _secretsManager.SaveRefreshTokenAsync(data.refresh_token);
+            if (!string.IsNullOrWhiteSpace(data.user_id))
+                await _secretsManager.SaveUserIdAsync(data.user_id);
             await _secretsManager.SaveUserEmailAsync(email);
             if (!string.IsNullOrWhiteSpace(data.username))
                 await _secretsManager.SaveUserUsernameAsync(data.username);
@@ -508,6 +514,11 @@ public sealed class AccountService : IAccountService
 
             if (userProfile != null)
             {
+                if (!string.IsNullOrWhiteSpace(userProfile.user_id))
+                {
+                    await _secretsManager.SaveUserIdAsync(userProfile.user_id);
+                }
+
                 if (!string.IsNullOrWhiteSpace(userProfile.username))
                 {
                     await _secretsManager.SaveUserUsernameAsync(userProfile.username);
