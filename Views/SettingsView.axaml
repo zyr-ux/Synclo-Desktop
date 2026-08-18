@@ -26,7 +26,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="Appearance"
                                    FontWeight="Bold"
-                                   FontSize="18"
+                                   FontSize="16"
                                    Foreground="{DynamicResource Foreground}"
                                    Margin="0,8,0,4" />
 
@@ -45,12 +45,12 @@
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="Theme"
                                                FontWeight="Bold"
-                                               FontSize="16"
+                                               FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Select theme to apply"
                                               
-                                               FontSize="13"
+                                               FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7"/>
@@ -85,13 +85,13 @@
 
                                     <TextBlock Text="Mica Backdrop"
                                                FontWeight="Bold"
-                                               FontSize="16"
+                                               FontSize="14"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Enable Windows 11 Mica translucent window effect"
                                               
-                                               FontSize="13"
+                                               FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7"
@@ -113,7 +113,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="General"
                                    FontWeight="Bold"
-                                   FontSize="18"
+                                   FontSize="16"
                                    Foreground="{DynamicResource Foreground}"
                                    Margin="0,20,0,4" />
 
@@ -134,12 +134,12 @@
 
                                     <TextBlock Text="Close Behaviour"
                                                FontWeight="Bold"
-                                               FontSize="16"
+                                               FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="What happens when you close the window?"
                                               
-                                               FontSize="13"
+                                               FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7" />
@@ -173,12 +173,12 @@
 
                                     <TextBlock Text="Right-Click Action"
                                                FontWeight="Bold"
-                                               FontSize="16"
+                                               FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Choose what happens when you right-click a clipboard history entry"
                                               
-                                               FontSize="13"
+                                               FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7" />
@@ -210,11 +210,11 @@
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Server URL"
                                                FontWeight="Bold"
-                                               FontSize="16"
+                                               FontSize="14"
                                                Foreground="{DynamicResource Foreground}" />
                                     <TextBlock Text="Set a custom self-hosted instance URL"
                                               
-                                               FontSize="13"
+                                               FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7"
@@ -279,13 +279,13 @@
 
                                     <TextBlock Text="Launch at Startup"
                                                FontWeight="Bold"
-                                               FontSize="16"
+                                               FontSize="14"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource Foreground}" />
 
                                     <TextBlock Text="Whether the app should automatically launch when you log in"
                                               
-                                               FontSize="13"
+                                               FontSize="12"
                                                Margin="0,4,0,0"
                                                Foreground="{DynamicResource Foreground}"
                                                Opacity="0.7"
