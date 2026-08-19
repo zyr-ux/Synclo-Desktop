@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -49,7 +50,8 @@ public sealed class ThemeService : IThemeService
         if (targetWindow == null) return;
 
         var contentBorder = targetWindow.FindControl<Border>("ContentBorder");
-        if (enabled)
+        bool isMicaSupported = OperatingSystem.IsWindows() && Environment.OSVersion.Version.Build >= 22000;
+        if (enabled && isMicaSupported)
         {
             targetWindow.TransparencyLevelHint = new[] { WindowTransparencyLevel.Mica };
             targetWindow.Bind(Window.BackgroundProperty, new DynamicResourceExtension("MicaWindowBackground"));
